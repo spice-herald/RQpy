@@ -3,10 +3,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-__all__ = ["histrq", "plotrq"]
+__all__ = ["hist", "scatter"]
 
-def histrq(arr, nbins='sqrt', xlims=None, cutold=None, cutnew=None, lgcrawdata=True, 
-           lgceff=True, lgclegend=True, labeldict=None):
+
+def hist(arr, nbins='sqrt', xlims=None, cutold=None, cutnew=None, lgcrawdata=True, 
+         lgceff=True, lgclegend=True, labeldict=None, ax=None):
     """
     Function to plot histogram of RQ data. The bins are set such that all bins have the same size
     as the raw data
@@ -36,11 +37,13 @@ def histrq(arr, nbins='sqrt', xlims=None, cutold=None, cutnew=None, lgcrawdata=T
             labels = {'title' : 'Histogram', 'xlabel' : 'variable', 'ylabel' : 'Count', 
             'cutnew' : 'current', 'cutold' : 'previous'}
         Ex: to change just the title, pass: labeldict = {'title' : 'new title'}, to histrq()
+    ax : axes.Axes object, optional
+        Option to pass an existing Matplotlib Axes object to plot over, if it already exists.
     
     Returns
     -------
     fig : Figure
-        Matplotlib Figure object
+        Matplotlib Figure object. Set to None if ax is passed as a parameter.
     ax : axes.Axes object
         Matplotlib Axes object
         
@@ -56,7 +59,11 @@ def histrq(arr, nbins='sqrt', xlims=None, cutold=None, cutnew=None, lgcrawdata=T
         for key in labeldict:
             labels[key] = labeldict[key]
     
-    fig, ax = plt.subplots(figsize=(9, 6))
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(9, 6))
+    else:
+        fig = None
+        
     ax.set_title(labels['title'])
     ax.set_xlabel(labels['xlabel'])
     ax.set_ylabel(labels['ylabel'])
@@ -106,21 +113,21 @@ def histrq(arr, nbins='sqrt', xlims=None, cutold=None, cutnew=None, lgcrawdata=T
     elif (cutnew is None) & (cutold is None):
         cuteff = 1
         cutefftot = 1
-    plt.grid(True)
-    plt.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
-    plt.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
+    ax.grid(True)
+    ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
+    ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
     
     if lgceff:
         ax.plot([], [], linestyle=' ', label=f'Efficiency of total cut: {cutefftot:.3f}')
     if lgclegend:
-        plt.legend()
+        ax.legend()
     return fig, ax
     
 
 
 
-def plotrq(xvals, yvals, xlims=None, ylims=None, cutold=None, cutnew=None, 
-           lgcrawdata=True, lgceff=True, lgclegend=True, labeldict=None, ms=1, a=.3):
+def scatter(xvals, yvals, xlims=None, ylims=None, cutold=None, cutnew=None, 
+            lgcrawdata=True, lgceff=True, lgclegend=True, labeldict=None, ms=1, a=.3, ax=None):
     """
     Function to plot RQ data as a scatter plot.
     
@@ -157,11 +164,13 @@ def plotrq(xvals, yvals, xlims=None, ylims=None, cutold=None, cutnew=None,
         The size of each marker in the scatter plot. Default is 1
     a : float, optional
         The opacity of the markers in the scatter plot, i.e. alpha. Default is 0.3
+    ax : axes.Axes object, optional
+        Option to pass an existing Matplotlib Axes object to plot over, if it already exists.
     
     Returns
     -------
     fig : Figure
-        Matplotlib Figure object
+        Matplotlib Figure object. Set to None if ax is passed as a parameter.
     ax : axes.Axes object
         Matplotlib Axes object
         
@@ -172,12 +181,14 @@ def plotrq(xvals, yvals, xlims=None, ylims=None, cutold=None, cutnew=None,
         for key in labeldict:
             labels[key] = labeldict[key]
     
-    fig, ax = plt.subplots(figsize = (9,6))
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(9, 6))
+    else:
+        fig = None
     
     ax.set_title(labels['title'])
     ax.set_xlabel(labels['xlabel'])
     ax.set_ylabel(labels['ylabel'])
-
     
     if xlims is not None:
         xlimitcut = (xvals>xlims[0]) & (xvals<xlims[1])
