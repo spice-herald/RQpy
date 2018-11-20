@@ -8,4 +8,4 @@ To install the most recent development version of RQpy, clone this repo, then fr
 `python setup.py clean`  
 `python setup.py install --user`
 
-This package requires python 3.6 or greater. Use of the `io` and `process` submodules requires an installation of scdmsPyTools.BatTools.IO.
+This package requires python 3.6 or greater. Use of the `io` and `process` submodules requires an installation of `scdmsPyTools`.
