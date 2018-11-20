@@ -1,8 +1,6 @@
 from . import core
+from .core import *
 from . import plotting
+from .plotting import *
 from . import process
 from . import io
-
-__all__ = []
-__all__.extend(core.__all__)
-__all__.extend(plotting.__all__)
