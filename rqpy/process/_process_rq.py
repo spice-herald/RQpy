@@ -104,6 +104,8 @@ def _calc_rq(traces, channels, setup, readout_inds=None):
     
     rq_dict = {}
     
+    fs = setup.fs
+    
     for ii, chan in enumerate(channels):
         
         signal = traces[readout_inds, ii]
@@ -216,7 +218,7 @@ def _calc_rq(traces, channels, setup, readout_inds=None):
     
     return rq_dict
 
-def _rq(file, chan, det, setup, convtoamps, savepath='', lgcsavedumps=False):
+def _rq(file, chan, det, setup, convtoamps, savepath, lgcsavedumps):
     
     dump = file.split('/')[-1].split('_')[-1].split('.')[0]
     seriesnum = file.split('/')[-2]
@@ -289,7 +291,8 @@ def rq(filelist, chan, det, setup, savepath='', lgcsavedumps=False, nprocess=1):
         convtoamps.append(io.get_trace_gain(folder, ch, det)[0])
     
     pool = multiprocessing.Pool(processes = nprocess)
-    results = pool.starmap(_rq, zip(filelist, repeat([chan, det, setup, convtoamps, savepath, lgcsavedumps])))
+    results = pool.starmap(_rq, zip(filelist, repeat(chan), repeat(det), repeat(setup), 
+                                    repeat(convtoamps), repeat(savepath), repeat(lgcsavedumps)))
     pool.close()
     pool.join()
     rq_df = pd.concat([df for df in results], ignore_index = True)
