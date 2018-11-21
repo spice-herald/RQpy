@@ -8,8 +8,7 @@ spec = find_spec(package_req)
 if spec is None:
     print("scdmsPyTools is not installed, cannot import the io submodule")
 else:
-    from . import io
-    from .io import *
+    from ._io import *
 
 del find_spec
 del sys
