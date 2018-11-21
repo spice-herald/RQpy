@@ -8,8 +8,7 @@ spec = find_spec(package_req)
 if spec is None:
     print("scdmsPyTools is not installed, cannot import the process submodule")
 else:
-    from . import rq
-    from .rq import *
+    from ._process_rq import *
 
 del find_spec
 del sys
