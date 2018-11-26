@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib import colors
 
 
 __all__ = ["hist", "scatter", "densityplot"]
@@ -293,7 +294,7 @@ def scatter(xvals, yvals, xlims=None, ylims=None, cutold=None, cutnew=None,
 
 
 def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=None, 
-             labeldict=None, lgclognorm = True, ax=None):
+                labeldict=None, lgclognorm = True, ax=None):
     """
     Function to plot RQ data as a density plot.
     
