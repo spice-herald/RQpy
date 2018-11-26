@@ -285,3 +285,86 @@ def scatter(xvals, yvals, xlims=None, ylims=None, cutold=None, cutnew=None,
     
     return fig, ax
 
+
+
+def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=None, 
+             labeldict=None, lgclognorm = True, ax=None,):
+    
+    """
+    Function to plot RQ data as a density plot.
+    
+    Parameters
+    ----------
+    xvals : array_like
+        Array of x values to be plotted
+    yvals : array_like
+        Array of y values to be plotted
+    xlims : list of float, optional
+        This is passed to the plot as the x limits. Automatically determined from range of data
+        if not set.
+    ylims : list of float, optional
+        This is passed to the plot as the y limits. Automatically determined from range of data
+        if not set.
+    nbins : tuple, optional
+        The number of bins to use to make the 2d histogram (nx, ny).
+    cut : array of bool, optional
+        Mask of values to be plotted
+    labeldict : dict, optional
+        Dictionary to overwrite the labels of the plot. defaults are : 
+            labels = {'title' : 'Histogram', 'xlabel' : 'variable', 'ylabel' : 'Count'}
+        Ex: to change just the title, pass: labeldict = {'title' : 'new title'}, to histrq()
+    lgclognorm : bool, optional
+        If True (default), the color normilization for the density will be log scaled, rather 
+        than linear
+    ax : axes.Axes object, optional
+        Option to pass an existing Matplotlib Axes object to plot over, if it already exists.
+    
+    Returns
+    -------
+    fig : Figure
+        Matplotlib Figure object. Set to None if ax is passed as a parameter.
+    ax : axes.Axes object
+        Matplotlib Axes object
+        
+    """
+    
+    labels = {'title' : 'Plot of y vs. x', 'xlabel' : 'x', 'ylabel' : 'y'}
+    if labeldict is not None:
+        for key in labeldict:
+            labels[key] = labeldict[key]
+    
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(11, 6))
+    else:
+        fig = None
+    
+    ax.set_title(labels['title'])
+    ax.set_xlabel(labels['xlabel'])
+    ax.set_ylabel(labels['ylabel'])
+    
+    if xlims is not None:
+        xlimitcut = (xvals>xlims[0]) & (xvals<xlims[1])
+    else:
+        xlimitcut = np.ones(len(xvals), dtype=bool)
+    if ylims is not None:
+        ylimitcut = (yvals>ylims[0]) & (yvals<ylims[1])
+    else:
+        ylimitcut = np.ones(len(yvals), dtype=bool)
+
+    limitcut = xlimitcut & ylimitcut
+    
+    if cut is None:
+        cut = np.ones(shape = xvals.shape, dtype=bool)
+    
+
+
+    cax = ax.hist2d(xvals[limitcut & cut], yvals[limitcut & cut], bins = nbins, 
+              norm = colors.LogNorm(), cmap = 'icefire')
+    fig.colorbar(cax[-1], label = 'Density of Data')
+    ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
+    ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
+    ax.grid(True)
+
+    
+    return fig, ax
+
