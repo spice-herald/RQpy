@@ -3,7 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-__all__ = ["hist", "scatter"]
+__all__ = ["hist", "scatter", "densityplot"]
 
 
 def hist(arr, nbins='sqrt', xlims=None, cutold=None, cutnew=None, lgcrawdata=True, 
@@ -176,7 +176,12 @@ def scatter(xvals, yvals, xlims=None, ylims=None, cutold=None, cutnew=None,
         
     """
 
-    labels = {'title' : 'Plot of x vs. y', 'xlabel' : 'x', 'ylabel' : 'y', 'cutnew' : 'current', 'cutold' : 'previous'}
+    labels = {'title'  : 'Scatter Plot',
+              'xlabel' : 'x variable', 
+              'ylabel' : 'y variable', 
+              'cutnew' : 'current', 
+              'cutold' : 'previous'}
+    
     if labeldict is not None:
         for key in labeldict:
             labels[key] = labeldict[key]
@@ -288,8 +293,7 @@ def scatter(xvals, yvals, xlims=None, ylims=None, cutold=None, cutnew=None,
 
 
 def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=None, 
-             labeldict=None, lgclognorm = True, ax=None,):
-    
+             labeldict=None, lgclognorm = True, ax=None):
     """
     Function to plot RQ data as a density plot.
     
@@ -328,7 +332,10 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
         
     """
     
-    labels = {'title' : 'Plot of y vs. x', 'xlabel' : 'x', 'ylabel' : 'y'}
+    labels = {'title'  : 'Density Plot',
+              'xlabel' : 'x variable', 
+              'ylabel' : 'y variable'}
+    
     if labeldict is not None:
         for key in labeldict:
             labels[key] = labeldict[key]
@@ -355,8 +362,6 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
     
     if cut is None:
         cut = np.ones(shape = xvals.shape, dtype=bool)
-    
-
 
     cax = ax.hist2d(xvals[limitcut & cut], yvals[limitcut & cut], bins = nbins, 
               norm = colors.LogNorm(), cmap = 'icefire')
@@ -365,6 +370,5 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
     ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
     ax.grid(True)
 
-    
     return fig, ax
 
