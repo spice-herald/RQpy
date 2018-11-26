@@ -538,11 +538,17 @@ def rq(filelist, channels, det, setup, savepath='', lgcsavedumps=False, nprocess
     for ch in channels:
         convtoamps.append(io.get_trace_gain(folder, ch, det)[0])
     
-    pool = multiprocessing.Pool(processes = nprocess)
-    results = pool.starmap(_rq, zip(filelist, repeat(channels), repeat(det), repeat(setup), 
-                                    repeat(convtoamps), repeat(savepath), repeat(lgcsavedumps)))
-    pool.close()
-    pool.join()
+    if nprocess == 1:
+        results = []
+        for f in filelist:
+            results.append(_rq(f, channels, det, setup, convtoamps, savepath, lgcsavedumps))
+    else:
+        pool = multiprocessing.Pool(processes = nprocess)
+        results = pool.starmap(_rq, zip(filelist, repeat(channels), repeat(det), repeat(setup), 
+                                        repeat(convtoamps), repeat(savepath), repeat(lgcsavedumps)))
+        pool.close()
+        pool.join()
+    
     rq_df = pd.concat([df for df in results], ignore_index = True)
     
     return rq_df
