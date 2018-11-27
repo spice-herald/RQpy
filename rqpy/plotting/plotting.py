@@ -114,9 +114,11 @@ def hist(arr, nbins='sqrt', xlims=None, cutold=None, cutnew=None, lgcrawdata=Tru
     elif (cutnew is None) & (cutold is None):
         cuteff = 1
         cutefftot = 1
-    ax.grid(True)
+        
     ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
     ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
+    ax.tick_params(which="both", direction="in", right=True, top=True)
+    ax.grid(linestyle="dashed")
     
     if lgceff:
         ax.plot([], [], linestyle=' ', label=f'Efficiency of total cut: {cutefftot:.3f}')
@@ -282,7 +284,8 @@ def scatter(xvals, yvals, xlims=None, ylims=None, cutold=None, cutnew=None,
         
     ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
     ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
-    ax.grid(True)
+    ax.tick_params(which="both", direction="in", right=True, top=True)
+    ax.grid(linestyle="dashed")
     
     if lgceff:
         ax.plot([], [], linestyle=' ', label=f'Efficiency of total cut: {cutefftot:.3f}')
@@ -366,10 +369,12 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
 
     cax = ax.hist2d(xvals[limitcut & cut], yvals[limitcut & cut], bins = nbins, 
               norm = colors.LogNorm(), cmap = 'icefire')
-    fig.colorbar(cax[-1], label = 'Density of Data')
+    cbar = fig.colorbar(cax[-1], label = 'Density of Data')
+    cbar.ax.tick_params(direction="in")
     ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
     ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
-    ax.grid(True)
+    ax.tick_params(which="both", direction="in", right=True, top=True)
+    ax.grid(linestyle="dashed")
 
     return fig, ax
 
