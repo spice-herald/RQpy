@@ -1,2 +1,1 @@
-from . import cut
-from .cut import *
+from ._cut import *
