@@ -53,7 +53,7 @@ def gaussian_background(x,amp, mean, sd, offset):
         
     """
     
-    gauss_background =  gaussian(x,amp, mean, sd)) + background
+    gauss_background =  gaussian(x,amp, mean, sd) + background
     return gauss_background
 
 
