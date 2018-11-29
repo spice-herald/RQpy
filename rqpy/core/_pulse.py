@@ -29,11 +29,13 @@ def pulse_func(time, tau_r, tau_f):
     pulse = np.exp(-time/tau_f)-np.exp(-time/tau_r)
     return pulse 
 
+
 def make_ideal_template(x, tau_r, tau_f, offset):
     """
     Function to make ideal pulse template in time domain with single pole exponential rise
     and fall times and a given time offset. The template will be returned with maximum
-    pulse hight normalized to one. 
+    pulse hight normalized to one. The template is rolled by the specified offset to define
+    the location of the peak. 
     
     Parameters
     ----------
