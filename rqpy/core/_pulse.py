@@ -1,7 +1,8 @@
 import numpy as np
+from scipy.signal import decimate
 
 
-__all__ = ["pulse_func", "make_ideal_template"]
+__all__ = ["pulse_func", "make_ideal_template", "ds_trunc"]
 
 
 def pulse_func(time, tau_r, tau_f):
@@ -60,3 +61,58 @@ def make_ideal_template(x, tau_r, tau_f, offset):
     pulse_shifted[:offset] = 0
     template_normed = pulse_shifted/pulse_shifted.max()
     return template_normed
+
+
+
+
+def ds_trunc(traces, fs, trunc, ds, template = None):
+    """
+    Function to downsample and/or truncate time series data. 
+    Note, this will likely change the DC offset of the traces
+    
+    Parameters
+    ----------
+    traces: ndarray
+        array or time series traces
+    fs: int
+        sample rate
+    trunc: int
+        index of where the trace should be truncated
+    ds: int
+        scale factor for how much downsampling to be done
+        ex: ds = 16 means traces will be downsampled by a factor
+        of 16
+    template: ndarray, optional
+        pulse template to be downsampled
+    
+    Returns
+    -------
+    traces_ds: ndarray
+        downsampled/truncated traces
+    psd_ds: ndarray
+        psd made from downsampled traces
+    fs_ds: int
+        downsampled frequency
+    template_ds: ndarray, optional
+        downsampled template
+        
+    """
+    # truncate the traces/template
+    
+    traces_trunc = traces[..., :trunc]
+    
+    trunc_time = trunc/fs
+    
+    # low pass filter and downsample the traces/template
+    if template is not None:
+        template_trunc = template[(len(template)-trunc)//2:(len(template)-trunc)//2+trunc]
+        template_ds = decimate(template_trunc, ds, zero_phase=True)
+    traces_ds = decimate(traces_trunc, ds, zero_phase=True)
+    
+    fs_ds = len(traces_ds)/trunc_time
+    
+    f_ds, psd_ds = calc_psd(traces_ds, fs=fs_ds, folded_over=False)
+    if template is not None:
+        return traces_ds, template_ds, psd_ds, fs_ds
+    else:
+        return traces_ds, psd_ds, fs_ds
