@@ -11,7 +11,7 @@ if HAS_SCDMSPYTOOLS:
 __all__ = ["getrandevents", "get_trace_gain", "get_traces_midgz", "get_traces_npz", "loadstanfordfile"]
 
 
-def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], sumchans=False, 
+def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], det="Z1", sumchans=False, 
                   convtoamps=1, fs=625e3, lgcplot=False, ntraces=1, nplot=20, seed=None,
                   filetype="mid.gz"):
     """
@@ -32,6 +32,9 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], su
         then no cut is applied.
     channels : list, optional
         A list of strings that contains all of the channels that should be loaded.
+    det : str
+        String that specifies the detector name. Only used if filetype=='mid.gz'. Default
+        is 'Z1'.
     sumchans : bool, optional
         A boolean flag for whether or not to sum the channels when plotting. If False, each 
         channel is plotted individually.
@@ -113,9 +116,8 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], su
     if filetype == "mid.gz":
         chans = list()
         for chan in channels:
-            chans.append(arr["Z1"]["pChan"].index(chan))
-        chans = sorted(chans)
-        x = np.vstack([a["Z1"]["p"][:, chans] for a in arrs]).astype(float)
+            chans.append(arr[det]["pChan"].index(chan))
+        x = np.vstack([a[det]["p"][:, chans] for a in arrs]).astype(float)
         
     elif filetype == "npz":
         x = np.vstack(arrs).astype(float)
@@ -138,7 +140,7 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], su
                 colors = plt.cm.viridis(np.linspace(0, 1, num=x.shape[1]), alpha=0.5)
                 for jj, chan in enumerate(chans):
                     if filetype == "mid.gz":
-                        label = f"Channel {arr['Z1']['pChan'][chan]}"
+                        label = f"Channel {arr[det]['pChan'][chan]}"
                     elif filetype == "npz":
                         label = f"Channel {chan+1}"
                     
@@ -201,8 +203,10 @@ def get_traces_midgz(path, chan, det, convtoamps = 1, lgcskip_empty = False):
     ----------
     path : str, list of str
         Absolute path, or list of paths, to the dump to open.
-    chan : str
-        Channel name, i.e. 'PDS1'
+    chan : str, list of str
+        Channel name(s), i.e. 'PDS1'. If a list of channels, the outputted traces will be sorted to match the order
+        the getRawEvents reports in events[det]['pChan'], which can cause slow downs. It is recommended to match
+        this order if opening many or large files.
     det : str
         Detector name, i.e. 'Z1'
     convtoamps : float, list of floats, optional
@@ -250,7 +254,9 @@ def get_traces_midgz(path, chan, det, convtoamps = 1, lgcskip_empty = False):
     convtoamps_arr = np.array(convtoamps)
     convtoamps_arr = convtoamps_arr[np.newaxis,:,np.newaxis]
     
-    events = getRawEvents(filepath='',files_series = path, channelList=chan, skipEmptyEvents=lgcskip_empty, outputFormat=3)
+    events = getRawEvents(filepath='',files_series = path, channelList=chan, 
+                          detectorList=[int(''.join(x for x in det if x.isdigit()))],
+                          skipEmptyEvents=lgcskip_empty, outputFormat=3)
     
     columns = ["eventnumber", "seriesnumber", "eventtime", "triggertype", "readoutstatus", "pollingendtime", 
                "triggertime", "deadtime", "livetime", "seriestime", "triggervetoreadouttime",
@@ -305,7 +311,11 @@ def get_traces_midgz(path, chan, det, convtoamps = 1, lgcskip_empty = False):
         except:
             rq_dict["waveformreadstarttime"].append(-999999.0)
     
-    traces = events[det]['p']*convtoamps_arr
+    if chan != events[det]["pChan"]:
+        inds = [events[det]["pChan"].index(val) for val in chan]
+        traces = events[det]["p"][:,[inds]]*convtoamps_arr
+    else:
+        traces = events[det]["p"]*convtoamps_arr
     
     return traces, rq_dict
 
