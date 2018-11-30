@@ -116,3 +116,7 @@ def ds_trunc(traces, fs, trunc, ds, template = None):
         return traces_ds, template_ds, psd_ds, fs_ds
     else:
         return traces_ds, psd_ds, fs_ds
+    
+    
+    
+    

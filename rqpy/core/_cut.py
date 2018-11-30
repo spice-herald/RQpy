@@ -3,7 +3,7 @@ import pandas as pd
 from qetpy.utils import removeoutliers
 from scipy import stats, interpolate
 
-__all__ = ["baselinecut_tdep", "baselinecut_dr"]
+__all__ = ["baselinecut_tdep", "baselinecut_dr", "inrange"]
 
 
 def baselinecut_dr(arr, r0, i0, rload, dr = 0.1e-3, cut = None):
@@ -107,3 +107,29 @@ def baselinecut_tdep(t, b, cut=None, dt=1000, cut_eff=90, positive_pulses=True):
     
     return cbase
 
+def inrange(vals, bounds):
+    """
+    Function for returning a boolean mask that specifies which values
+    in an array are between the specified bounds (inclusive of the bounds).
+    
+    Parameters
+    ----------
+    vals : array_like
+        A 1-d array of values.
+    bounds : array_like
+        The bounds for which we will check if each value in vals
+        is in between. This should be an array of shape (2,). However,
+        a longer array will not throw an error, as the function will just
+        use the first two values
+            
+    Returns
+    -------
+    mask : ndarray
+        A boolean array of the same shape as vals. True means that the
+        value was between the bounds, False means that the value was not.
+    
+    """
+    
+    mask = np.array([bounds[0] <= val <= bounds[1] for val in vals])
+    
+    return mask
