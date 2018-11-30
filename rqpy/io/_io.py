@@ -310,12 +310,13 @@ def get_traces_midgz(path, chan, det, convtoamps = 1, lgcskip_empty = False):
             rq_dict["waveformreadstarttime"].append(trigv[det]["WaveformReadStartTime"])
         except:
             rq_dict["waveformreadstarttime"].append(-999999.0)
-    
+            
     if chan != events[det]["pChan"]:
         inds = [events[det]["pChan"].index(val) for val in chan]
-        traces = events[det]["p"][:,[inds]]*convtoamps_arr
+        traces = events[det]["p"][:, inds]*convtoamps_arr
     else:
         traces = events[det]["p"]*convtoamps_arr
+    
     
     return traces, rq_dict
 
