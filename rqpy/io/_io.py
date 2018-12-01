@@ -12,7 +12,7 @@ __all__ = ["getrandevents", "get_trace_gain", "get_traces_midgz", "get_traces_np
 
 
 def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], det="Z1", sumchans=False, 
-                  convtoamps=1, fs=625e3, lgcplot=False, ntraces=1, nplot=20, seed=None,
+                  convtoamps=1, fs=625e3, lgcplot=False, ntraces=1, nplot=20, seed=None, indbasepre=None,
                   filetype="mid.gz"):
     """
     Function for loading (and plotting) random events from a datasets. Has functionality to pull 
@@ -51,6 +51,10 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
     seed : int, optional
         A value to pass to np.random.seed if the user wishes to use the same random seed
         each time getrandevents is called.
+    indbasepre : NoneType, int, optional
+        The number of indices up to which a trace should be averaged to determine the baseline.
+        This baseline will then be subtracted from the traces when plotting. If left as None, no
+        baseline subtraction will be done.
     filetype : str, optional
         The string that corresponds to the file type that will be opened. Supports two 
         types -"mid.gz" and ".npz". "mid.gz" is the default.
@@ -114,10 +118,11 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
         arrs.append(arr)
         
     if filetype == "mid.gz":
-        chans = list()
-        for chan in channels:
-            chans.append(arr[det]["pChan"].index(chan))
-        x = np.vstack([a[det]["p"][:, chans] for a in arrs]).astype(float)
+        if channels != arr[det]["pChan"]:
+            chans = [arr[det]["pChan"].index(val) for val in channels]
+            x = arr[det]["p"][:, chans]
+        else:
+            x = arr[det]["p"]
         
     elif filetype == "npz":
         x = np.vstack(arrs).astype(float)
@@ -131,20 +136,34 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
         if nplot>ntraces:
             nplot = ntraces
     
+    
+    
         for ii in range(nplot):
             
             fig, ax = plt.subplots(figsize=(10, 6))
             if sumchans:
-                ax.plot(t * 1e6, x[ii].sum(axis=0) * 1e6, label="Summed Channels")
+                trace_sum = x[ii].sum(axis=0)
+                
+                if indbasepre is not None:
+                    baseline = np.mean(trace_sum[..., :indbasepre])
+                else:
+                    baseline = 0
+                
+                ax.plot(t * 1e6, trace_sum * 1e6, label="Summed Channels")
             else:
                 colors = plt.cm.viridis(np.linspace(0, 1, num=x.shape[1]), alpha=0.5)
-                for jj, chan in enumerate(chans):
+                for jj, chan in enumerate(channels):
                     if filetype == "mid.gz":
-                        label = f"Channel {arr[det]['pChan'][chan]}"
+                        label = f"Channel {chan}"
                     elif filetype == "npz":
-                        label = f"Channel {chan+1}"
+                        label = f"Channel {chan}"
                     
-                    ax.plot(t * 1e6, x[ii, chan] * 1e6, color=colors[jj], label=label)
+                    if indbasepre is not None:
+                        baseline = np.mean(x[ii, jj, :indbasepre])
+                    else:
+                        baseline = 0
+                        
+                    ax.plot(t * 1e6, x[ii, jj] * 1e6 - baseline * 1e6, color=colors[jj], label=label)
             ax.grid()
             ax.set_ylabel("Current [μA]")
             ax.set_xlabel("Time [μs]")
