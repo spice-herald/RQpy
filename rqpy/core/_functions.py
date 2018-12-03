@@ -29,7 +29,7 @@ def gaussian(x,amp, mean, sd):
     gauss = amp*np.exp(-(x - mean)**2/(2*sd**2))
     return gauss 
 
-def gaussian_background(x,amp, mean, sd, offset):
+def gaussian_background(x,amp, mean, sd, background):
     """
     Functional form for Gaussian distribution plus a background offset 
     
@@ -43,7 +43,7 @@ def gaussian_background(x,amp, mean, sd, offset):
         The first moment of the distribution
     sd: float
         The second moment of the distribution
-    offset: float
+    background: float
         The offset (in the y-direction)
         
     Return
