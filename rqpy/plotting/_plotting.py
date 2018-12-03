@@ -464,13 +464,14 @@ def _plot_n_gauss(x, bins, y, fitparams, labeldict):
     ax: matplotlib axes object
     
     """
+    n = int((len(fitparams)-1)/3)
     
     x_fit = np.linspace(x[0], x[-1], 250) #make x data for fit
         
     labels = {'title'  : 'Gaussian Fit',
               'xlabel' : 'x variable', 
               'ylabel' : 'Count'} 
-    for ii in range(int((len(fitparams)-1)/3)):
+    for ii in range(n):
         labels[f'peak{ii+1}'] = f'Peak{ii+1}'
     if labeldict is not None:
         for key in labeldict:
