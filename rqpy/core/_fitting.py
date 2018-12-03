@@ -1,9 +1,87 @@
 import numpy as np
 from ._utils import _bindata
-from ._functions import gaussian_background
+from ._functions import gaussian_background, n_gauss
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 from rqpy.plotting._plotting import _plot_gauss
+
+
+
+
+
+
+
+def fit_multi_gauss(arr, guess, ngauss, xrange = None):
+    """
+    Function to multiple Gaussians plus a flat background. Note, depending on
+    the spectrum, this function can ber very sensitive to the inital guess parameters. 
+    
+    
+    Parameters
+    ----------
+    arr: array
+        Array of values to be binned
+    guess: tuple
+        The initial guesses for the Gaussian peaks. The order must be as follows:
+        (amplitude_i, mu_i, std_i,
+        ....,
+        ....,
+        background),
+        where the guess for the background is the last element
+    ngauss: int
+        The number of peaks to fit
+    xrange: tuple, optional
+        The range over which to fit the peaks
+    
+    Returns
+    -------
+    fitparams: array
+        The best fit parameters, in the same order as the input guess
+    errors: array
+        The uncertainty in the best fit parameters
+    cov: array
+        The covariance matrix returned by scipy.optimize.curve_fit()
+        
+    Raises
+    ------
+    ValueError:
+        If the number or parameters given in the guess is in conflict with ngauss,
+        a ValueError is raised.
+        
+    """
+    
+    if ngauss != (len(guess)-1)/3:
+        raise ValueError('Number of parameters in guess must match the number of Gaussians being fit (ngauss)')
+
+    def fit_n_gauss(x, *params):
+        return n_gauss(x, params, ngauss).sum(axis = 0)
+    
+        
+    
+    x,y, bins = _bindata(arr,  xrange = xrange, bins = 'sqrt')
+    yerr = np.sqrt(y)
+    yerr[yerr == 0] = 1 #make errors 1 if bins are empty
+    
+   
+    fitparams, cov = curve_fit(fit_n_gauss, x, y, guess, sigma = yerr,absolute_sigma = True)
+    errors = np.sqrt(np.diag(cov))    
+    
+    x_fit = np.linspace(x[0], x[-1], 250) 
+    fig, ax = plt.subplots(figsize=(11, 6))
+    ax.hist(x, bins = bins, weights = y, histtype = 'step', linewidth = 1, label ='Raw Data', alpha = .9)
+    
+
+    y_fits = n_gauss(x_fit, fitparams, ngauss)
+    ax.plot(x_fit, y_fits.sum(axis = 0), label = 'Total Fit')
+    for ii in range(y_fits.shape[0] - 1):
+        ax.plot(x_fit, y_fits[ii], alpha = .5, label = f'Peak {ii+1}')
+    ax.plot(x_fit, y_fits[-1], alpha = .5, linestyle = '--', label = 'Background')
+    ax.grid(True, linestyle = 'dashed')
+    ax.set_ylim(1, y.max()*1.05)
+    ax.legend()
+    
+    return fitparams, errors, cov
+
 
 def fit_gauss(arr ,xrange = None, noiserange = None, lgcplot = False, labeldict = None):
     """

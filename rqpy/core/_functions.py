@@ -29,6 +29,48 @@ def gaussian(x,amp, mean, sd):
     gauss = amp*np.exp(-(x - mean)**2/(2*sd**2))
     return gauss 
 
+def n_gauss(x, params, n):
+    """
+    Function to sum n Gaussian distributions
+    
+    Parameters
+    ----------
+    x: array
+        Array corresponding to x data
+    params: tuple
+        The order must be as follows:
+        (amplitude_i, mu_i, std_i,
+        ....,
+        ....,
+        background),
+        where the guess for the background is the last element
+    n: int
+        The number of Gaussian distributions to be summed
+        
+    Returns
+    -------
+        results: array
+            2D array of Gaussians, where the first dimension corresponds
+            to each Gaussian. 
+            
+    Raises
+    ------
+    ValueError:
+        If the number or parameters given is in conflict with n,
+        a ValueError is raised.
+        
+    """
+    
+    if n != (len(params)-1)/3:
+        raise ValueError('Number of parameters must match the number of Gaussians')
+
+    results = []
+    for ii in range(n):
+        results.append(gaussian(x, *params[ii*3:(ii*3)+3]))
+    results.append(np.ones(shape = x.shape)*params[-1])
+    results =  np.array(results)
+    return results
+
 def gaussian_background(x,amp, mean, sd, background):
     """
     Functional form for Gaussian distribution plus a background offset 
