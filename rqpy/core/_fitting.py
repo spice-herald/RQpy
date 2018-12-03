@@ -76,21 +76,6 @@ def fit_gauss(arr ,xrange = None, noiserange = None, lgcplot = False):
     if lgcplot:
         _plot_gauss(x, bins, y, fitparams, errors, background)
     
-#         x_fit = np.linspace(x[0], x[-1], 250)
-    
-#         plt.figure(figsize=(9,6))
-#         plt.plot([],[], linestyle = ' ', label = f' μ = {fitparams[1]:.2f} $\pm$ {errors[1]:.3f}')
-#         plt.plot([],[], linestyle = ' ', label = f' σ = {fitparams[2]:.2f} $\pm$ {errors[2]:.3f}')
-#         plt.plot([],[], linestyle = ' ', label = f' A = {fitparams[0]:.2f} $\pm$ {errors[0]:.3f}')
-#         plt.plot([],[], linestyle = ' ', label = f' Offset = {fitparams[3]:.2f} $\pm$ {errors[3]:.3f}')
-        
-#         plt.hist(x, bins = bins, weights = y, histtype = 'step', linewidth = 1, label ='Raw Data', alpha = .9)
-#         plt.axhline(background, label = 'Average Background Rate', linestyle = '--', alpha = .3)
-
-#         plt.plot(x_fit, gaussian_background(x_fit, *fitparams))
-#         plt.legend()
-#         plt.grid(True, linestyle = 'dashed')
-    
     peakloc = fitparams[1]
     peakerr = np.sqrt((fitparams[2]/np.sqrt(fitparams[0]))**2)# + errors[1]**2)
     
