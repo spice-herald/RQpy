@@ -4,7 +4,7 @@ import os
 import multiprocessing
 from itertools import repeat
 from rqpy import io
-from qetpy import fitting
+from qetpy.detcal import _fitting as fitting
 from rqpy import HAS_SCDMSPYTOOLS
 
 if HAS_SCDMSPYTOOLS:

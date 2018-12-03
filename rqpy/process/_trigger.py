@@ -5,7 +5,7 @@ from numpy.random import choice
 from collections import Counter
 from math import log10, floor
 from rqpy.io import loadstanfordfile
-from qetpy.utils import inrange
+from rqpy.core._cut import inrange
 import datetime
 
 
