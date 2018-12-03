@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib import colors
-from rqpy import gaussian_background
+from rqpy.core._functions import gaussian_background, n_gauss
 
 
 __all__ = ["hist", "scatter", "densityplot"]
@@ -437,6 +437,62 @@ def _plot_gauss(x, bins, y, fitparams, errors, background, labeldict):
     
     return fig, ax
     
+def _plot_n_gauss(x, bins, y, fitparams, labeldict):
+    """
+    Hidden helper function to plot and arbitrary number of Gaussians plus background fit
     
+    Parameters
+    ----------
+    x: array
+        Array of x data
+    bins: array
+        Array of binned data
+    y: array
+        Array of y data
+    fitparams: tuple
+        The best fit parameters from the fit
     
+    labeldict : dict, optional
+        Dictionary to overwrite the labels of the plot. defaults are : 
+            labels = {'title' : 'Histogram', 'xlabel' : 'variable', 'ylabel' : 'Count'}
+        Ex: to change just the title, pass: labeldict = {'title' : 'new title'}, to _plot_n_gauss()
+        
+    Returns
+    -------
+    fig: matrplotlib figure object
+    
+    ax: matplotlib axes object
+    
+    """
+    
+    x_fit = np.linspace(x[0], x[-1], 250) #make x data for fit
+        
+    labels = {'title'  : 'Gaussian Fit',
+              'xlabel' : 'x variable', 
+              'ylabel' : 'Count'} 
+    for ii in range(int((len(fitparams)-1)/3)):
+        labels[f'peak{ii+1}'] = f'Peak{ii+1}'
+    if labeldict is not None:
+        for key in labeldict:
+            labels[key] = labeldict[key]
+    
+
+    fig, ax = plt.subplots(figsize=(11, 6))
+    
+    ax.set_title(labels['title'])
+    ax.set_xlabel(labels['xlabel'])
+    ax.set_ylabel(labels['ylabel'])
+    ax.hist(x, bins = bins, weights = y, histtype = 'step', linewidth = 1, label ='Raw Data', alpha = .9)
+    
+
+    y_fits = n_gauss(x_fit, fitparams, n)
+    ax.plot(x_fit, y_fits.sum(axis = 0), label = 'Total Fit')
+    for ii in range(y_fits.shape[0] - 1):
+        ax.plot(x_fit, y_fits[ii], alpha = .5, label = labels[f'peak{ii+1}'])
+    ax.plot(x_fit, y_fits[-1], alpha = .5, linestyle = '--', label = 'Background')
+    ax.grid(True, linestyle = 'dashed')
+    ax.set_ylim(1, y.max()*1.05)
+    ax.legend()
+    
+    return fig, ax    
     

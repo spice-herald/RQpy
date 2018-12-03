@@ -1,6 +1,6 @@
 import numpy as np
 
-__all__ = ["gaussian", "gaussian_background", "double_gaussian"]
+__all__ = ["gaussian", "gaussian_background", "double_gaussian", "n_gauss"]
 
 
 
@@ -61,7 +61,7 @@ def n_gauss(x, params, n):
         
     """
     
-    if n != (len(params)-1)/3:
+    if n != int((len(params)-1)/3):
         raise ValueError('Number of parameters must match the number of Gaussians')
 
     results = []

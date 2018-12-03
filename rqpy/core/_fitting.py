@@ -3,7 +3,7 @@ from ._utils import _bindata
 from ._functions import gaussian_background, n_gauss
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
-from rqpy.plotting._plotting import _plot_gauss
+from rqpy.plotting._plotting import _plot_gauss, _plot_n_gauss
 
 
 
@@ -11,7 +11,7 @@ from rqpy.plotting._plotting import _plot_gauss
 
 
 
-def fit_multi_gauss(arr, guess, ngauss, xrange = None):
+def fit_multi_gauss(arr, guess, ngauss, xrange = None, lgcplot = True, labeldict = None):
     """
     Function to multiple Gaussians plus a flat background. Note, depending on
     the spectrum, this function can ber very sensitive to the inital guess parameters. 
@@ -32,7 +32,12 @@ def fit_multi_gauss(arr, guess, ngauss, xrange = None):
         The number of peaks to fit
     xrange: tuple, optional
         The range over which to fit the peaks
-    
+    lgcplot: bool, optional
+        If True, the fit and spectrum will be plotted 
+    labeldict : dict, optional
+        Dictionary to overwrite the labels of the plot. defaults are : 
+            labels = {'title' : 'Histogram', 'xlabel' : 'variable', 'ylabel' : 'Count'}
+            Ex: to change just the title, pass: labeldict = {'title' : 'new title'}, to fig_gauss()
     Returns
     -------
     fitparams: array
@@ -66,19 +71,8 @@ def fit_multi_gauss(arr, guess, ngauss, xrange = None):
     fitparams, cov = curve_fit(fit_n_gauss, x, y, guess, sigma = yerr,absolute_sigma = True)
     errors = np.sqrt(np.diag(cov))    
     
-    x_fit = np.linspace(x[0], x[-1], 250) 
-    fig, ax = plt.subplots(figsize=(11, 6))
-    ax.hist(x, bins = bins, weights = y, histtype = 'step', linewidth = 1, label ='Raw Data', alpha = .9)
-    
-
-    y_fits = n_gauss(x_fit, fitparams, ngauss)
-    ax.plot(x_fit, y_fits.sum(axis = 0), label = 'Total Fit')
-    for ii in range(y_fits.shape[0] - 1):
-        ax.plot(x_fit, y_fits[ii], alpha = .5, label = f'Peak {ii+1}')
-    ax.plot(x_fit, y_fits[-1], alpha = .5, linestyle = '--', label = 'Background')
-    ax.grid(True, linestyle = 'dashed')
-    ax.set_ylim(1, y.max()*1.05)
-    ax.legend()
+    if lgcplot:
+        _plot_n_gauss(x, bins, y, fitparams, labeldict)
     
     return fitparams, errors, cov
 
