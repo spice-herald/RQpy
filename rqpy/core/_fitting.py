@@ -1,5 +1,6 @@
 import numpy as np
 from ._utils import _bindata
+from ._functions import gaussian_background
 
 def fit_gauss(arr ,xrange = None, noiserange = None, lgcplotorig = False):
     """
@@ -37,7 +38,7 @@ def fit_gauss(arr ,xrange = None, noiserange = None, lgcplotorig = False):
     x,y, bins = _bindata(arr,  xrange, bins = 'sqrt')
     
     yerr = np.sqrt(y)
-    yerr[yerr == 0] = 1
+    yerr[yerr == 0] = 1 #make errors 1 if bins are empty
     if noiserange is not None:
         if noiserange[0][0] >= xrange[0]:
             clowl = noiserange[0][0]
@@ -70,7 +71,7 @@ def fit_gauss(arr ,xrange = None, noiserange = None, lgcplotorig = False):
     #y_to_fit = np.abs(y_to_fit)
     #yerr = np.sqrt(y_to_fit)
     #yerr[yerr <= 0 ] = 1
-    fitparams, cov = curve_fit(norm_background, x, y_to_fit, p0, sigma = yerr,absolute_sigma = True)
+    fitparams, cov = curve_fit(gaussian_background, x, y_to_fit, p0, sigma = yerr,absolute_sigma = True)
     errors = np.sqrt(np.diag(cov))
     x_fit = np.linspace(xrange[0], xrange[-1], 250)
     
