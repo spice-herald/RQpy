@@ -1,6 +1,7 @@
 import numpy as np
 from ._utils import _bindata
 from ._functions import gaussian_background
+from scipy.optimize import curve_fit
 
 def fit_gauss(arr ,xrange = None, noiserange = None, lgcplotorig = False):
     """
