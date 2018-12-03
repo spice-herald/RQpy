@@ -5,7 +5,7 @@ from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 from rqpy.plotting._plotting import _plot_gauss
 
-def fit_gauss(arr ,xrange = None, noiserange = None, lgcplot = False):
+def fit_gauss(arr ,xrange = None, noiserange = None, lgcplot = False, labeldict = None):
     """
     Function to fit Gaussian distribution with background to peak in spectrum. 
     Errors are assumed to be poissonian. 
@@ -23,6 +23,10 @@ def fit_gauss(arr ,xrange = None, noiserange = None, lgcplot = False):
             background
         lgcplot: bool, optional
             If True, the fit and spectrum will be plotted 
+        labeldict : dict, optional
+            Dictionary to overwrite the labels of the plot. defaults are : 
+                labels = {'title' : 'Histogram', 'xlabel' : 'variable', 'ylabel' : 'Count'}
+            Ex: to change just the title, pass: labeldict = {'title' : 'new title'}, to fig_gauss()
             
     Returns
     -------
@@ -74,7 +78,7 @@ def fit_gauss(arr ,xrange = None, noiserange = None, lgcplot = False):
     errors = np.sqrt(np.diag(cov))
     
     if lgcplot:
-        _plot_gauss(x, bins, y, fitparams, errors, background)
+        _plot_gauss(x, bins, y, fitparams, errors, background, labeldict)
     
     peakloc = fitparams[1]
     peakerr = np.sqrt((fitparams[2]/np.sqrt(fitparams[0]))**2)# + errors[1]**2)
