@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib import colors
+from rqpy import gaussian_background
 
 
 __all__ = ["hist", "scatter", "densityplot"]
@@ -378,3 +379,45 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
 
     return fig, ax
 
+def _plot_gauss(x, bins, y, fitparams, errors, background):
+    """
+    Hidden helper function to plot Gaussian plus background fits
+    
+    Parameters
+    ----------
+    x: array
+        Array of x data
+    bins: array
+        Array of binned data
+    y: array
+        Array of y data
+    fitparams: tuple
+        The best fit parameters from the fit
+    errors: tuple
+        The unccertainy in the best fit parameters
+    background: float,
+        The average background rate
+        
+    Returns
+    -------
+    None
+    """
+    
+    x_fit = np.linspace(x[0], x[-1], 250)
+
+    plt.figure(figsize=(9,6))
+    plt.plot([],[], linestyle = ' ', label = f' μ = {fitparams[1]:.2f} $\pm$ {errors[1]:.3f}')
+    plt.plot([],[], linestyle = ' ', label = f' σ = {fitparams[2]:.2f} $\pm$ {errors[2]:.3f}')
+    plt.plot([],[], linestyle = ' ', label = f' A = {fitparams[0]:.2f} $\pm$ {errors[0]:.3f}')
+    plt.plot([],[], linestyle = ' ', label = f' Offset = {fitparams[3]:.2f} $\pm$ {errors[3]:.3f}')
+
+    plt.hist(x, bins = bins, weights = y, histtype = 'step', linewidth = 1, label ='Raw Data', alpha = .9)
+    plt.axhline(background, label = 'Average Background Rate', linestyle = '--', alpha = .3)
+
+    plt.plot(x_fit, gaussian_background(x_fit, *fitparams), label = 'Gaussian Fit')
+    plt.legend()
+    plt.grid(True, linestyle = 'dashed')
+    
+    
+    
+    
