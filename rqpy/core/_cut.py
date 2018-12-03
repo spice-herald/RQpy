@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from qetpy.utils import removeoutliers
+from qetpy._cut import removeoutliers
 from scipy import stats, interpolate
 
 __all__ = ["baselinecut_tdep", "baselinecut_dr", "inrange"]
