@@ -43,11 +43,20 @@ def fit_multi_gauss(arr, guess, ngauss, xrange = None, lgcplot = True, labeldict
         
     Returns
     -------
-    fitparams: array
+    peaks: array
+        Array of locations of Gaussians maximums, sorted by magnitude in 
+        increasing order
+    amps: array
+        Array of amplitudes, corresponding to order of 'peaks'
+    stds: array
+        Array of sqrt of variance, corresponding to order of 'peaks'
+    background_fit: float
+        The magnitude of the background
+    fitparams: array, optional
         The best fit parameters, in the same order as the input guess
-    errors: array
+    errors: array, optional
         The uncertainty in the best fit parameters
-    cov: array
+    cov: array, optional
         The covariance matrix returned by scipy.optimize.curve_fit()
     bindata: tuple, optional
         The binned data from _bindata(), in order (x, y, bins)
@@ -74,14 +83,26 @@ def fit_multi_gauss(arr, guess, ngauss, xrange = None, lgcplot = True, labeldict
     
    
     fitparams, cov = curve_fit(fit_n_gauss, x, y, guess, sigma = yerr,absolute_sigma = True)
-    errors = np.sqrt(np.diag(cov))    
+    errors = np.sqrt(np.diag(cov))
+    
+    peaks = fitparams[1:-1:3]
+    amps =  fitparams[0:-1:3]
+    stds = peaks = fitparams[2:-1:3]
+    background_fit = peaks = fitparams[-1]
+    
+    peakssort = peaks.argsort()
+    peaks = peaks[peakssort]
+    amps = amps[peakssort]
+    stds = stds[peakssort]
+    
+    
     
     if lgcplot:
         _plot_n_gauss(x, y, bins, fitparams, labeldict)
     if lgcfullreturn:
-        return fitparams, errors, cov, (x, y, bins)
+        return peaks, amps, stds, background_fit, fitparams, errors, cov, (x, y, bins)
     else:
-        return fitparams, errors, cov
+        return peaks, amps, stds, background_fit
 
 
 def fit_gauss(arr ,xrange = None, noiserange = None, lgcplot = False, labeldict = None):
