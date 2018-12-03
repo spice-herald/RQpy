@@ -11,7 +11,7 @@ from rqpy.plotting._plotting import _plot_gauss, _plot_n_gauss
 
 
 
-def fit_multi_gauss(arr, guess, ngauss, xrange = None, lgcplot = True, labeldict = None):
+def fit_multi_gauss(arr, guess, ngauss, xrange = None, lgcplot = True, labeldict = None, lgcfullreturn = False):
     """
     Function to multiple Gaussians plus a flat background. Note, depending on
     the spectrum, this function can ber very sensitive to the inital guess parameters. 
@@ -38,6 +38,9 @@ def fit_multi_gauss(arr, guess, ngauss, xrange = None, lgcplot = True, labeldict
         Dictionary to overwrite the labels of the plot. defaults are : 
             labels = {'title' : 'Histogram', 'xlabel' : 'variable', 'ylabel' : 'Count'}
             Ex: to change just the title, pass: labeldict = {'title' : 'new title'}, to fig_gauss()
+    lgcfullreturn: bool, optional
+        If True, the binned data is returned along with the fit parameters
+        
     Returns
     -------
     fitparams: array
@@ -46,6 +49,8 @@ def fit_multi_gauss(arr, guess, ngauss, xrange = None, lgcplot = True, labeldict
         The uncertainty in the best fit parameters
     cov: array
         The covariance matrix returned by scipy.optimize.curve_fit()
+    bindata: tuple, optional
+        The binned data from _bindata(), in order (x, y, bins)
         
     Raises
     ------
@@ -73,8 +78,10 @@ def fit_multi_gauss(arr, guess, ngauss, xrange = None, lgcplot = True, labeldict
     
     if lgcplot:
         _plot_n_gauss(x, bins, y, fitparams, labeldict)
-    
-    return fitparams, errors, cov
+    if lgcfullreturn:
+        return fitparams, errors, cov, (x, y, bins)
+    else:
+        return fitparams, errors, cov
 
 
 def fit_gauss(arr ,xrange = None, noiserange = None, lgcplot = False, labeldict = None):
