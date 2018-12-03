@@ -43,7 +43,6 @@ def fit_gauss(arr ,xrange = None, noiserange = None, lgcplot = False, labeldict 
     """
     
     x,y, bins = _bindata(arr,  xrange, bins = 'sqrt')
-    
     yerr = np.sqrt(y)
     yerr[yerr == 0] = 1 #make errors 1 if bins are empty
     if noiserange is not None:
@@ -56,31 +55,27 @@ def fit_gauss(arr ,xrange = None, noiserange = None, lgcplot = False, labeldict 
         if noiserange[1][1] <= xrange[1]:
             chighh = noiserange[1][1] 
         else:
-            chighh = xrange[1]
-            
-            
+            chighh = xrange[1]          
         indlowl = (np.abs(x - clowl)).argmin()
         indlowh = (np.abs(x - clowh)).argmin() 
         indhighl = (np.abs(x - chighl)).argmin()
         indhighh = (np.abs(x - chighh)).argmin() - 1
-        background = np.mean(np.concatenate((y[indlowl:indlowh],y[indhighl:indhighh])))
-        
-         
+        background = np.mean(np.concatenate((y[indlowl:indlowh],y[indhighl:indhighh])))  
     else:
         background = 0
     y_noback = y - background
-        
+    # get starting values for guess   
     A0 = np.max(y_noback)
     mu0 = x[np.argmax(y_noback)]
     sig0 = np.abs(mu0 - x[np.abs(y_noback - np.max(y_noback)/2).argmin()])
     p0 = (A0, mu0, sig0, background)
+    #do fit
     fitparams, cov = curve_fit(gaussian_background, x, y, p0, sigma = yerr,absolute_sigma = True)
-    errors = np.sqrt(np.diag(cov))
+    errors = np.sqrt(np.diag(cov))    
+    peakloc = fitparams[1]
+    peakerr = np.sqrt((fitparams[2]/np.sqrt(fitparams[0]))**2)
     
     if lgcplot:
         _plot_gauss(x, bins, y, fitparams, errors, background, labeldict)
-    
-    peakloc = fitparams[1]
-    peakerr = np.sqrt((fitparams[2]/np.sqrt(fitparams[0]))**2)# + errors[1]**2)
     
     return peakloc, peakerr, fitparams, errors
