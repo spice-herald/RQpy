@@ -321,7 +321,7 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
     labeldict : dict, optional
         Dictionary to overwrite the labels of the plot. defaults are : 
             labels = {'title' : 'Histogram', 'xlabel' : 'variable', 'ylabel' : 'Count'}
-        Ex: to change just the title, pass: labeldict = {'title' : 'new title'}, to histrq()
+        Ex: to change just the title, pass: labeldict = {'title' : 'new title'}, to densityplot()
     lgclognorm : bool, optional
         If True (default), the color normilization for the density will be log scaled, rather 
         than linear
@@ -379,7 +379,7 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
 
     return fig, ax
 
-def _plot_gauss(x, bins, y, fitparams, errors, background):
+def _plot_gauss(x, bins, y, fitparams, errors, background, labeldict):
     """
     Hidden helper function to plot Gaussian plus background fits
     
@@ -397,26 +397,47 @@ def _plot_gauss(x, bins, y, fitparams, errors, background):
         The unccertainy in the best fit parameters
     background: float,
         The average background rate
+    labeldict : dict, optional
+        Dictionary to overwrite the labels of the plot. defaults are : 
+            labels = {'title' : 'Histogram', 'xlabel' : 'variable', 'ylabel' : 'Count'}
+        Ex: to change just the title, pass: labeldict = {'title' : 'new title'}, to _plot_gauss()
         
     Returns
     -------
-    None
+    fig: matrplotlib figure object
+    
+    ax: matplotlib axes object
+    
     """
     
-    x_fit = np.linspace(x[0], x[-1], 250)
+    x_fit = np.linspace(x[0], x[-1], 250) #make x data for fit
+        
+    labels = {'title'  : 'Gaussian Fit',
+              'xlabel' : 'x variable', 
+              'ylabel' : 'Count'}
+    
+    if labeldict is not None:
+        for key in labeldict:
+            labels[key] = labeldict[key]
+    
+    
+    fig, ax = plt.subplots(figsize=(11, 6))
+    ax.set_title(labels['title'])
+    ax.set_xlabel(labels['xlabel'])
+    ax.set_ylabel(labels['ylabel'])
+    ax.plot([],[], linestyle = ' ', label = f' μ = {fitparams[1]:.2f} $\pm$ {errors[1]:.3f}')
+    ax.plot([],[], linestyle = ' ', label = f' σ = {fitparams[2]:.2f} $\pm$ {errors[2]:.3f}')
+    ax.plot([],[], linestyle = ' ', label = f' A = {fitparams[0]:.2f} $\pm$ {errors[0]:.3f}')
+    ax.plot([],[], linestyle = ' ', label = f' Offset = {fitparams[3]:.2f} $\pm$ {errors[3]:.3f}')
 
-    plt.figure(figsize=(9,6))
-    plt.plot([],[], linestyle = ' ', label = f' μ = {fitparams[1]:.2f} $\pm$ {errors[1]:.3f}')
-    plt.plot([],[], linestyle = ' ', label = f' σ = {fitparams[2]:.2f} $\pm$ {errors[2]:.3f}')
-    plt.plot([],[], linestyle = ' ', label = f' A = {fitparams[0]:.2f} $\pm$ {errors[0]:.3f}')
-    plt.plot([],[], linestyle = ' ', label = f' Offset = {fitparams[3]:.2f} $\pm$ {errors[3]:.3f}')
+    ax.hist(x, bins = bins, weights = y, histtype = 'step', linewidth = 1, label ='Raw Data', alpha = .9)
+    ax.axhline(background, label = 'Average Background Rate', linestyle = '--', alpha = .3)
 
-    plt.hist(x, bins = bins, weights = y, histtype = 'step', linewidth = 1, label ='Raw Data', alpha = .9)
-    plt.axhline(background, label = 'Average Background Rate', linestyle = '--', alpha = .3)
-
-    plt.plot(x_fit, gaussian_background(x_fit, *fitparams), label = 'Gaussian Fit')
-    plt.legend()
-    plt.grid(True, linestyle = 'dashed')
+    ax.plot(x_fit, gaussian_background(x_fit, *fitparams), label = 'Gaussian Fit')
+    ax.legend()
+    ax.grid(True, linestyle = 'dashed')
+    
+    return fig, ax
     
     
     
