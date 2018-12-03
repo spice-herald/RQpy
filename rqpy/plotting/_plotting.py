@@ -414,12 +414,10 @@ def _plot_gauss(x, bins, y, fitparams, errors, background, labeldict):
         
     labels = {'title'  : 'Gaussian Fit',
               'xlabel' : 'x variable', 
-              'ylabel' : 'Count'}
-    
+              'ylabel' : 'Count'} 
     if labeldict is not None:
         for key in labeldict:
             labels[key] = labeldict[key]
-    
     
     fig, ax = plt.subplots(figsize=(11, 6))
     ax.set_title(labels['title'])
