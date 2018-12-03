@@ -437,7 +437,7 @@ def _plot_gauss(x, bins, y, fitparams, errors, background, labeldict):
     
     return fig, ax
     
-def _plot_n_gauss(x, bins, y, fitparams, labeldict):
+def _plot_n_gauss(x, y, bins, fitparams, labeldict, ax = None):
     """
     Hidden helper function to plot and arbitrary number of Gaussians plus background fit
     
@@ -445,10 +445,10 @@ def _plot_n_gauss(x, bins, y, fitparams, labeldict):
     ----------
     x: array
         Array of x data
-    bins: array
-        Array of binned data
     y: array
         Array of y data
+    bins: array
+        Array of binned data
     fitparams: tuple
         The best fit parameters from the fit
     
@@ -477,8 +477,11 @@ def _plot_n_gauss(x, bins, y, fitparams, labeldict):
         for key in labeldict:
             labels[key] = labeldict[key]
     
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(11, 6))
+    else:
+        fig = None
 
-    fig, ax = plt.subplots(figsize=(11, 6))
     
     ax.set_title(labels['title'])
     ax.set_xlabel(labels['xlabel'])

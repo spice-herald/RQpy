@@ -77,7 +77,7 @@ def fit_multi_gauss(arr, guess, ngauss, xrange = None, lgcplot = True, labeldict
     errors = np.sqrt(np.diag(cov))    
     
     if lgcplot:
-        _plot_n_gauss(x, bins, y, fitparams, labeldict)
+        _plot_n_gauss(x, y, bins, fitparams, labeldict)
     if lgcfullreturn:
         return fitparams, errors, cov, (x, y, bins)
     else:
