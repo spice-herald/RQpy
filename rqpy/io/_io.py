@@ -120,9 +120,9 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
     if filetype == "mid.gz":
         if channels != arr[det]["pChan"]:
             chans = [arr[det]["pChan"].index(val) for val in channels]
-            x = arr[det]["p"][:, chans]
+            x = arr[det]["p"][:, chans].astype(float)
         else:
-            x = arr[det]["p"]
+            x = arr[det]["p"].astype(float)
         
     elif filetype == "npz":
         x = np.vstack(arrs).astype(float)
@@ -135,8 +135,6 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
     if lgcplot:
         if nplot>ntraces:
             nplot = ntraces
-    
-    
     
         for ii in range(nplot):
             
