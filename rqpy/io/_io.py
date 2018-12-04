@@ -89,6 +89,9 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
     if cut is None:
         cut = np.ones(len(evtnums), dtype=bool)
         
+    if np.sum(cut) == 0:
+        raise ValueError("The inputted cut has no events, cannot load any traces.")
+        
     if ntraces > np.sum(cut):
         ntraces = np.sum(cut)
         
