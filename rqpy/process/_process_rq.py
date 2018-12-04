@@ -4,7 +4,7 @@ import os
 import multiprocessing
 from itertools import repeat
 from rqpy import io
-from qetpy.detcal import _fitting as fitting
+import qetpy as qp
 from rqpy import HAS_SCDMSPYTOOLS
 
 if HAS_SCDMSPYTOOLS:
@@ -407,7 +407,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
     if setup.do_chi2_nopulse:
         chi0 = np.zeros(len(signal))
         for jj, s in enumerate(signal):
-            chi0[jj] = fitting.chi2_nopulse(s, psd, fs)
+            chi0[jj] = qp.chi2_nopulse(s, psd, fs)
 
         rq_dict[f'chi2_nopulse_{chan}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'chi2_nopulse_{chan}'][readout_inds] = chi0
@@ -416,7 +416,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         amp_nodelay = np.zeros(len(signal))
         chi2_nodelay = np.zeros(len(signal))
         for jj, s in enumerate(signal):
-            amp_nodelay[jj], _, chi2_nodelay[jj] = fitting.ofamp(s, template, psd, fs, withdelay=False)
+            amp_nodelay[jj], _, chi2_nodelay[jj] = qp.ofamp(s, template, psd, fs, withdelay=False)
 
         rq_dict[f'ofamp_nodelay_{chan}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'ofamp_nodelay_{chan}'][readout_inds] = amp_nodelay
@@ -426,7 +426,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         if setup.ofamp_nodelay_lowfreqchi2 and setup.do_chi2_lowfreq:
             chi2low = np.zeros(len(signal))
             for jj, s in enumerate(signal):
-                chi2low[jj] = fitting.chi2lowfreq(s, template, amp_nodelay[jj], 
+                chi2low[jj] = qp.chi2lowfreq(s, template, amp_nodelay[jj], 
                                                   0, psd, fs, fcutoff=setup.chi2_lowfreq_fcutoff[chan_num])
 
             rq_dict[f'chi2_nodelay_{chan}'] = np.ones(len(readout_inds))*(-999999.0)
@@ -437,7 +437,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         t0_noconstrain = np.zeros(len(signal))
         chi2_noconstrain = np.zeros(len(signal))
         for jj, s in enumerate(signal):
-            amp_noconstrain[jj], t0_noconstrain[jj], chi2_noconstrain[jj] = fitting.ofamp(s, template, 
+            amp_noconstrain[jj], t0_noconstrain[jj], chi2_noconstrain[jj] = qp.ofamp(s, template, 
                                                                                       psd, fs, withdelay=True)
 
         rq_dict[f'ofamp_unconstrain_{chan}'] = np.ones(len(readout_inds))*(-999999.0)
@@ -450,7 +450,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         if setup.ofamp_unconstrained_lowfreqchi2 and setup.do_chi2_lowfreq:
             chi2low = np.zeros(len(signal))
             for jj, s in enumerate(signal):
-                chi2low[jj] = fitting.chi2lowfreq(s, template, amp_noconstrain[jj], t0_noconstrain[jj], 
+                chi2low[jj] = qp.chi2lowfreq(s, template, amp_noconstrain[jj], t0_noconstrain[jj], 
                                                   psd, fs, fcutoff=setup.chi2_lowfreq_fcutoff[chan_num])
 
             rq_dict[f'chi2lowfreq_unconstrain_{chan}'] = np.ones(len(readout_inds))*(-999999.0)
@@ -461,7 +461,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         t0_constrain = np.zeros(len(signal))
         chi2_constrain = np.zeros(len(signal))
         for jj, s in enumerate(signal):
-            amp_constrain[jj], t0_constrain[jj], chi2_constrain[jj] = fitting.ofamp(s, template, 
+            amp_constrain[jj], t0_constrain[jj], chi2_constrain[jj] = qp.ofamp(s, template, 
                                                                psd, fs, withdelay=True,
                                                                nconstrain=setup.ofamp_constrained_nconstrain[chan_num])
 
@@ -475,7 +475,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         if setup.ofamp_constrained_lowfreqchi2 and setup.do_chi2_lowfreq:
             chi2low = np.zeros(len(signal))
             for jj, s in enumerate(signal):
-                chi2low[jj] = fitting.chi2lowfreq(s, template, amp_constrain[jj], t0_constrain[jj], 
+                chi2low[jj] = qp.chi2lowfreq(s, template, amp_constrain[jj], t0_constrain[jj], 
                                                   psd, fs, fcutoff=setup.chi2_lowfreq_fcutoff[chan_num])
 
             rq_dict[f'chi2lowfreq_constrain_{chan}'] = np.ones(len(readout_inds))*(-999999.0)
@@ -486,7 +486,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         t0_pileup = np.zeros(len(signal))
         chi2_pileup = np.zeros(len(signal))
         for jj, s in enumerate(signal):
-            _,_,amp_pileup[jj], t0_pileup[jj], chi2_pileup[jj] = fitting.ofamp_pileup(s, template, 
+            _,_,amp_pileup[jj], t0_pileup[jj], chi2_pileup[jj] = qp.ofamp_pileup(s, template, 
                                                                psd, fs, a1=amp_constrain[jj], t1=t0_constrain[jj],
                                                                nconstrain2=setup.ofamp_pileup_nconstrain[chan_num])
 
