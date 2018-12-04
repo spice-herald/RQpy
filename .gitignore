@@ -102,3 +102,11 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# ignore trigger demo files that are created
+demos/trigger/*pulses*.npz
+demos/trigger/*randoms*.npz
+
+# ignore gedit autosaved files
+*.*~
+
