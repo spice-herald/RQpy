@@ -32,9 +32,11 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
         then no cut is applied.
     channels : list, optional
         A list of strings that contains all of the channels that should be loaded.
-    det : str
-        String that specifies the detector name. Only used if filetype=='mid.gz'. Default
-        is 'Z1'.
+    det : str or list of str, optional
+        String or list of strings that specifies the detector name. Only used if filetype=='mid.gz'. 
+        If a list of strings, then should each value should directly correspond to the channel names.
+        If a string is inputted and there are multiple channels, then it is assumed that the detector
+        name is the same for each channel.
     sumchans : bool, optional
         A boolean flag for whether or not to sum the channels when plotting. If False, each 
         channel is plotted individually.
@@ -76,6 +78,9 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
     if seed is not None:
         np.random.seed(seed)
     
+    if isinstance(channels, str):
+        channels = [channels]
+    
     if type(evtnums) is not pd.core.series.Series:
         evtnums = pd.Series(data=evtnums)
     if type(seriesnums) is not pd.core.series.Series:
@@ -105,14 +110,23 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
         cseries = crand & (seriesnums == snum)
         
         if filetype == "mid.gz":
+            
+            if isinstance(det, str):
+                det = [det]*len(channels)
+            
+            if len(det) != len(channels):
+                raise ValueError("channels and det should have the same length")
+            
             if np.issubdtype(type(snum), np.integer):
                 snum_str = f"{snum:012}"
                 snum_str = snum_str[:8] + '_' + snum_str[8:]
             else:
                 snum_str = snum
-
-            arr = getRawEvents(f"{basepath}{snum_str}/", "", channelList=channels, outputFormat=3, 
-                               eventNumbers=evtnums[cseries].astype(int).tolist())
+            
+            dets = [int("".join(filter(str.isdigit, d))) for d in det]
+            
+            arr = getRawEvents(f"{basepath}{snum_str}/", "", channelList=channels, detectorList=dets,
+                               outputFormat=3, eventNumbers=evtnums[cseries].astype(int).tolist())
         elif filetype == "npz":
             inds = np.mod(evtnums[cseries], 10000) - 1
             with np.load(f"{basepath}/{snum}.npz") as f:
@@ -121,11 +135,16 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
         arrs.append(arr)
         
     if filetype == "mid.gz":
-        if channels != arr[det]["pChan"]:
-            chans = [arr[det]["pChan"].index(val) for val in channels]
-            x = arr[det]["p"][:, chans].astype(float)
+        if len(set(dets))==1:
+            if channels != arr[det[0]]["pChan"]:
+                chans = [arr[det[0]]["pChan"].index(ch) for ch in channels]
+                x = arr[det[0]]["p"][:, chans].astype(float)
+            else:
+                x = arr[det[0]]["p"].astype(float)
         else:
-            x = arr[det]["p"].astype(float)
+            chans = [arr[d]["pChan"].index(ch) for d, ch in zip(det, channels)]
+            x = [arr[d]["p"][:, ch].astype(float) for d, ch in zip(det, chans)]
+            x = np.stack(x, axis=1)
         
     elif filetype == "npz":
         x = np.vstack(arrs).astype(float)
@@ -185,7 +204,7 @@ def get_trace_gain(path, chan, det, gainfactors = {'rfb': 5000, 'loopgain' : 2.4
     chan : str
         Channel name, i.e. 'PDS1'
     det : str
-        Detector name, i.e. 'Z1'
+        Detector name, i.e. 'Z1'. 
     gainfactors : dict, optional
         Dictionary containing phonon amp parameters.
         The keys for dictionary are as follows.
@@ -215,7 +234,7 @@ def get_trace_gain(path, chan, det, gainfactors = {'rfb': 5000, 'loopgain' : 2.4
     
     return convtoamps, drivergain, qetbias
 
-def get_traces_midgz(path, chan, det, convtoamps = 1, lgcskip_empty = False):
+def get_traces_midgz(path, channels, det, convtoamps = 1, lgcskip_empty = False):
     """
     Function to return raw traces and event information for a single channel for mid.gz files.
     
@@ -223,12 +242,14 @@ def get_traces_midgz(path, chan, det, convtoamps = 1, lgcskip_empty = False):
     ----------
     path : str, list of str
         Absolute path, or list of paths, to the dump to open.
-    chan : str, list of str
+    channels : str, list of str
         Channel name(s), i.e. 'PDS1'. If a list of channels, the outputted traces will be sorted to match the order
         the getRawEvents reports in events[det]['pChan'], which can cause slow downs. It is recommended to match
         this order if opening many or large files.
-    det : str
-        Detector name, i.e. 'Z1'
+    det : str, list of str
+        Detector name, i.e. 'Z1'. If a list of strings, then should each value should directly correspond to 
+        the channel names. If a string is inputted and there are multiple channels, then it 
+        is assumed that the detector name is the same for each channel.
     convtoamps : float, list of floats, optional
         Conversion factor from ADC bins to TES current in Amps (units are [Amps]/[ADC bins]). Default is to 
         keep in units of ADC bins (i.e. the traces are left in units of ADC bins)
@@ -239,7 +260,7 @@ def get_traces_midgz(path, chan, det, convtoamps = 1, lgcskip_empty = False):
     
     Returns
     -------
-    traces : ndarray
+    x : ndarray
         Array of traces in the specified dump. Dimensions are (number of traces, number of channels, bins in each trace)
     rq_dict : dict
         Dictionary that contains extra information on each event. Includes timing and trigger information.
@@ -266,21 +287,36 @@ def get_traces_midgz(path, chan, det, convtoamps = 1, lgcskip_empty = False):
     
     if not isinstance(path, list):
         path = [path]
-    if not isinstance(chan, list):
-        chan = [chan]
+        
+    if not isinstance(channels, list):
+        channels = [channels]
+        
+    if isinstance(det, str):
+        det = [det]*len(channels)
+
+    if len(det) != len(channels):
+        raise ValueError("channels and det should have the same length")
 
     if not isinstance(convtoamps, list):
         convtoamps = [convtoamps]
     convtoamps_arr = np.array(convtoamps)
     convtoamps_arr = convtoamps_arr[np.newaxis,:,np.newaxis]
     
-    events = getRawEvents(filepath='',files_series = path, channelList=chan, 
-                          detectorList=[int(''.join(x for x in det if x.isdigit()))],
-                          skipEmptyEvents=lgcskip_empty, outputFormat=3)
+    dets = [int("".join(filter(str.isdigit, d))) for d in det]
     
-    columns = ["eventnumber", "seriesnumber", "eventtime", "triggertype", "readoutstatus", "pollingendtime", 
-               "triggertime", "deadtime", "livetime", "seriestime", "triggervetoreadouttime",
-               "waveformreadendtime", "waveformreadstarttime", "triggeramp"]
+    events = getRawEvents(filepath='',files_series = path, channelList=channels, 
+                          detectorList=dets, skipEmptyEvents=lgcskip_empty, outputFormat=3)
+    
+    columns = ["eventnumber", "seriesnumber", "eventtime", "triggertype", "pollingendtime", 
+               "triggertime", "triggeramp"]
+    
+    columns_trigveto = ["readoutstatus", "deadtime", "livetime", 
+                        "triggervetoreadouttime", "seriestime", "waveformreadendtime", 
+                        "waveformreadstarttime"]
+    
+    for item in columns_trigveto:
+        for d in set(det):
+            columns.append(f"{item}{d}")
 
     rq_dict = {}
     for item in columns:
@@ -296,49 +332,56 @@ def get_traces_midgz(path, chan, det, convtoamps = 1, lgcskip_empty = False):
 
         rq_dict["triggertime"].append(trig["TriggerTime"])
 
-        try:
-            rq_dict["readoutstatus"].append(trigv[det]["ReadoutStatus"])
-        except:
-            rq_dict["readoutstatus"].append(-999999.0)
+        for d in set(det):
+            try:
+                rq_dict[f"readoutstatus{d}"].append(trigv[d]["ReadoutStatus"])
+            except:
+                rq_dict[f"readoutstatus{d}"].append(-999999.0)
 
-        try:
-            rq_dict["deadtime"].append(trigv[det]["DeadTime0"])
-        except:
-            rq_dict["deadtime"].append(-999999.0)
+            try:
+                rq_dict[f"deadtime{d}"].append(trigv[d]["DeadTime0"])
+            except:
+                rq_dict[f"deadtime{d}"].append(-999999.0)
 
-        try:
-            rq_dict["livetime"].append(trigv[det]["LiveTime0"])
-        except:
-            rq_dict["livetime"].append(-999999.0)
+            try:
+                rq_dict[f"livetime{d}"].append(trigv[d]["LiveTime0"])
+            except:
+                rq_dict[f"livetime{d}"].append(-999999.0)
 
-        try:
-            rq_dict["triggervetoreadouttime"].append(trigv[det]["TriggerVetoReadoutTime0"])
-        except:
-            rq_dict["triggervetoreadouttime"].append(-999999.0)
+            try:
+                rq_dict[f"triggervetoreadouttime{d}"].append(trigv[d]["TriggerVetoReadoutTime0"])
+            except:
+                rq_dict[f"triggervetoreadouttime{d}"].append(-999999.0)
 
-        try:
-            rq_dict["seriestime"].append(trigv[det]["SeriesTime"])
-        except:
-            rq_dict["seriestime"].append(-999999.0)
+            try:
+                rq_dict[f"seriestime{d}"].append(trigv[d]["SeriesTime"])
+            except:
+                rq_dict[f"seriestime{d}"].append(-999999.0)
 
-        try:
-            rq_dict["waveformreadendtime"].append(trigv[det]["WaveformReadEndTime"])
-        except:
-            rq_dict["waveformreadendtime"].append(-999999.0)
+            try:
+                rq_dict[f"waveformreadendtime{d}"].append(trigv[d]["WaveformReadEndTime"])
+            except:
+                rq_dict[f"waveformreadendtime{d}"].append(-999999.0)
 
-        try:
-            rq_dict["waveformreadstarttime"].append(trigv[det]["WaveformReadStartTime"])
-        except:
-            rq_dict["waveformreadstarttime"].append(-999999.0)
-            
-    if chan != events[det]["pChan"]:
-        inds = [events[det]["pChan"].index(val) for val in chan]
-        traces = events[det]["p"][:, inds]*convtoamps_arr
+            try:
+                rq_dict[f"waveformreadstarttime{d}"].append(trigv[d]["WaveformReadStartTime"])
+            except:
+                rq_dict[f"waveformreadstarttime{d}"].append(-999999.0)
+    
+    if len(set(dets))==1:
+        if channels != events[det[0]]["pChan"]:
+            chans = [events[det[0]]["pChan"].index(ch) for ch in channels]
+            x = events[det[0]]["p"][:, chans].astype(float)
+        else:
+            x = events[det[0]]["p"].astype(float)
     else:
-        traces = events[det]["p"]*convtoamps_arr
-    
-    
-    return traces, rq_dict
+        chans = [events[d]["pChan"].index(ch) for d, ch in zip(det, channels)]
+        x = [events[d]["p"][:, ch].astype(float) for d, ch in zip(det, chans)]
+        x = np.stack(x, axis=1)
+        
+    x*=convtoamps_arr
+        
+    return x, rq_dict
 
 
 def get_traces_npz(path):

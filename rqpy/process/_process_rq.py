@@ -356,7 +356,7 @@ class SetupRQ(object):
         
         self.do_integral = lgcrun
         
-def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, chan_num):
+def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, chan_num, det):
     """
     Helper function for calculating RQs for an array of traces corresponding to a single channel.
     
@@ -379,6 +379,8 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         Name of the channel that is being processed.
     chan_num : int
         The corresponding number for the channel being processed.
+    det : str
+        Name of the detector corresponding to the channel that is being processed.
     
     Returns
     -------
@@ -393,24 +395,24 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
     
     if setup.do_baseline:
         baseline = np.mean(signal[:, :setup.baseline_indbasepre[chan_num]], axis=-1)
-        rq_dict[f'baseline_{chan}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'baseline_{chan}'][readout_inds] = baseline
+        rq_dict[f'baseline_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'baseline_{chan}{det}'][readout_inds] = baseline
 
     if setup.do_integral:
         if setup.do_baseline:
             integral = np.trapz(signal - baseline[:, np.newaxis], axis=-1)/fs
         else:
             integral = np.trapz(signal, axis=-1)/fs
-        rq_dict[f'integral_{chan}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'integral_{chan}'][readout_inds] = integral
+        rq_dict[f'integral_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'integral_{chan}{det}'][readout_inds] = integral
 
     if setup.do_chi2_nopulse:
         chi0 = np.zeros(len(signal))
         for jj, s in enumerate(signal):
             chi0[jj] = qp.chi2_nopulse(s, psd, fs)
 
-        rq_dict[f'chi2_nopulse_{chan}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'chi2_nopulse_{chan}'][readout_inds] = chi0
+        rq_dict[f'chi2_nopulse_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2_nopulse_{chan}{det}'][readout_inds] = chi0
 
     if setup.do_ofamp_nodelay:
         amp_nodelay = np.zeros(len(signal))
@@ -418,10 +420,10 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         for jj, s in enumerate(signal):
             amp_nodelay[jj], _, chi2_nodelay[jj] = qp.ofamp(s, template, psd, fs, withdelay=False)
 
-        rq_dict[f'ofamp_nodelay_{chan}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'ofamp_nodelay_{chan}'][readout_inds] = amp_nodelay
-        rq_dict[f'chi2_nodelay_{chan}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'chi2_nodelay_{chan}'][readout_inds] = chi2_nodelay
+        rq_dict[f'ofamp_nodelay_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'ofamp_nodelay_{chan}{det}'][readout_inds] = amp_nodelay
+        rq_dict[f'chi2_nodelay_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2_nodelay_{chan}{det}'][readout_inds] = chi2_nodelay
 
         if setup.ofamp_nodelay_lowfreqchi2 and setup.do_chi2_lowfreq:
             chi2low = np.zeros(len(signal))
@@ -429,8 +431,8 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                 chi2low[jj] = qp.chi2lowfreq(s, template, amp_nodelay[jj], 
                                                   0, psd, fs, fcutoff=setup.chi2_lowfreq_fcutoff[chan_num])
 
-            rq_dict[f'chi2_nodelay_{chan}'] = np.ones(len(readout_inds))*(-999999.0)
-            rq_dict[f'chi2lowfreq_nodelay_{chan}'][readout_inds] = chi2low
+            rq_dict[f'chi2_nodelay_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f'chi2lowfreq_nodelay_{chan}{det}'][readout_inds] = chi2low
 
     if setup.do_ofamp_unconstrained:
         amp_noconstrain = np.zeros(len(signal))
@@ -440,12 +442,12 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
             amp_noconstrain[jj], t0_noconstrain[jj], chi2_noconstrain[jj] = qp.ofamp(s, template, 
                                                                                       psd, fs, withdelay=True)
 
-        rq_dict[f'ofamp_unconstrain_{chan}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'ofamp_unconstrain_{chan}'][readout_inds] = amp_noconstrain
-        rq_dict[f't0_unconstrain_{chan}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f't0_unconstrain_{chan}'][readout_inds] = t0_noconstrain
-        rq_dict[f'chi2_unconstrain_{chan}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'chi2_unconstrain_{chan}'][readout_inds] = chi2_noconstrain
+        rq_dict[f'ofamp_unconstrain_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'ofamp_unconstrain_{chan}{det}'][readout_inds] = amp_noconstrain
+        rq_dict[f't0_unconstrain_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f't0_unconstrain_{chan}{det}'][readout_inds] = t0_noconstrain
+        rq_dict[f'chi2_unconstrain_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2_unconstrain_{chan}{det}'][readout_inds] = chi2_noconstrain
 
         if setup.ofamp_unconstrained_lowfreqchi2 and setup.do_chi2_lowfreq:
             chi2low = np.zeros(len(signal))
@@ -453,8 +455,8 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                 chi2low[jj] = qp.chi2lowfreq(s, template, amp_noconstrain[jj], t0_noconstrain[jj], 
                                                   psd, fs, fcutoff=setup.chi2_lowfreq_fcutoff[chan_num])
 
-            rq_dict[f'chi2lowfreq_unconstrain_{chan}'] = np.ones(len(readout_inds))*(-999999.0)
-            rq_dict[f'chi2lowfreq_unconstrain_{chan}'][readout_inds] = chi2low
+            rq_dict[f'chi2lowfreq_unconstrain_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f'chi2lowfreq_unconstrain_{chan}{det}'][readout_inds] = chi2low
 
     if setup.do_ofamp_constrained:
         amp_constrain = np.zeros(len(signal))
@@ -465,12 +467,12 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                                                                psd, fs, withdelay=True,
                                                                nconstrain=setup.ofamp_constrained_nconstrain[chan_num])
 
-        rq_dict[f'ofamp_constrain_{chan}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'ofamp_constrain_{chan}'][readout_inds] = amp_constrain
-        rq_dict[f't0_constrain_{chan}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f't0_constrain_{chan}'][readout_inds] = t0_constrain
-        rq_dict[f'chi2_constrain_{chan}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'chi2_constrain_{chan}'][readout_inds] = chi2_constrain
+        rq_dict[f'ofamp_constrain_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'ofamp_constrain_{chan}{det}'][readout_inds] = amp_constrain
+        rq_dict[f't0_constrain_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f't0_constrain_{chan}{det}'][readout_inds] = t0_constrain
+        rq_dict[f'chi2_constrain_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2_constrain_{chan}{det}'][readout_inds] = chi2_constrain
 
         if setup.ofamp_constrained_lowfreqchi2 and setup.do_chi2_lowfreq:
             chi2low = np.zeros(len(signal))
@@ -478,8 +480,8 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                 chi2low[jj] = qp.chi2lowfreq(s, template, amp_constrain[jj], t0_constrain[jj], 
                                                   psd, fs, fcutoff=setup.chi2_lowfreq_fcutoff[chan_num])
 
-            rq_dict[f'chi2lowfreq_constrain_{chan}'] = np.ones(len(readout_inds))*(-999999.0)
-            rq_dict[f'chi2lowfreq_constrain_{chan}'][readout_inds] = chi2low
+            rq_dict[f'chi2lowfreq_constrain_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f'chi2lowfreq_constrain_{chan}{det}'][readout_inds] = chi2low
 
     if setup.do_ofamp_pileup:
         amp_pileup = np.zeros(len(signal))
@@ -490,16 +492,16 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                                                                psd, fs, a1=amp_constrain[jj], t1=t0_constrain[jj],
                                                                nconstrain2=setup.ofamp_pileup_nconstrain[chan_num])
 
-        rq_dict[f'ofamp_pileup_{chan}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'ofamp_pileup_{chan}'][readout_inds] = amp_pileup
-        rq_dict[f't0_pileup_{chan}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f't0_pileup_{chan}'][readout_inds] = t0_pileup
-        rq_dict[f'chi2_pileup_{chan}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'chi2_pileup_{chan}'][readout_inds] = chi2_pileup
+        rq_dict[f'ofamp_pileup_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'ofamp_pileup_{chan}{det}'][readout_inds] = amp_pileup
+        rq_dict[f't0_pileup_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f't0_pileup_{chan}{det}'][readout_inds] = t0_pileup
+        rq_dict[f'chi2_pileup_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2_pileup_{chan}{det}'][readout_inds] = chi2_pileup
         
     return rq_dict
     
-def _calc_rq(traces, channels, setup, readout_inds=None):
+def _calc_rq(traces, channels, det, setup, readout_inds=None):
     """
     Helper function for calculating RQs for arrays of traces.
     
@@ -508,8 +510,10 @@ def _calc_rq(traces, channels, setup, readout_inds=None):
     traces : ndarray
         Array of traces to use in calculation of RQs. Should be of shape (number of traces,
         number of channels, length of trace)
-    channels : list
+    channels : list of str
         List of the channels that will be processed
+    det : list of str
+        The detector ID that corresponds to the channels that will be processed.
     setup : SetupRQ
         A SetupRQ class object. This object defines all of the different RQs that should be calculated 
         and specifies relevant parameters.
@@ -530,13 +534,13 @@ def _calc_rq(traces, channels, setup, readout_inds=None):
     rq_dict = {}
     
     if setup.calcchans:
-        for ii, chan in enumerate(channels):
+        for ii, (chan, d) in enumerate(zip(channels, det)):
 
             signal = traces[readout_inds, ii]
             template = setup.templates[ii]
             psd = setup.psds[ii]
 
-            chan_dict = _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ii)
+            chan_dict = _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ii, d)
 
             rq_dict.update(chan_dict)
             
@@ -546,7 +550,7 @@ def _calc_rq(traces, channels, setup, readout_inds=None):
         psd = setup.summed_psd
         chan = "sum"
 
-        sum_dict = _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, 0)
+        sum_dict = _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, 0, "")
 
         rq_dict.update(sum_dict)
     
@@ -559,11 +563,11 @@ def _rq(file, channels, det, setup, convtoamps, savepath, lgcsavedumps, filetype
     Parameters
     ----------
     file : str
-        Path to a file that should be opened and processed
+        Path to a file that should be opened and processed.
     channels : list of str
-        List of the channels that will be processed
-    det : str
-        The detector ID that corresponds to the channels that will be processed
+        List of the channels that will be processed.
+    det : list of str
+        The detector ID that corresponds to the channels that will be processed.
     setup : SetupRQ
         A SetupRQ class object. This object defines all of the different RQs that should be calculated 
         and specifies relevant parameters.
@@ -600,9 +604,15 @@ def _rq(file, channels, det, setup, convtoamps, savepath, lgcsavedumps, filetype
     
     if isinstance(channels, str):
         channels = [channels]
+        
+    if isinstance(det, str):
+        det = [det]*len(channels)
+        
+    if len(det)!=len(channels):
+        raise ValueError("channels and det should have the same length")
     
     if filetype == "mid.gz":
-        traces, info_dict = io.get_traces_midgz([file], chan=channels, det=det, convtoamps=convtoamps)
+        traces, info_dict = io.get_traces_midgz([file], channels=channels, det=det, convtoamps=convtoamps)
     elif filetype == "npz":
         traces, info_dict = io.get_traces_npz([file])
     
@@ -611,11 +621,14 @@ def _rq(file, channels, det, setup, convtoamps, savepath, lgcsavedumps, filetype
     data.update(info_dict)
     
     if filetype == "mid.gz":
-        readout_inds = np.array(data["readoutstatus"]) == 1
+        readout_inds = []
+        for d in set(det):
+            readout_inds.append(np.array(data[f'readoutstatus{d}'])==1)
+        readout_inds = np.logical_and.reduce(readout_inds)
     elif filetype == "npz":
         readout_inds = None
     
-    rq_dict = _calc_rq(traces, channels, setup, readout_inds=readout_inds)
+    rq_dict = _calc_rq(traces, channels, det, setup, readout_inds=readout_inds)
     
     data.update(rq_dict)
     
@@ -635,15 +648,17 @@ def rq(filelist, channels, setup, det="Z1", savepath='', lgcsavedumps=False, npr
     ----------
     filelist : list
         List of paths to each file that should be opened and processed
-    channels : list of str
+    channels : str, list of str
         List of the channel names that will be processed. Used when naming RQs. When filetype is "mid.gz", 
         this is also used when reading the traces from each file.
     setup : SetupRQ
         A SetupRQ class object. This object defines all of the different RQs that should be calculated 
         and specifies relevant parameters.
-    det : str, optional
+    det : str, list of str, optional
         The detector ID that corresponds to the channels that will be processed. Set to "Z1" by default.
-        Only used when filetype is "mid.gz"
+        Only used when filetype is "mid.gz". If a list of strings, then should each value should directly 
+        correspond to the channel names. If a string is inputted and there are multiple channels, then it
+        is assumed that the detector name is the same for each channel.
     savepath : str
         The path to where each dump should be saved, if lgcsavedumps is set to True.
     lgcsavedumps : bool
@@ -668,13 +683,22 @@ def rq(filelist, channels, setup, det="Z1", savepath='', lgcsavedumps=False, npr
     
     if isinstance(filelist, str):
         filelist = [filelist]
+        
+    if isinstance(channels, str):
+        channels = [channels]
+        
+    if isinstance(det, str):
+        det = [det]*len(channels)
+        
+    if len(det)!=len(channels):
+        raise ValueError("channels and det should have the same length")
     
     folder = os.path.split(filelist[0])[0]
     
     if filetype == "mid.gz":
         convtoamps = []
-        for ch in channels:
-            convtoamps.append(io.get_trace_gain(folder, ch, det)[0])
+        for ch, d in zip(channels, det):
+            convtoamps.append(io.get_trace_gain(folder, ch, d)[0])
     elif filetype == "npz":
         convtoamps = [1]*len(channels)
     
