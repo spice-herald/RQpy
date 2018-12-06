@@ -122,3 +122,46 @@ def double_gaussian(x, *params):
     a1, a2, m1, m2, sd1, sd2 = params
     double_gauss = gaussian(x,a1, m1, sd1) + gaussian(x,a2, m2, sd2)
     return double_gauss
+
+
+    
+def saturation_func(x,a,b):
+    """
+    Function to describe the satruation of a signal in a 
+    detector as a function of energy 
+    
+    
+    Parameters
+    ----------
+    x: array
+        Array of x-data
+    a: float
+        Amplitude parameter
+    b: float
+        Saturation parameter
+        
+    Returns
+    -------
+    sat_func: array
+        Array of y-values 
+        
+    Notes
+    -----
+    This function has the following criteria imposed on it
+    in order to be physically consistant with saturation
+    in a system. It must be monotonic, and must asymptote to
+    a fixed value for large values of x. 
+    
+    The functional form is as follows:
+    
+    y = a(1-exp(-x/b))
+    
+    """
+    
+    sat_func = a*(1-np.exp(-x/b))
+    return sat_func
+
+
+
+
+
