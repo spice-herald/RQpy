@@ -1,6 +1,6 @@
 import numpy as np
 
-__all__ = ["gaussian", "gaussian_background", "double_gaussian", "n_gauss"]
+__all__ = ["gaussian", "gaussian_background", "double_gaussian", "n_gauss", "saturation_func"]
 
 
 
@@ -125,24 +125,24 @@ def double_gaussian(x, *params):
 
 
     
-def saturation_func(x,a,b):
+def saturation_func(x, a, b):
     """
-    Function to describe the satruation of a signal in a 
+    Function to describe the saturation of a signal in a 
     detector as a function of energy 
     
     
     Parameters
     ----------
-    x: array
+    x : array
         Array of x-data
-    a: float
+    a : float
         Amplitude parameter
-    b: float
+    b : float
         Saturation parameter
         
     Returns
     -------
-    sat_func: array
+    sat_func : array
         Array of y-values 
         
     Notes
@@ -157,9 +157,101 @@ def saturation_func(x,a,b):
     y = a(1-exp(-x/b))
     
     """
-    
+
     sat_func = a*(1-np.exp(-x/b))
+    
     return sat_func
+
+def sat_func_expansion(x, a, b):
+    """
+    Taylor expansion of saturation_func()
+    
+    Parameters
+    ----------
+    x : array
+        Array of x-data
+    a : float
+        Amplitude parameter
+    b : float
+        Saturation parameter
+        
+    Returns
+    -------
+    lin_func : array
+        Array of y-values 
+    
+    """
+    
+    lin_func = a*x/b
+    
+    return lin_func
+
+def prop_sat_err(x,params,cov):
+    """
+    Helper function to propagate errors for saturation_func()
+    
+    Parameters
+    ----------
+    x : array
+        Array of x-data
+    params : array
+        Best fit parameters for saturation_func()
+    cov : array
+        Covariance matrix for parameters
+        
+    Returns
+    -------
+    errors : array
+        Array of 1 sigma errors as a function of x
+        
+    """
+    
+    a, b = params
+    deriv = np.array([(1-np.exp(-x/b)), -a*x*np.exp(-x/b)/(b**2)])
+    sig_func = []
+    for ii in range(len(deriv)):
+        for jj in range(len(deriv)):
+            sig_func.append(deriv[ii]*cov[ii][jj]*deriv[jj])
+    sig_func = np.array(sig_func)
+    errors = sig_func.sum(axis = 0) 
+    
+    return errors
+
+
+
+def prop_sat_err_lin(x, params, cov):
+    """
+    Helper function to propagate errors for the taylor expantion of 
+    saturation_func()
+    
+    Parameters
+    ----------
+    x : array
+        Array of x-data
+    params : array
+        Best fit parameters for saturation_func()
+    cov : array
+        Covariance matrix for parameters
+        
+    Returns
+    -------
+    errors : array
+        Array of 1 sigma errors as a function of x
+        
+    """
+    
+    a, b = params
+    deriv = np.array([x/b, -a*x/(b**2)])
+    sig_func = []
+    for ii in range(len(deriv)):
+        for jj in range(len(deriv)):
+            sig_func.append(deriv[ii]*cov[ii][jj]*deriv[jj])
+    sig_func = np.array(sig_func)
+    errors = sig_func.sum(axis = 0)
+    
+    return errors
+
+
 
 
 

@@ -1,6 +1,6 @@
 import numpy as np
 from ._utils import _bindata
-from ._functions import gaussian_background, n_gauss
+from ._functions import gaussian_background, n_gauss, saturation_func, sat_func_expansion, prop_sat_err, prop_sat_err_lin
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 from rqpy.plotting._plotting import _plot_gauss, _plot_n_gauss
@@ -179,3 +179,76 @@ def fit_gauss(arr ,xrange = None, noiserange = None, lgcplot = False, labeldict 
         _plot_gauss(x, bins, y, fitparams, errors, background, labeldict)
     
     return peakloc, peakerr, fitparams, errors
+
+
+def fit_saturation(x, y, yerr, guess):
+    """
+    Function to fit the saturation of the measured calibration spectrum. 
+    
+    Parameters
+    ----------
+    x: array-like
+        The true energy of the spectrual peaks
+    y: array-like
+        The measured energy (or similar quantity) of the spectral peaks
+    yerr: array-like
+        The errors in the measured energy of the spectral peaks
+    guess: array-like
+        Array of initial guess parameters (a,b) to be passed to saturation_func()
+        
+    Returns
+    -------
+    Stuff
+    
+    Notes
+    -----
+    This function fits the function y = a(1-exp(-x/b)) to the given data. This function
+    is then Taylor expanded about x=0 to find the linear part of the calibration at
+    low energies. There errors in this taylor expanded function y~ax/b, are determined
+    via the covariance matrix returned from the initial fit.
+    
+    """
+    
+    
+    
+        
+    popt, pcov = curve_fit(saturation_func, x, y, sigma = yerr, p0 = guess, absolute_sigma=True, maxfev = 10000)
+    
+    
+    x_fit = np.linspace(0, x[-1], 100)
+    y_fit = saturation_func(x_fit, *popt)
+    y_fit_lin = sat_func_expansion(x_fit, *popt)
+    
+    err_full = prop_sat_err(x_fit,popt,pcov)
+    err_lin = prop_sat_err_lin(x_fit,popt,pcov)
+
+    plt.figure(figsize=(12,8))
+    plt.grid(True, linestyle = 'dashed')
+    plt.scatter(x,y, marker = 'x', label = 'Spectral Peaks' , s = 100, zorder = 100, color ='b')
+    plt.errorbar(x,y, yerr=yerr, linestyle = ' ')
+    plt.plot(x_fit, y_fit, label = r'$y = a[1-exp(x/b)]$', color = 'g')
+    
+    plt.fill_between(x_fit, y_fit-2*err_full, y_fit+2*err_full, alpha = .5, color = 'g')
+    
+    plt.plot(x_fit, y_fit_lin, linestyle = '--', color = 'r', label = 'Taylor Expansion of Saturation Function')
+    plt.fill_between(x_fit, y_fit_lin-2*err_lin, y_fit_lin+2*err_lin, alpha = .2, color = 'r')
+    
+    plt.ylabel('Calculated Integral Energy[eV]', fontsize = 14)
+    plt.xlabel('True Energy [eV]', fontsize = 14)
+    plt.title('Integrated Energy Saturation Correction', fontsize = 14)
+
+    plt.legend(loc = 2, fontsize = 14)
+    plt.tick_params(which="both", direction="in", right=True, top=True)
+    
+    #return errz
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
