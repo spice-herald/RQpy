@@ -50,7 +50,7 @@ def baselinecut_dr(arr, r0, i0, rload, dr = 0.1e-3, cut = None):
     return cbase_pre
 
 
-def baselinecut_tdep(t, b, cut=None, dt=1000, cut_eff=90, positive_pulses=True):
+def baselinecut_tdep(t, b, cut=None, dt=1000, cut_eff=0.9, positive_pulses=True):
     """
     Function for calculating a baseline cut over time based on a given percentile.
     
@@ -67,8 +67,7 @@ def baselinecut_tdep(t, b, cut=None, dt=1000, cut_eff=90, positive_pulses=True):
         Length in time that the baselines should be binned in. Should be in units of s.
         Determines the number of bins by (time elapsed)/dt.
     cut_eff : float, optional
-        The desired cut efficiency, should be a value between 0 and 100. This is the 
-        percentile used to cut on.
+        The desired cut efficiency, should be a value between 0 and 1.
     positive_pulses : bool, optional
         The direction of the pulses in the data, which determines the direction of the 
         tails of the baseline distributions and which values should be kept.
@@ -79,6 +78,9 @@ def baselinecut_tdep(t, b, cut=None, dt=1000, cut_eff=90, positive_pulses=True):
         A boolean mask indicating which data points passed the baseline cut.
     
     """
+    
+    if (cut_eff > 1) or (cut_eff < 0):
+        raise ValueError("cut_eff must be a value between 0 and 1")
     
     if cut is None:
         cut = np.ones(len(b), dtype=bool)
@@ -91,11 +93,12 @@ def baselinecut_tdep(t, b, cut=None, dt=1000, cut_eff=90, positive_pulses=True):
     nbins = int(t_elapsed/dt)
     
     if not positive_pulses:
-        cut_eff = 100 - cut_eff
+        cut_eff = 1 - cut_eff
+    
+    st = lambda x: x[np.argpartition(x, int(len(x)*cut_eff))][int(len(x)*cut_eff)]
     
     cutoffs, bin_edges, _ = stats.binned_statistic(t[cut], b[cut], bins=nbins,
-                                                   statistic=lambda x: np.percentile(x, cut_eff))
-    
+                                                   statistic=st)
     f = interpolate.interp1d(bin_edges[:-1], cutoffs, kind='next', 
                              bounds_error=False, fill_value=(cutoffs[0], cutoffs[-1]),
                              assume_sorted=True)
