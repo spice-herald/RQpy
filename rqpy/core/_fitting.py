@@ -7,7 +7,8 @@ from rqpy import plotting, utils
 __all__ = ["fit_multi_gauss", "fit_gauss", "fit_saturation"]
 
 
-def fit_multi_gauss(arr, guess, ngauss, xrange=None, lgcplot=True, labeldict=None, lgcfullreturn=False):
+def fit_multi_gauss(arr, guess, ngauss, xrange=None, nbins='sqrt', lgcplot=True, 
+                    labeldict=None, lgcfullreturn=False):
     """
     Function to multiple Gaussians plus a flat background. Note, depending on
     the spectrum, this function can ber very sensitive to the inital guess parameters. 
@@ -27,12 +28,14 @@ def fit_multi_gauss(arr, guess, ngauss, xrange=None, lgcplot=True, labeldict=Non
         The number of peaks to fit
     xrange : tuple, optional
         The range over which to fit the peaks
+    nbins : int, str, optional
+        This is the same as plt.hist() bins parameter. Defaults is 'sqrt'.
     lgcplot : bool, optional
         If True, the fit and spectrum will be plotted 
     labeldict : dict, optional
-        Dictionary to overwrite the labels of the plot. defaults are : 
+        Dictionary to overwrite the labels of the plot. defaults are: 
             labels = {'title' : 'Histogram', 'xlabel' : 'variable', 'ylabel' : 'Count'}
-            Ex: to change just the title, pass: labeldict = {'title' : 'new title'}, to fig_gauss()
+            Ex: to change just the title, pass: labeldict = {'title' : 'new title'}, to fit_multi_gauss()
     lgcfullreturn : bool, optional
         If True, the binned data is returned along with the fit parameters
         
@@ -69,7 +72,7 @@ def fit_multi_gauss(arr, guess, ngauss, xrange=None, lgcplot=True, labeldict=Non
 
     fit_n_gauss = lambda x, *params: utils.n_gauss(x, params, ngauss).sum(axis=0)
     
-    x,y, bins = _bindata(arr,  xrange=xrange, bins='sqrt')
+    x,y, bins = _bindata(arr,  xrange=xrange, bins=nbins)
     yerr = np.sqrt(y)
     yerr[yerr == 0] = 1 # make errors 1 if bins are empty
     
@@ -96,43 +99,44 @@ def fit_multi_gauss(arr, guess, ngauss, xrange=None, lgcplot=True, labeldict=Non
         return peaks, amps, stds, background_fit
 
 
-def fit_gauss(arr, xrange=None, noiserange=None, lgcplot=False, labeldict=None):
+def fit_gauss(arr, xrange=None, nbins='sqrt', noiserange=None, lgcplot=False, labeldict=None):
     """
     Function to fit Gaussian distribution with background to peak in spectrum. 
     Errors are assumed to be poissonian. 
     
-    
     Parameters
     ----------
-        arr : ndarray
-            Array of data to bin and fit to gaussian
-        xrange : tuple, optional
-            The range of data to use when binning
-        noiserange : tuple, optional
-            nested 2-tuple. should contain the range before 
-            and after the peak to be used for subtracting the 
-            background
-        lgcplot : bool, optional
-            If True, the fit and spectrum will be plotted 
-        labeldict : dict, optional
-            Dictionary to overwrite the labels of the plot. defaults are : 
-                labels = {'title' : 'Histogram', 'xlabel' : 'variable', 'ylabel' : 'Count'}
-            Ex: to change just the title, pass: labeldict = {'title' : 'new title'}, to fig_gauss()
+    arr : ndarray
+        Array of data to bin and fit to gaussian
+    xrange : tuple, optional
+        The range of data to use when binning
+    nbins : int, str, optional
+        This is the same as plt.hist() bins parameter. Defaults is 'sqrt'.
+    noiserange : tuple, optional
+        nested 2-tuple. should contain the range before 
+        and after the peak to be used for subtracting the 
+        background
+    lgcplot : bool, optional
+        If True, the fit and spectrum will be plotted 
+    labeldict : dict, optional
+        Dictionary to overwrite the labels of the plot. defaults are : 
+            labels = {'title' : 'Histogram', 'xlabel' : 'variable', 'ylabel' : 'Count'}
+        Ex: to change just the title, pass: labeldict = {'title' : 'new title'}, to fit_gauss()
             
     Returns
     -------
-        peakloc : float
-            The mean of the distribution
-        peakerr : float
-            The full error in the location of the peak
-        fitparams : tuple
-            The best fit parameters of the fit; A, mu, sigma
-        errors : ndarray
-            The uncertainty in the fit parameters
+    peakloc : float
+        The mean of the distribution
+    peakerr : float
+        The full error in the location of the peak
+    fitparams : tuple
+        The best fit parameters of the fit; A, mu, sigma
+    errors : ndarray
+        The uncertainty in the fit parameters
         
     """
     
-    x,y, bins = utils.bindata(arr,  xrange, bins = 'sqrt')
+    x,y, bins = utils.bindata(arr,  xrange, bins=nbins)
     yerr = np.sqrt(y)
     yerr[yerr == 0] = 1 # make errors 1 if bins are empty
     
