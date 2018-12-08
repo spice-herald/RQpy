@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from rqpy.plotting._plotting import _plot_gauss, _plot_n_gauss
 
 
-__all__ = ["fit_multi_gauss", "fit_gauss", "fit"]
+__all__ = ["fit_multi_gauss", "fit_gauss", "fit_saturation"]
 
 
 def _gaussian(x, amp, mean, sd):
