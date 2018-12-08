@@ -33,6 +33,9 @@ class SetupRQ(object):
         The PSD corresponding to all of the channels summed together to be used when calculating
         RQs. Should be a two-sided PSD, with units of A^2/Hz. If not set, then the RQs for 
         the sum of the channels will not be calculated.
+    trigger : float, NoneType, optional
+        The index corresponding to which channel is the trigger channel in the list of templates
+        and psds. If left as None, then no channel is assumed to be the trigger channel.
     calcchans : bool
         Boolean flag for whether or not to calculate the RQs for each of the individual 
         channels.
@@ -80,10 +83,18 @@ class SetupRQ(object):
         The number of indices up to which a trace should be averaged to determine the baseline.
     do_integral : bool
         Boolean flag for whether or not to calculate the baseline-subtracted integral of each trace.
+    do_ofamp_shifted : bool
+        Boolean flag for whether or not the shifted optimum filter fit should be calculated for
+        the non-trigger channels. If set to True, then self.trigger must have been set to a value.
+    shifted_fit : str
+        String specifying which fit that the time shift should be pulled from if the shifted
+        optimum filter fit will be calculated. Should be "nodelay", "constrained", or "unconstrained",
+        referring the the no delay OF, constrained OF, and unconstrained OF, respectively. Default
+        is "constrained".
     
     """
     
-    def __init__(self, templates, psds, fs, summed_template=None, summed_psd=None):
+    def __init__(self, templates, psds, fs, summed_template=None, summed_psd=None, trigger=None):
         """
         Initialization of the SetupRQ class.
         
@@ -104,6 +115,9 @@ class SetupRQ(object):
             The PSD corresponding to all of the channels summed together to be used when calculating
             RQs. Should be a two-sided PSD, with units of A^2/Hz. If not set, then the RQs for 
             the sum of the channels will not be calculated.
+        trigger : float, NoneType, optional
+            The index corresponding to which channel is the trigger channel in the list of templates
+            and psds. If left as None, then no channel is assumed to be the trigger channel.
         
         """
         
@@ -118,7 +132,14 @@ class SetupRQ(object):
         self.summed_template = summed_template
         self.summed_psd = summed_psd
         
+        if self.trigger is None or self.trigger in list(range(self.nchan)):
+            self.trigger = trigger
+        else:
+            raise ValueError("trigger must be either None, or an integer"+\
+                             f" from zero to the number of channels - 1 ({self.nchan-1})")
+            
         self.calcchans=True
+        
         if summed_template is None or summed_psd is None:
             self.calcsum=False
         else:
@@ -146,6 +167,9 @@ class SetupRQ(object):
         self.baseline_indbasepre = [16000]*self.nchan
         
         self.do_integral = True
+        
+        self.do_ofamp_shifted = False
+        self.which_fit = "constrained"
         
     def adjust_calc(self, lgcchans=True, lgcsum=True):
         """
@@ -356,6 +380,41 @@ class SetupRQ(object):
         
         self.do_integral = lgcrun
         
+    def adjust_ofamp_shifted(self, lgcrun=True, which_fit="constrained"):
+        """
+        Method for adjusting the calculation of the shifted optimum filter fit.
+        
+        Parameters
+        ----------
+        lgcrun : bool, optional
+            Boolean flag for whether or not the shifted optimum filter fit should be calculated for
+            the non-trigger channels. If set to True, then self.trigger must have been set to a value.
+        which_fit : str, optional
+            String specifying which fit that the time shift should be pulled from if the shifted
+            optimum filter fit will be calculated. Should be "nodelay", "constrained", or "unconstrained",
+            referring the the no delay OF, constrained OF, and unconstrained OF, respectively. Default
+            is "constrained".
+            
+        """
+        
+        self.do_ofamp_shifted = lgcrun
+        
+        if self.do_ofamp_shifted:
+            if which_fit not in ["constrained", "unconstrained", "nodelay"]:
+                raise ValueError("which_fit should be set to 'constrained', 'unconstrained', or 'nodelay'")
+
+            if which_fit == "constrained" and not self.do_ofamp_constrained:
+                raise ValueError("which_fit was set to 'constrained', but that fit has been set to not be calculated")
+
+            if which_fit == "unconstrained" and not self.do_ofamp_unconstrained:
+                raise ValueError("which_fit was set to 'constrained', but that fit has been set to not be calculated")
+
+            if which_fit == "nodelay" and not self.do_ofamp_nodelay:
+                raise ValueError("which_fit was set to 'nodelay', but that fit has been set to not be calculated")
+            
+        self.shifted_fit = which_fit
+        
+        
 def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, chan_num, det):
     """
     Helper function for calculating RQs for an array of traces corresponding to a single channel.
@@ -498,6 +557,29 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         rq_dict[f't0_pileup_{chan}{det}'][readout_inds] = t0_pileup
         rq_dict[f'chi2_pileup_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'chi2_pileup_{chan}{det}'][readout_inds] = chi2_pileup
+        
+    if setup.do_ofamp_shifted and setup.trigger is not None and chan_num!=setup.trigger:
+        amp_shifted = np.zeros(len(signal))
+        chi2_shifted = np.zeros(len(signal))
+        
+        if setup.shifted_fit=="nodelay" and setup.do_ofamp_nodelay:
+            t0_shifted = np.zeros(len(signal))
+        elif setup.shifted_fit=="constrained" and setup.do_ofamp_constrained:
+            t0_shifted = t0_constrain
+        elif setup.shifted_fit=="unconstrained" and setup.do_ofamp_unconstrained:
+            t0_shifted = t0_unconstrain
+        
+        for jj, s in enumerate(signal):
+            amp_shifted[jj], _, chi2_shifted[jj] = qp.ofamp(s, rp.shift(template, int(t0_shifted[jj]*fs)), 
+                                                                        psd, fs, withdelay=False)
+            
+        rq_dict[f'ofamp_shifted_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'ofamp_shifted_{chan}{det}'][readout_inds] = amp_shifted
+        rq_dict[f't0_shifted_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f't0_shifted_{chan}{det}'][readout_inds] = t0_shifted
+        rq_dict[f'chi2_shifted_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2_shifted_{chan}{det}'][readout_inds] = chi2_shifted
+            
         
     return rq_dict
     
