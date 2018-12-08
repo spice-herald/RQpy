@@ -2,10 +2,10 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib import colors
-from rqpy.core._functions import gaussian_background, n_gauss
+from rqpy import utils
 
 
-__all__ = ["hist", "scatter", "densityplot"]
+__all__ = ["hist", "scatter", "densityplot", "plot_gauss", "plot_n_gauss"]
 
 
 def hist(arr, nbins='sqrt', xlims=None, cutold=None, cutnew=None, lgcrawdata=True, 
@@ -379,7 +379,7 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
 
     return fig, ax
 
-def _plot_gauss(x, bins, y, fitparams, errors, background, labeldict):
+def plot_gauss(x, bins, y, fitparams, errors, background, labeldict):
     """
     Hidden helper function to plot Gaussian plus background fits
     
@@ -431,13 +431,13 @@ def _plot_gauss(x, bins, y, fitparams, errors, background, labeldict):
     ax.hist(x, bins = bins, weights = y, histtype = 'step', linewidth = 1, label ='Raw Data', alpha = .9)
     ax.axhline(background, label = 'Average Background Rate', linestyle = '--', alpha = .3)
 
-    ax.plot(x_fit, gaussian_background(x_fit, *fitparams), label = 'Gaussian Fit')
+    ax.plot(x_fit, utils.gaussian_background(x_fit, *fitparams), label = 'Gaussian Fit')
     ax.legend()
     ax.grid(True, linestyle = 'dashed')
     
     return fig, ax
     
-def _plot_n_gauss(x, y, bins, fitparams, labeldict, ax = None):
+def plot_n_gauss(x, y, bins, fitparams, labeldict, ax = None):
     """
     Hidden helper function to plot and arbitrary number of Gaussians plus background fit
     
@@ -489,7 +489,7 @@ def _plot_n_gauss(x, y, bins, fitparams, labeldict, ax = None):
     ax.hist(x, bins = bins, weights = y, histtype = 'step', linewidth = 1, label ='Raw Data', alpha = .9)
     
 
-    y_fits = n_gauss(x_fit, fitparams, n)
+    y_fits = utils.n_gauss(x_fit, fitparams, n)
     ax.plot(x_fit, y_fits.sum(axis = 0), label = 'Total Fit')
     for ii in range(y_fits.shape[0] - 1):
         ax.plot(x_fit, y_fits[ii], alpha = .5, label = labels[f'peak{ii+1}'])

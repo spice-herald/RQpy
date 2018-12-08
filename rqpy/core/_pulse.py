@@ -39,31 +39,6 @@ def shift(arr, num, fill_value=0):
         
     return result
 
-def _pulse_func(time, tau_r, tau_f):
-    """
-    Simple function to make an ideal pulse shape in time domain 
-    with a single pole rise and a signle pole fall
-    
-    Parameters
-    ---------
-    time : array
-        Array of time values to make the pulse with
-    tau_r : float
-        The time constant for the exponential rise of the pulse
-    tau_f : float
-        The time constant for the exponential fall of the pulse
-        
-    Returns
-    -------
-    pulse : array
-        The pulse magnitude as a function of time. Note, the normalization is
-        arbitrary. 
-        
-    """
-    
-    pulse = np.exp(-time/tau_f)-np.exp(-time/tau_r)
-    return pulse 
-
 
 def make_ideal_template(x, tau_r, tau_f, offset):
     """
@@ -90,9 +65,8 @@ def make_ideal_template(x, tau_r, tau_f, offset):
         
     """
     
-    pulse = _pulse_func(x, tau_r,tau_f)
+    pulse = np.exp(-x/tau_f)-np.exp(-x/tau_r)
     pulse_shifted = shift(pulse, offset)
-    pulse_shifted[:offset] = 0
     template_normed = pulse_shifted/pulse_shifted.max()
     
     return template_normed
@@ -149,7 +123,6 @@ def ds_trunc(traces, fs, trunc, ds, template = None):
         return traces_ds, template_ds, psd_ds, fs_ds
     else:
         return traces_ds, psd_ds, fs_ds
-    
     
     
     

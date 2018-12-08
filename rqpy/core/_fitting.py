@@ -1,109 +1,10 @@
 import numpy as np
-from rqpy.core._utils import _bindata
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
-from rqpy.plotting._plotting import _plot_gauss, _plot_n_gauss
+from rqpy import plotting, utils
 
 
 __all__ = ["fit_multi_gauss", "fit_gauss", "fit_saturation"]
-
-
-def _gaussian(x, amp, mean, sd):
-    """
-    Functional form for Gaussian distribution
-    
-    Parameters
-    ----------
-    x : array
-        Array corresponding to x data
-    amp : float
-        Normilization factor (or amplitude) for function
-    mean : float
-        The first moment of the distribution
-    sd : float
-        The second moment of the distribution
-        
-    Return
-    ------
-    gauss : array
-        Array y values corresponding to the given x values
-        
-    """
-    
-    gauss = amp*np.exp(-(x - mean)**2/(2*sd**2))
-    
-    return gauss 
-
-def _n_gauss(x, params, n):
-    """
-    Function to sum n Gaussian distributions
-    
-    Parameters
-    ----------
-    x : ndarray
-        Array corresponding to x data
-    params : tuple
-        The order must be as follows:
-        (amplitude_i, mu_i, std_i,
-        ....,
-        ....,
-        background),
-        where the guess for the background is the last element
-    n : int
-        The number of Gaussian distributions to be summed
-        
-    Returns
-    -------
-    results : ndarray
-        2D array of Gaussians, where the first dimension corresponds
-        to each Gaussian. 
-            
-    Raises
-    ------
-    ValueError
-        If the number or parameters given is in conflict with n,
-        a ValueError is raised.
-        
-    """
-    
-    if n != int((len(params)-1)/3):
-        raise ValueError('Number of parameters must match the number of Gaussians')
-
-    results = []
-    for ii in range(n):
-        results.append(_gaussian(x, *params[ii*3:(ii*3)+3]))
-    results.append(np.ones(x.shape)*params[-1])
-    results = np.array(results)
-    
-    return results
-
-def _gaussian_background(x, amp, mean, sd, background):
-    """
-    Functional form for Gaussian distribution plus a background offset 
-    
-    Parameters
-    ----------
-    x : ndarray
-        Array corresponding to x data
-    amp : float
-        Normilization factor (or amplitude) for function
-    mean : float
-        The first moment of the distribution
-    sd : float
-        The second moment of the distribution
-    background : float
-        The offset (in the y-direction)
-        
-    Returns
-    -------
-    gauss_background : ndarray
-        Array y values corresponding to the given x values
-        
-    """
-    
-    gauss_background = _gaussian(x, amp, mean, sd) + background
-    
-    return gauss_background
 
 
 def fit_multi_gauss(arr, guess, ngauss, xrange=None, lgcplot=True, labeldict=None, lgcfullreturn=False):
@@ -166,7 +67,7 @@ def fit_multi_gauss(arr, guess, ngauss, xrange=None, lgcplot=True, labeldict=Non
     if ngauss != (len(guess)-1)/3:
         raise ValueError('Number of parameters in guess must match the number of Gaussians being fit (ngauss)')
 
-    fit_n_gauss = lambda x, *params: _n_gauss(x, params, ngauss).sum(axis=0)
+    fit_n_gauss = lambda x, *params: utils.n_gauss(x, params, ngauss).sum(axis=0)
     
     x,y, bins = _bindata(arr,  xrange=xrange, bins='sqrt')
     yerr = np.sqrt(y)
@@ -187,7 +88,7 @@ def fit_multi_gauss(arr, guess, ngauss, xrange=None, lgcplot=True, labeldict=Non
     stds = stds[peakssort]
     
     if lgcplot:
-        _plot_n_gauss(x, y, bins, fitparams, labeldict)
+        plotting.plot_n_gauss(x, y, bins, fitparams, labeldict)
         
     if lgcfullreturn:
         return peaks, amps, stds, background_fit, fitparams, errors, cov, (x, y, bins)
@@ -231,7 +132,7 @@ def fit_gauss(arr, xrange=None, noiserange=None, lgcplot=False, labeldict=None):
         
     """
     
-    x,y, bins = _bindata(arr,  xrange, bins = 'sqrt')
+    x,y, bins = utils.bindata(arr,  xrange, bins = 'sqrt')
     yerr = np.sqrt(y)
     yerr[yerr == 0] = 1 # make errors 1 if bins are empty
     
@@ -266,141 +167,15 @@ def fit_gauss(arr, xrange=None, noiserange=None, lgcplot=False, labeldict=None):
     p0 = (A0, mu0, sig0, background)
     
     #do fit
-    fitparams, cov = curve_fit(_gaussian_background, x, y, p0, sigma=yerr, absolute_sigma=True)
+    fitparams, cov = curve_fit(utils.gaussian_background, x, y, p0, sigma=yerr, absolute_sigma=True)
     errors = np.sqrt(np.diag(cov))    
     peakloc = fitparams[1]
     peakerr = np.sqrt((fitparams[2]/np.sqrt(fitparams[0]))**2)
     
     if lgcplot:
-        _plot_gauss(x, bins, y, fitparams, errors, background, labeldict)
+        plotting.plot_gauss(x, bins, y, fitparams, errors, background, labeldict)
     
     return peakloc, peakerr, fitparams, errors
-
-def _saturation_func(x, a, b):
-    """
-    Function to describe the saturation of a signal in a 
-    detector as a function of energy 
-    
-    
-    Parameters
-    ----------
-    x : ndarray
-        Array of x-data
-    a : float
-        Amplitude parameter
-    b : float
-        Saturation parameter
-        
-    Returns
-    -------
-    sat_func : ndarray
-        Array of y-values 
-        
-    Notes
-    -----
-    This function has the following criteria imposed on it
-    in order to be physically consistant with saturation
-    in a system. It must be monotonic, and must asymptote to
-    a fixed value for large values of x. 
-    
-    The functional form is as follows:
-    
-    y = a(1-exp(-x/b))
-    
-    """
-
-    sat_func = a*(1-np.exp(-x/b))
-    
-    return sat_func
-
-def _sat_func_expansion(x, a, b):
-    """
-    Taylor expansion of saturation_func()
-    
-    Parameters
-    ----------
-    x : ndarray
-        Array of x-data
-    a : float
-        Amplitude parameter
-    b : float
-        Saturation parameter
-        
-    Returns
-    -------
-    lin_func : ndarray
-        Array of y-values 
-    
-    """
-    
-    lin_func = a*x/b
-    
-    return lin_func
-
-def _prop_sat_err(x,params,cov):
-    """
-    Helper function to propagate errors for saturation_func()
-    
-    Parameters
-    ----------
-    x : ndarray
-        Array of x-data
-    params : ndarray
-        Best fit parameters for saturation_func()
-    cov : ndarray
-        Covariance matrix for parameters
-        
-    Returns
-    -------
-    errors : ndarray
-        Array of 1 sigma errors as a function of x
-        
-    """
-    
-    a, b = params
-    deriv = np.array([(1-np.exp(-x/b)), -a*x*np.exp(-x/b)/(b**2)])
-    sig_func = []
-    for ii in range(len(deriv)):
-        for jj in range(len(deriv)):
-            sig_func.append(deriv[ii]*cov[ii][jj]*deriv[jj])
-    sig_func = np.array(sig_func)
-    errors = sig_func.sum(axis=0) 
-    
-    return errors
-
-
-
-def _prop_sat_err_lin(x, params, cov):
-    """
-    Helper function to propagate errors for the taylor expantion of 
-    saturation_func()
-    
-    Parameters
-    ----------
-    x : ndarray
-        Array of x-data
-    params : ndarray
-        Best fit parameters for _saturation_func()
-    cov : ndarray
-        Covariance matrix for parameters
-        
-    Returns
-    -------
-    errors : ndarray
-        Array of 1 sigma errors as a function of x
-        
-    """
-    
-    a, b = params
-    deriv = np.array([x/b, -a*x/(b**2)])
-    sig_func = []
-    for ii in range(len(deriv)):
-        for jj in range(len(deriv)):
-            sig_func.append(deriv[ii]*cov[ii][jj]*deriv[jj])
-    sig_func = np.array(sig_func)
-    errors = sig_func.sum(axis=0)
-    
-    return errors
 
 
 def fit_saturation(x, y, yerr, guess):
@@ -430,11 +205,11 @@ def fit_saturation(x, y, yerr, guess):
     popt, pcov = curve_fit(_saturation_func, x, y, sigma=yerr, p0=guess, absolute_sigma=True, maxfev=10000)
     
     x_fit = np.linspace(0, x[-1], 100)
-    y_fit = _saturation_func(x_fit, *popt)
-    y_fit_lin = _sat_func_expansion(x_fit, *popt)
+    y_fit = utils.saturation_func(x_fit, *popt)
+    y_fit_lin = utils.sat_func_expansion(x_fit, *popt)
     
-    err_full = _prop_sat_err(x_fit,popt,pcov)
-    err_lin = _prop_sat_err_lin(x_fit,popt,pcov)
+    err_full = utils.prop_sat_err(x_fit,popt,pcov)
+    err_lin = utils.prop_sat_err_lin(x_fit,popt,pcov)
 
     plt.figure(figsize=(12,8))
     plt.grid(linestyle='dashed')
