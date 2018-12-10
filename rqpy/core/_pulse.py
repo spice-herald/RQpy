@@ -40,16 +40,16 @@ def shift(arr, num, fill_value=0):
     return result
 
 
-def make_ideal_template(x, tau_r, tau_f, offset):
+def make_ideal_template(t, tau_r, tau_f, offset=0):
     """
-    Function to make ideal pulse template in time domain with single pole exponential rise
-    and fall times and a given time offset. The template will be returned with maximum
-    pulse hight normalized to one. The template is rolled by the specified offset to define
-    the location of the peak. 
+    Function to make an ideal pulse template in time domain with single pole exponential rise
+    and fall times, and a given time offset. The template will be returned with the maximum
+    pulse height normalized to one. The pulse, by default, begins at the center of the trace, 
+    which can be left or right shifted via the `offset` optional argument.
     
     Parameters
     ----------
-    time : array
+    t : ndarray
         Array of time values to make the pulse with
     tau_r : float
         The time constant for the exponential rise of the pulse
@@ -65,8 +65,8 @@ def make_ideal_template(x, tau_r, tau_f, offset):
         
     """
     
-    pulse = np.exp(-x/tau_f)-np.exp(-x/tau_r)
-    pulse_shifted = shift(pulse, offset)
+    pulse = np.exp(-t/tau_f)-np.exp(-t/tau_r)
+    pulse_shifted = shift(pulse, len(t)//2 + offset)
     template_normed = pulse_shifted/pulse_shifted.max()
     
     return template_normed
