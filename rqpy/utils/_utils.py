@@ -1,32 +1,67 @@
 import numpy as np
 
-__all__ = ["gaussian", "gaussian_background", "double_gaussian", "n_gauss", "saturation_func"]
+
+__all__ = ["bindata", "gaussian", "n_gauss", "gaussian_background", "saturation_func", 
+           "sat_func_expansion", "prop_sat_err", "prop_sat_err_lin"]
 
 
+def bindata(arr, xrange=None, bins='sqrt'):
+    """
+    Helper function to convert 1d array into binned (x,y) data
+    
+    Parameters
+    ----------
+    arr : ndarray
+        Input array
+    xrange : tuple, optional
+        Range over which to bin data
+    bins : int or str, optional
+        Number of bins, or type of automatic binning scheme 
+        (see numpy.histogram())
+    
+    Returns
+    -------
+    x : ndarray
+        Array of x data
+    y : ndarray
+        Array of y data
+    bins : ndarray
+        Array of bins returned by numpy.histogram()
+    
+    """
+    
+    if xrange is not None:
+        y, bins = np.histogram(arr, bins=bins, range=xrange)
+    else:
+        y, bins = np.histogram(arr, bins=bins)
+    x = (bins[1:]+bins[:-1])/2
+    
+    return x, y, bins
 
-def gaussian(x,amp, mean, sd):
+def gaussian(x, amp, mean, sd):
     """
     Functional form for Gaussian distribution
     
     Parameters
     ----------
-    x: array
+    x : ndarray
         Array corresponding to x data
-    amp: float
+    amp : float
         Normilization factor (or amplitude) for function
-    mean: float
+    mean : float
         The first moment of the distribution
-    sd: float
+    sd : float
         The second moment of the distribution
         
     Return
     ------
-    gauss: array
+    gauss : array
         Array y values corresponding to the given x values
         
     """
     
     gauss = amp*np.exp(-(x - mean)**2/(2*sd**2))
+    
     return gauss 
 
 def n_gauss(x, params, n):
@@ -35,27 +70,27 @@ def n_gauss(x, params, n):
     
     Parameters
     ----------
-    x: array
+    x : ndarray
         Array corresponding to x data
-    params: tuple
+    params : tuple
         The order must be as follows:
         (amplitude_i, mu_i, std_i,
         ....,
         ....,
         background),
         where the guess for the background is the last element
-    n: int
+    n : int
         The number of Gaussian distributions to be summed
         
     Returns
     -------
-        results: array
-            2D array of Gaussians, where the first dimension corresponds
-            to each Gaussian. 
+    results : ndarray
+        2D array of Gaussians, where the first dimension corresponds
+        to each Gaussian. 
             
     Raises
     ------
-    ValueError:
+    ValueError
         If the number or parameters given is in conflict with n,
         a ValueError is raised.
         
@@ -67,64 +102,39 @@ def n_gauss(x, params, n):
     results = []
     for ii in range(n):
         results.append(gaussian(x, *params[ii*3:(ii*3)+3]))
-    results.append(np.ones(shape = x.shape)*params[-1])
-    results =  np.array(results)
+    results.append(np.ones(x.shape)*params[-1])
+    results = np.array(results)
+    
     return results
 
-def gaussian_background(x,amp, mean, sd, background):
+def gaussian_background(x, amp, mean, sd, background):
     """
     Functional form for Gaussian distribution plus a background offset 
     
     Parameters
     ----------
-    x: array
+    x : ndarray
         Array corresponding to x data
-    amp: float
+    amp : float
         Normilization factor (or amplitude) for function
-    mean: float
+    mean : float
         The first moment of the distribution
-    sd: float
+    sd : float
         The second moment of the distribution
-    background: float
+    background : float
         The offset (in the y-direction)
         
-    Return
-    ------
-    gauss_background: array
+    Returns
+    -------
+    gauss_background : ndarray
         Array y values corresponding to the given x values
         
     """
     
-    gauss_background =  gaussian(x,amp, mean, sd) + background
+    gauss_background = gaussian(x, amp, mean, sd) + background
+    
     return gauss_background
 
-
-def double_gaussian(x, *params):
-    """
-    Functional form for two Gaussian distributions added together
-    
-    Parameters
-    ----------
-    x: array
-        Array corresponding to x data
-    params: list
-        A list of the paramters to be passed to gaussian()
-        in the following order:
-            amp1, amp2, mean1, mean2, sd1, sd2 = params
-            
-    Return
-    ------
-    double_gauss: array
-        Array y values corresponding to the given x values
-        
-    """
-    
-    a1, a2, m1, m2, sd1, sd2 = params
-    double_gauss = gaussian(x,a1, m1, sd1) + gaussian(x,a2, m2, sd2)
-    return double_gauss
-
-
-    
 def saturation_func(x, a, b):
     """
     Function to describe the saturation of a signal in a 
@@ -133,7 +143,7 @@ def saturation_func(x, a, b):
     
     Parameters
     ----------
-    x : array
+    x : ndarray
         Array of x-data
     a : float
         Amplitude parameter
@@ -142,7 +152,7 @@ def saturation_func(x, a, b):
         
     Returns
     -------
-    sat_func : array
+    sat_func : ndarray
         Array of y-values 
         
     Notes
@@ -168,7 +178,7 @@ def sat_func_expansion(x, a, b):
     
     Parameters
     ----------
-    x : array
+    x : ndarray
         Array of x-data
     a : float
         Amplitude parameter
@@ -177,7 +187,7 @@ def sat_func_expansion(x, a, b):
         
     Returns
     -------
-    lin_func : array
+    lin_func : ndarray
         Array of y-values 
     
     """
@@ -186,22 +196,22 @@ def sat_func_expansion(x, a, b):
     
     return lin_func
 
-def prop_sat_err(x,params,cov):
+def prop_sat_err(x, params,cov):
     """
     Helper function to propagate errors for saturation_func()
     
     Parameters
     ----------
-    x : array
+    x : ndarray
         Array of x-data
-    params : array
+    params : ndarray
         Best fit parameters for saturation_func()
-    cov : array
+    cov : ndarray
         Covariance matrix for parameters
         
     Returns
     -------
-    errors : array
+    errors : ndarray
         Array of 1 sigma errors as a function of x
         
     """
@@ -213,7 +223,7 @@ def prop_sat_err(x,params,cov):
         for jj in range(len(deriv)):
             sig_func.append(deriv[ii]*cov[ii][jj]*deriv[jj])
     sig_func = np.array(sig_func)
-    errors = sig_func.sum(axis = 0) 
+    errors = sig_func.sum(axis=0) 
     
     return errors
 
@@ -226,16 +236,16 @@ def prop_sat_err_lin(x, params, cov):
     
     Parameters
     ----------
-    x : array
+    x : ndarray
         Array of x-data
-    params : array
-        Best fit parameters for saturation_func()
-    cov : array
+    params : ndarray
+        Best fit parameters for _saturation_func()
+    cov : ndarray
         Covariance matrix for parameters
         
     Returns
     -------
-    errors : array
+    errors : ndarray
         Array of 1 sigma errors as a function of x
         
     """
@@ -247,13 +257,7 @@ def prop_sat_err_lin(x, params, cov):
         for jj in range(len(deriv)):
             sig_func.append(deriv[ii]*cov[ii][jj]*deriv[jj])
     sig_func = np.array(sig_func)
-    errors = sig_func.sum(axis = 0)
+    errors = sig_func.sum(axis=0)
     
     return errors
-
-
-
-
-
-
 
