@@ -72,7 +72,7 @@ def fit_multi_gauss(arr, guess, ngauss, xrange=None, nbins='sqrt', lgcplot=True,
 
     fit_n_gauss = lambda x, *params: utils.n_gauss(x, params, ngauss).sum(axis=0)
     
-    x,y, bins = _bindata(arr,  xrange=xrange, bins=nbins)
+    x,y, bins = utils.bindata(arr,  xrange=xrange, bins=nbins)
     yerr = np.sqrt(y)
     yerr[yerr == 0] = 1 # make errors 1 if bins are empty
     
@@ -182,20 +182,39 @@ def fit_gauss(arr, xrange=None, nbins='sqrt', noiserange=None, lgcplot=False, la
     return peakloc, peakerr, fitparams, errors
 
 
-def fit_saturation(x, y, yerr, guess):
+def fit_saturation(x, y, yerr, guess, labeldict, lgcplot = True, ax = None):
     """
     Function to fit the saturation of the measured calibration spectrum. 
     
     Parameters
     ----------
-    x : array_like
+    x : array-like
         The true energy of the spectrual peaks
-    y : array_like
+    y : array-like
         The measured energy (or similar quantity) of the spectral peaks
-    yerr : array_like
+    yerr : array-like
         The errors in the measured energy of the spectral peaks
-    guess : array_like
+    guess : array-like
         Array of initial guess parameters (a,b) to be passed to saturation_func()
+    labeldict : dict, optional
+        Dictionary to overwrite the labels of the plot. defaults are : 
+            labels = {'title' : 'Energy Saturation Correction', 
+                      'xlabel' : 'True Energy [eV]',
+                      'ylabel' : 'Measured Energy [eV]',
+                      'nsigma' : 2} # Note, nsigma is the number of sigma error bars 
+                                      to plot 
+        Ex: to change just the title, pass: labeldict = {'title' : 'new title'}
+    lgcplot : bool, optional
+            If True, the fit and spectrum will be plotted    
+    ax : axes.Axes object, optional
+        Option to pass an existing Matplotlib Axes object to plot over, if it already exists.
+        
+    Returns
+    -------
+    popt : array
+        Array of best fit paramters
+    pcov : array
+        Covariance matrix from fit
     
     Notes
     -----
@@ -206,31 +225,9 @@ def fit_saturation(x, y, yerr, guess):
     
     """
     
-    popt, pcov = curve_fit(_saturation_func, x, y, sigma=yerr, p0=guess, absolute_sigma=True, maxfev=10000)
-    
-    x_fit = np.linspace(0, x[-1], 100)
-    y_fit = utils.saturation_func(x_fit, *popt)
-    y_fit_lin = utils.sat_func_expansion(x_fit, *popt)
-    
-    err_full = utils.prop_sat_err(x_fit,popt,pcov)
-    err_lin = utils.prop_sat_err_lin(x_fit,popt,pcov)
+    popt, pcov = curve_fit(utils.saturation_func, x, y, sigma = yerr, p0 = guess, absolute_sigma=True, maxfev = 10000)    
+    plotting.plot_saturation_correction(x, y, yerr, popt, pcov, labeldict, ax)
 
-    plt.figure(figsize=(12,8))
-    plt.grid(linestyle='dashed')
-    plt.scatter(x, y, marker='x', label='Spectral Peaks', s=100, zorder=100, color='b')
-    plt.errorbar(x, y, yerr=yerr, linestyle=' ')
-    plt.plot(x_fit, y_fit, label=r'$y = a[1-exp(x/b)]$', color='g')
-    
-    plt.fill_between(x_fit, y_fit-2*err_full, y_fit+2*err_full, alpha=.5, color='g')
-    
-    plt.plot(x_fit, y_fit_lin, linestyle='--', color='r', label='Taylor Expansion of Saturation Function')
-    plt.fill_between(x_fit, y_fit_lin-2*err_lin, y_fit_lin+2*err_lin, alpha=.2, color= 'r')
-    
-    plt.ylabel('Calculated Integral Energy[eV]', fontsize=14)
-    plt.xlabel('True Energy [eV]', fontsize=14)
-    plt.title('Integrated Energy Saturation Correction', fontsize=14)
-
-    plt.legend(loc=2, fontsize=14)
-    plt.tick_params(which="both", direction="in", right=True, top=True)
+    return popt, pcov
     
     
