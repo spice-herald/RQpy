@@ -83,7 +83,7 @@ class SetupRQ(object):
     
     """
     
-    def __init__(self, templates, psds, fs, summed_template=None, summed_psd=None):
+    def __init__(self, templates, psds, fs, summed_template=None, summed_psd=None, background_templates=None):
         """
         Initialization of the SetupRQ class.
         
@@ -104,9 +104,13 @@ class SetupRQ(object):
             The PSD corresponding to all of the channels summed together to be used when calculating
             RQs. Should be a two-sided PSD, with units of A^2/Hz. If not set, then the RQs for 
             the sum of the channels will not be calculated.
+        background_templates : ndarray, optional
+            The m background templates for the nSmB optimal filter. All should be normalized to max(temp)=1)
+            Dimensions: (time bins) X (m)
+           
         
         """
-        
+
         if len(templates) != len(psds):
             raise ValueError("templates and psds should have the same length")
         
@@ -117,6 +121,8 @@ class SetupRQ(object):
         
         self.summed_template = summed_template
         self.summed_psd = summed_psd
+
+        self.background_templates = background_templates
         
         self.calcchans=True
         if summed_template is None or summed_psd is None:
@@ -137,6 +143,8 @@ class SetupRQ(object):
         self.do_ofamp_pileup = True
         self.ofamp_pileup_nconstrain = [80]*self.nchan
         
+        self.do_ofamp_nSmB = True
+
         self.do_chi2_nopulse = True
         
         self.do_chi2_lowfreq = True
@@ -356,7 +364,7 @@ class SetupRQ(object):
         
         self.do_integral = lgcrun
         
-def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, chan_num, det):
+def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, chan_num, det, background_templates=None):
     """
     Helper function for calculating RQs for an array of traces corresponding to a single channel.
     
@@ -499,6 +507,52 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         rq_dict[f'chi2_pileup_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'chi2_pileup_{chan}{det}'][readout_inds] = chi2_pileup
         
+
+    if setup.do_ofamp_nSmB:
+        amp_nsmb = np.zeros(len(signal))
+        t0_nsmb = np.zeros(len(signal))
+        chi2_nsmb = np.zeros(len(signal))
+        chi2BOnly_nsmb = np.zeros(len(signal))
+        
+        # allow signal template to move anywhere along trace
+        indwindow = np.arange(0,len(template))
+        # make indwinow dims 1 X (time bins)
+        indwindow = indwindow[:,None].T
+        # define number of signal and number of backgrounds
+        nS = 1
+        nB = np.shape(background_templates[1,:])
+
+        print('template shape = ', np.shape(np.expand_dims(template,1)))
+        print('psd shape = ', np.shape(psd))
+        psddnu,OFfiltf,sbTemplatef,sbTemplatet,iWt,iBB =  qp.of_nSmB_setup(template,background_templates,psd, fs)
+        print('OFfiltf shape =', np.shape(OFfiltf))
+        print('sbTemplatef = ', np.shape(sbTemplatef))
+        print('iBB shape = ',np.shape(iBB))
+        lgc_disp=False
+        # setup the ns
+        for jj, s in enumerate(signal):
+            amp_nsmb[jj],t0_nsmb[jj],chi2_nsmb[jj],_,_,_,chi2BOnly_nsmb[jj] = qp.of_nSmB_inside(
+                s, OFfiltf, sbTemplatef.T, sbTemplatet, iWt, iBB,
+                psddnu.T, fs, indwindow, nS,nB, lgc_interp=False,lgc_disp=lgc_disp)
+            print('amp = ', amp_nsmb[jj])
+            print('t0 =', t0_nsmb[jj])
+            print('chi2 = ', chi2_nsmb[jj])
+            print('chi2BOnly = ', chi2BOnly_nsmb[jj])
+            
+            if lgc_disp:
+                if(jj==10):
+                    break
+        
+        rq_dict[f'ofamp_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'ofamp_nSmB_{chan}{det}'][readout_inds] = amp_nsmb
+        rq_dict[f't0_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f't0_nSmB_{chan}{det}'][readout_inds] = t0_nsmb
+        rq_dict[f'chi2_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2_nSmB_{chan}{det}'][readout_inds] = chi2_nsmb
+        rq_dict[f'chi2BOnly_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2BOnly_nSmB_{chan}{det}'][readout_inds] = chi2_BOnly_nsmb
+
+
     return rq_dict
     
 def _calc_rq(traces, channels, det, setup, readout_inds=None):
@@ -539,8 +593,9 @@ def _calc_rq(traces, channels, det, setup, readout_inds=None):
             signal = traces[readout_inds, ii]
             template = setup.templates[ii]
             psd = setup.psds[ii]
+            background_templates = setup.background_templates
 
-            chan_dict = _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ii, d)
+            chan_dict = _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ii, background_templates)
 
             rq_dict.update(chan_dict)
             
@@ -548,9 +603,11 @@ def _calc_rq(traces, channels, det, setup, readout_inds=None):
         signal = traces[readout_inds].sum(axis=1)
         template = setup.summed_template
         psd = setup.summed_psd
+        background_templates = setup.background_templates
+
         chan = "sum"
 
-        sum_dict = _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, 0, "")
+        sum_dict = _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, 0, "", background_templates)
 
         rq_dict.update(sum_dict)
     
@@ -601,7 +658,7 @@ def _rq(file, channels, det, setup, convtoamps, savepath, lgcsavedumps, filetype
         dump = int(seriesnum.split('_')[-1])
         
     print(f"On Series: {seriesnum},  dump: {dump}")
-    
+
     if isinstance(channels, str):
         channels = [channels]
         
