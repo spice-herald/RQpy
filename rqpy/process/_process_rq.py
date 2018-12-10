@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import multiprocessing
 from itertools import repeat
+import rqpy as rp
 from rqpy import io
 import qetpy as qp
 from rqpy import HAS_SCDMSPYTOOLS
@@ -91,6 +92,9 @@ class SetupRQ(object):
         optimum filter fit will be calculated. Should be "nodelay", "constrained", or "unconstrained",
         referring the the no delay OF, constrained OF, and unconstrained OF, respectively. Default
         is "constrained".
+    t0_shifted : ndarray
+        Attribute used to save the times to shift the non-trigger channels. Only used if `do_ofamp_shifted`
+        is True.
     
     """
     
@@ -132,7 +136,7 @@ class SetupRQ(object):
         self.summed_template = summed_template
         self.summed_psd = summed_psd
         
-        if self.trigger is None or self.trigger in list(range(self.nchan)):
+        if trigger is None or trigger in list(range(self.nchan)):
             self.trigger = trigger
         else:
             raise ValueError("trigger must be either None, or an integer"+\
@@ -170,6 +174,7 @@ class SetupRQ(object):
         
         self.do_ofamp_shifted = False
         self.which_fit = "constrained"
+        self.t0_shifted = None
         
     def adjust_calc(self, lgcchans=True, lgcsum=True):
         """
@@ -558,27 +563,29 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         rq_dict[f'chi2_pileup_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'chi2_pileup_{chan}{det}'][readout_inds] = chi2_pileup
         
-    if setup.do_ofamp_shifted and setup.trigger is not None and chan_num!=setup.trigger:
-        amp_shifted = np.zeros(len(signal))
-        chi2_shifted = np.zeros(len(signal))
+    if setup.do_ofamp_shifted and setup.trigger is not None:
         
-        if setup.shifted_fit=="nodelay" and setup.do_ofamp_nodelay:
-            t0_shifted = np.zeros(len(signal))
-        elif setup.shifted_fit=="constrained" and setup.do_ofamp_constrained:
-            t0_shifted = t0_constrain
-        elif setup.shifted_fit=="unconstrained" and setup.do_ofamp_unconstrained:
-            t0_shifted = t0_unconstrain
-        
-        for jj, s in enumerate(signal):
-            amp_shifted[jj], _, chi2_shifted[jj] = qp.ofamp(s, rp.shift(template, int(t0_shifted[jj]*fs)), 
-                                                                        psd, fs, withdelay=False)
-            
-        rq_dict[f'ofamp_shifted_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'ofamp_shifted_{chan}{det}'][readout_inds] = amp_shifted
-        rq_dict[f't0_shifted_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f't0_shifted_{chan}{det}'][readout_inds] = t0_shifted
-        rq_dict[f'chi2_shifted_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'chi2_shifted_{chan}{det}'][readout_inds] = chi2_shifted
+        if chan_num==setup.trigger:
+            if setup.shifted_fit=="nodelay" and setup.do_ofamp_nodelay:
+                setup.t0_shifted = np.zeros(len(signal))
+            elif setup.shifted_fit=="constrained" and setup.do_ofamp_constrained:
+                setup.t0_shifted = t0_constrain
+            elif setup.shifted_fit=="unconstrained" and setup.do_ofamp_unconstrained:
+                setup.t0_shifted = t0_unconstrain
+        else:
+            amp_shifted = np.zeros(len(signal))
+            chi2_shifted = np.zeros(len(signal))
+
+            for jj, s in enumerate(signal):
+                amp_shifted[jj], _, chi2_shifted[jj] = qp.ofamp(s, rp.shift(template, int(setup.t0_shifted[jj]*fs)), 
+                                                                            psd, fs, withdelay=False)
+
+            rq_dict[f'ofamp_shifted_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f'ofamp_shifted_{chan}{det}'][readout_inds] = amp_shifted
+            rq_dict[f't0_shifted_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f't0_shifted_{chan}{det}'][readout_inds] = setup.t0_shifted
+            rq_dict[f'chi2_shifted_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f'chi2_shifted_{chan}{det}'][readout_inds] = chi2_shifted
             
         
     return rq_dict
@@ -616,8 +623,14 @@ def _calc_rq(traces, channels, det, setup, readout_inds=None):
     rq_dict = {}
     
     if setup.calcchans:
-        for ii, (chan, d) in enumerate(zip(channels, det)):
-
+        vals = list(enumerate(zip(channels, det)))
+        
+        if setup.do_ofamp_shifted and setup.trigger is not None:
+            # change order so that trigger is processed to be able get the shifted times
+            # to be able to shift the non-trigger channels to the right time
+            vals[setup.trigger], vals[0] = vals[0], vals[setup.trigger]
+        
+        for ii, (chan, d) in vals:
             signal = traces[readout_inds, ii]
             template = setup.templates[ii]
             psd = setup.psds[ii]
