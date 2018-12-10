@@ -2,7 +2,8 @@ import numpy as np
 
 
 __all__ = ["bindata", "gaussian", "n_gauss", "gaussian_background", "saturation_func", 
-           "sat_func_expansion", "prop_sat_err", "prop_sat_err_lin"]
+           "sat_func_expansion", "prop_sat_err", "prop_sat_err_lin", "invert_saturation_func", 
+           "prop_invert_sat_err"]
 
 
 def bindata(arr, xrange=None, bins='sqrt'):
@@ -138,7 +139,7 @@ def gaussian_background(x, amp, mean, sd, background):
 def saturation_func(x, a, b):
     """
     Function to describe the saturation of a signal in a 
-    detector as a function of energy 
+    detector as a function of energy. 
     
     
     Parameters
@@ -152,7 +153,7 @@ def saturation_func(x, a, b):
         
     Returns
     -------
-    sat_func : ndarray
+    sat_func : array
         Array of y-values 
         
     Notes
@@ -171,6 +172,33 @@ def saturation_func(x, a, b):
     sat_func = a*(1-np.exp(-x/b))
     
     return sat_func
+
+def invert_saturation_func(y, a, b):
+    """
+    Inversion of saturation_func(), Used to convert measured
+    energy to true energy.
+    
+    Parameters
+    ----------
+    y : ndarray
+        Array of y-data to be inverted
+    a : float
+        Amplitude parameter
+    b : float
+        Saturation parameter
+    
+    
+    Returns
+    -------
+    invert_sat_func : array
+        Array of inverted y-values
+    
+    """
+
+    invert_sat_func = -b*np.log(1-y/a)
+    
+    return invert_sat_func
+
 
 def sat_func_expansion(x, a, b):
     """
@@ -227,6 +255,36 @@ def prop_sat_err(x, params,cov):
     
     return errors
 
+def prop_invert_sat_err(x, params,cov):
+    """
+    Helper function to propagate errors for invert_saturation_func()
+    
+    Parameters
+    ----------
+    x : ndarray
+        Array of x-data
+    params : ndarray
+        Best fit parameters for saturation_func()
+    cov : ndarray
+        Covariance matrix for parameters
+        
+    Returns
+    -------
+    errors : ndarray
+        Array of 1 sigma errors as a function of x
+        
+    """
+    
+    a, b = params
+    deriv = np.array([-b*y/(a**2-a*y), -np.log(1-x/a)]) 
+    sig_func = []
+    for ii in range(len(deriv)):
+        for jj in range(len(deriv)):
+            sig_func.append(deriv[ii]*cov[ii][jj]*deriv[jj])
+    sig_func = np.array(sig_func)
+    errors = sig_func.sum(axis=0) 
+    
+    return errors
 
 
 def prop_sat_err_lin(x, params, cov):

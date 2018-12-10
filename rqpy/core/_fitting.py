@@ -215,7 +215,10 @@ def fit_saturation(x, y, yerr, guess, labeldict, lgcplot = True, ax = None):
         Array of best fit paramters
     pcov : array
         Covariance matrix from fit
-    
+    slope_linear : float
+        The slope of the Taylor expansion of the saturation function 
+        evaluated at the best fit parameters
+        
     Notes
     -----
     This function fits the function y = a(1-exp(-x/b)) to the given data. This function
@@ -225,9 +228,14 @@ def fit_saturation(x, y, yerr, guess, labeldict, lgcplot = True, ax = None):
     
     """
     
-    popt, pcov = curve_fit(utils.saturation_func, x, y, sigma = yerr, p0 = guess, absolute_sigma=True, maxfev = 10000)    
-    plotting.plot_saturation_correction(x, y, yerr, popt, pcov, labeldict, ax)
+    popt, pcov = curve_fit(utils.saturation_func, x, y, sigma = yerr, p0 = guess, 
+                           absolute_sigma=True, maxfev = 10000)
+    if lgcplot:
+        plotting.plot_saturation_correction(x, y, yerr, popt, pcov, labeldict, ax)
+        
+    slope_linear = utils.sat_func_expansion(1, *popt)
+    
 
-    return popt, pcov
+    return popt, pcov, slope_linear
     
     
