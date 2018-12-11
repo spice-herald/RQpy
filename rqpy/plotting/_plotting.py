@@ -74,6 +74,7 @@ def hist(arr, nbins='sqrt', xlims=None, cutold=None, cutnew=None, lgcrawdata=Tru
         if xlims is None:
             hist, bins, _ = ax.hist(arr, bins=nbins, histtype='step', 
                                     label='full data', linewidth=2, color='b')
+            xlims = (bins.min(), bins.max())
         else:
             hist, bins, _ = ax.hist(arr, bins=nbins, range=xlims, histtype='step', 
                                     label='full data', linewidth=2, color='b')            
@@ -89,8 +90,9 @@ def hist(arr, nbins='sqrt', xlims=None, cutold=None, cutnew=None, lgcrawdata=Tru
             ax.hist(arr[cutold], bins=nbins, range=xlims, histtype='step', 
                     label=label, linewidth=2, color='r')
         else:
-            ax.hist(arr[cutold], bins=nbins, histtype='step', 
+            res = ax.hist(arr[cutold], bins=nbins, histtype='step', 
                     label=label, linewidth=2, color='r')
+            xlims = (res[1].min(), res[1].max())
     if cutnew is not None:
         newsum = cutnew.sum()
         if cutold is not None:
@@ -110,8 +112,9 @@ def hist(arr, nbins='sqrt', xlims=None, cutold=None, cutnew=None, lgcrawdata=Tru
             ax.hist(arr[cutnew], bins=nbins, range=xlims, histtype='step', 
                     linewidth=2, color='g', label=label)
         else:
-            ax.hist(arr[cutnew], bins=nbins, histtype='step', 
+            res = ax.hist(arr[cutnew], bins=nbins, histtype='step', 
                     linewidth=2, color='g', label=label)
+            xlims = (res[1].min(), res[1].max())
     elif (cutnew is None) & (cutold is None):
         cuteff = 1
         cutefftot = 1
