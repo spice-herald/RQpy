@@ -509,8 +509,13 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         
 
     if setup.do_ofamp_nSmB:
-        amp_nsmb = np.zeros(len(signal))
-        t0_nsmb = np.zeros(len(signal))
+        # define number of signal and number of backgrounds
+        nS = 1
+        nB = np.size(background_templates,1)
+        
+        amp_s_nsmb = np.zeros(len(signal))
+        t0_s_nsmb = np.zeros(len(signal))
+        amps_nsmb = np.zeros((len(signal),(nB+nS)))        
         chi2_nsmb = np.zeros(len(signal))
         chi2BOnly_nsmb = np.zeros(len(signal))
         
@@ -518,39 +523,30 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         indwindow = np.arange(0,len(template))
         # make indwinow dims 1 X (time bins)
         indwindow = indwindow[:,None].T
-        # define number of signal and number of backgrounds
-        nS = 1
-        nB = np.shape(background_templates[1,:])
-
-        print('template shape = ', np.shape(np.expand_dims(template,1)))
-        print('psd shape = ', np.shape(psd))
+        
         psddnu,OFfiltf,sbTemplatef,sbTemplatet,iWt,iBB =  qp.of_nSmB_setup(template,background_templates,psd, fs)
-        print('OFfiltf shape =', np.shape(OFfiltf))
-        print('sbTemplatef = ', np.shape(sbTemplatef))
-        print('iBB shape = ',np.shape(iBB))
         lgc_disp=False
         # setup the ns
         for jj, s in enumerate(signal):
-            amp_nsmb[jj],t0_nsmb[jj],chi2_nsmb[jj],_,_,_,chi2BOnly_nsmb[jj] = qp.of_nSmB_inside(
+            amps_nsmb[jj,:],t0_s_nsmb[jj],chi2_nsmb[jj],_,_,_,chi2BOnly_nsmb[jj] = qp.of_nSmB_inside(
                 s, OFfiltf, sbTemplatef.T, sbTemplatet, iWt, iBB,
                 psddnu.T, fs, indwindow, nS,nB, lgc_interp=False,lgc_disp=lgc_disp)
-            print('amp = ', amp_nsmb[jj])
-            print('t0 =', t0_nsmb[jj])
-            print('chi2 = ', chi2_nsmb[jj])
-            print('chi2BOnly = ', chi2BOnly_nsmb[jj])
             
             if lgc_disp:
                 if(jj==10):
                     break
         
-        rq_dict[f'ofamp_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'ofamp_nSmB_{chan}{det}'][readout_inds] = amp_nsmb
-        rq_dict[f't0_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f't0_nSmB_{chan}{det}'][readout_inds] = t0_nsmb
+        rq_dict[f'ofamp_s_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'ofamp_s_nSmB_{chan}{det}'][readout_inds] = amps_nsmb[:,0]
+        rq_dict[f't0_s_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f't0_s_nSmB_{chan}{det}'][readout_inds] = t0_s_nsmb
+        for iB in range(nS,nB):
+            rq_dict[f'ofamp_b{iB}_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f'ofamp_b{iB}_nSmB_{chan}{det}'][readout_inds] = amps_nsmb[:,iB]
         rq_dict[f'chi2_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'chi2_nSmB_{chan}{det}'][readout_inds] = chi2_nsmb
         rq_dict[f'chi2BOnly_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'chi2BOnly_nSmB_{chan}{det}'][readout_inds] = chi2_BOnly_nsmb
+        rq_dict[f'chi2BOnly_nSmB_{chan}{det}'][readout_inds] = chi2BOnly_nsmb
 
 
     return rq_dict
