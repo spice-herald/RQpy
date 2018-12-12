@@ -382,23 +382,23 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
 
     return fig, ax
 
-def plot_gauss(x, bins, y, fitparams, errors, background, labeldict):
+def plot_gauss(x, bins, y, fitparams, errors, background, labeldict=None):
     """
     Hidden helper function to plot Gaussian plus background fits
     
     Parameters
     ----------
-    x: array
+    x : array
         Array of x data
-    bins: array
+    bins : array
         Array of binned data
-    y: array
+    y : array
         Array of y data
-    fitparams: tuple
+    fitparams : tuple
         The best fit parameters from the fit
-    errors: tuple
+    errors : tuple
         The unccertainy in the best fit parameters
-    background: float,
+    background : float
         The average background rate
     labeldict : dict, optional
         Dictionary to overwrite the labels of the plot. defaults are : 
@@ -407,10 +407,11 @@ def plot_gauss(x, bins, y, fitparams, errors, background, labeldict):
         
     Returns
     -------
-    fig: matrplotlib figure object
-    
-    ax: matplotlib axes object
-    
+    fig : Figure
+        Matplotlib Figure object. Set to None if ax is passed as a parameter.
+    ax : axes.Axes object
+        Matplotlib Axes object
+        
     """
     
     x_fit = np.linspace(x[0], x[-1], 250) #make x data for fit
@@ -440,21 +441,20 @@ def plot_gauss(x, bins, y, fitparams, errors, background, labeldict):
     
     return fig, ax
     
-def plot_n_gauss(x, y, bins, fitparams, labeldict, ax = None):
+def plot_n_gauss(x, y, bins, fitparams, labeldict=None, ax=None):
     """
     Hidden helper function to plot and arbitrary number of Gaussians plus background fit
     
     Parameters
     ----------
-    x: array
+    x : ndarray
         Array of x data
-    y: array
+    y : ndarray
         Array of y data
-    bins: array
+    bins : ndarray
         Array of binned data
-    fitparams: tuple
+    fitparams : tuple
         The best fit parameters from the fit
-    
     labeldict : dict, optional
         Dictionary to overwrite the labels of the plot. defaults are : 
             labels = {'title' : 'Histogram', 'xlabel' : 'variable', 'ylabel' : 'Count'}
@@ -462,11 +462,13 @@ def plot_n_gauss(x, y, bins, fitparams, labeldict, ax = None):
         
     Returns
     -------
-    fig: matrplotlib figure object
-    
-    ax: matplotlib axes object
-    
+    fig : Figure
+        Matplotlib Figure object. Set to None if ax is passed as a parameter.
+    ax : axes.Axes object
+        Matplotlib Axes object
+        
     """
+    
     n = int((len(fitparams)-1)/3)
     
     x_fit = np.linspace(x[0], x[-1], 250) #make x data for fit
