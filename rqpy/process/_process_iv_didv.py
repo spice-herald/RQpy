@@ -4,7 +4,6 @@ import os
 import multiprocessing
 from itertools import repeat
 from rqpy import io
-from qetpy import fitting
 from rqpy import HAS_SCDMSPYTOOLS
 
 if HAS_SCDMSPYTOOLS:
@@ -14,46 +13,38 @@ if HAS_SCDMSPYTOOLS:
 __all__ = ["process_ivsweep"]
 
 
-
-
-
-
-
-
-
-
 def _process_ivfile(filepath, channels, detectorid, rfb, loopgain, binstovolts, 
-                 rshunt, rbias, lgcHV):
+                    rshunt, rbias, lgcHV):
     """
     Helper function to process data from noise or dIdV series as part of an IV/dIdV sweep. See Notes for 
     more details on what parameters are calculated
     
     Parameters
     ----------
-    filepath: str
+    filepath : str
         Absolute path to the series folder
-    channels: list
+    channels : list
         List containing strings corresponding to the names of all the channels of interest
-    detectorid: str
+    detectorid : str
         The label of the detector, i.e. Z1, Z2, .. etc
-    rfb: int
+    rfb : int
         The resistance of the feedback resistor in the phonon amplifier
-    loopgain: float
+    loopgain : float
         The ratio of number of turns in the squid input coil vs feedback coil
-    binstovolts: int
+    binstovolts : int
         The bit depth divided by the dynamic range of the ADC in Volts
-    rshunt: float
+    rshunt : float
         The value of the shunt resistor in the TES circuit
-    rbias: int
+    rbias : int
         The value of the bias resistor on the test signal line
-    lgcHV: bool
+    lgcHV : bool
         If False (default), the detector is assumed to be operating in iZip mode, 
         If True, HV mode. Note, the channel names will be different between the 
         two modes, it is up to the user to make sure the channel names are correct
         
     Returns
     -------
-    data_list: list
+    data_list : list
         The list of calculated parameters
         
     Notes
@@ -205,48 +196,48 @@ def _process_ivfile(filepath, channels, detectorid, rfb, loopgain, binstovolts,
 
 
 def process_ivsweep(ivfilepath, channels, detectorid="Z1", rfb=5000, loopgain=2.4, binstovolts=65536/2, 
-                 rshunt=0.005, rbias=20000, lgcHV = False, nprocess = 1, savepath = '', savename = 'IV_dIdV_DF'):
+                    rshunt=0.005, rbias=20000, lgcHV=False, nprocess=1, savepath='', savename='IV_dIdV_DF'):
     """
     Function to process data for an IV/dIdV sweep. See Notes for 
     more details on what parameters are calculated
     
     Parameters
     ----------
-    ivfilepath: str
+    ivfilepath : str
         Absolute path to the directory containing all the series in the sweep
-    channels: list
+    channels : list
         List containing strings corresponding to the names of all the channels of interest
-    detectorid: str, optional
+    detectorid : str, optional
         The label of the detector, i.e. Z1, Z2, .. etc
-    rfb: int
+    rfb : int
         The resistance of the feedback resistor in the phonon amplifier
-    loopgain: float, optional
+    loopgain : float, optional
         The ratio of number of turns in the squid input coil vs feedback coil
-    binstovolts: int, optional
+    binstovolts : int, optional
         The bit depth divided by the dynamic range of the ADC in Volts
-    rshunt: float, optional
+    rshunt : float, optional
         The value of the shunt resistor in the TES circuit
-    rbias: int, optional
+    rbias : int, optional
         The value of the bias resistor on the test signal line
-    lgcHV: bool, optional
+    lgcHV : bool, optional
         If False (default), the detector is assumed to be operating in iZip mode, 
         If True, HV mode. Note, the channel names will be different between the 
         two modes, it is up to the user to make sure the channel names are correct
-    nprocess: int
+    nprocess : int
         Number of jobs to use to process IV dIdV sweep. If nprocess = 1, only a single
         core will be used. If more than one, Pool will be used for multiprocessing. 
         Note, if you are running this on a shared computer, no more than 4 jobs should be
         used, idealy 2, as it will significantly slow down the computer.
-    lgcsave: bool, optional
+    lgcsave : bool, optional
         If True, the processed DataFrame will be saved
-    savepath: str, optional
+    savepath : str, optional
         Abosolute path to save DataFrame
-    savename: str, optional
+    savename : str, optional
         The name of the processed DataFrame to be saved
         
     Returns
     -------
-    df:  pandas.DataFrame
+    df : pandas.DataFrame
         A pandas DataFrame with all the processed parameters for the IV dIdV sweep
         
     Notes
@@ -274,17 +265,15 @@ def process_ivsweep(ivfilepath, channels, detectorid="Z1", rfb=5000, loopgain=2.
     
     """
     if not HAS_SCDMSPYTOOLS:
-        raise ImportError("Cannot use this IV processing because scdmsPyTools is not installed. \n More file types will be supported in future releases of RQpy.")
+        raise ImportError("""Cannot use this IV processing because scdmsPyTools is not installed. 
+                          More file types will be supported in future releases of RQpy.""")
     
     if nprocess == 1:
         results = []
         for filepath in ivfilepath:
             results.append(_process_ivfile(filepath, channels, detectorid, rfb, loopgain, binstovolts, 
                  rshunt, rbias, lgcHV))
-            
-            
     else:
-        
         pool = multiprocessing.Pool(processes = int(nprocess))
         results = pool.starmap(_process_ivfile, zip(files, repeat(channels, detectorid, rfb, loopgain, binstovolts, 
                  rshunt, rbias, lgcHV))) 
@@ -300,7 +289,5 @@ def process_ivsweep(ivfilepath, channels, detectorid="Z1", rfb=5000, loopgain=2.
         df.to_pickle(f"{savepath}{savename}.pkl")
     
     return df
-    
-    
     
     
