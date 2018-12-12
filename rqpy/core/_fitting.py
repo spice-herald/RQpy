@@ -1,6 +1,5 @@
 import numpy as np
 from scipy.optimize import curve_fit
-import matplotlib.pyplot as plt
 from rqpy import plotting, utils
 
 
@@ -182,20 +181,21 @@ def fit_gauss(arr, xrange=None, nbins='sqrt', noiserange=None, lgcplot=False, la
     return peakloc, peakerr, fitparams, errors
 
 
-def fit_saturation(x, y, yerr, guess, labeldict, lgcplot = True, ax = None):
+def fit_saturation(x, y, yerr, guess, labeldict=None, lgcplot=True, ax=None):
     """
     Function to fit the saturation of the measured calibration spectrum. 
     
     Parameters
     ----------
-    x : array-like
-        The true energy of the spectrual peaks
-    y : array-like
-        The measured energy (or similar quantity) of the spectral peaks
-    yerr : array-like
-        The errors in the measured energy of the spectral peaks
-    guess : array-like
-        Array of initial guess parameters (a,b) to be passed to saturation_func()
+    x : array_like
+        The true energy of the spectral peaks in eV
+    y : array_like
+        The measured energy (or similar quantity) of the spectral peaks in eV
+    yerr : array_like
+        The errors in the measured energy of the spectral peaks in eV
+    guess : array_like
+        Array of initial guess parameters (a,b) to be passed to saturation_func(). See Notes
+        for the functional form these parameters apply to.
     labeldict : dict, optional
         Dictionary to overwrite the labels of the plot. defaults are : 
             labels = {'title' : 'Energy Saturation Correction', 
@@ -211,9 +211,9 @@ def fit_saturation(x, y, yerr, guess, labeldict, lgcplot = True, ax = None):
         
     Returns
     -------
-    popt : array
+    popt : ndarray
         Array of best fit paramters
-    pcov : array
+    pcov : ndarray
         Covariance matrix from fit
     slope_linear : float
         The slope of the Taylor expansion of the saturation function 
@@ -235,7 +235,6 @@ def fit_saturation(x, y, yerr, guess, labeldict, lgcplot = True, ax = None):
         
     slope_linear = utils.sat_func_expansion(1, *popt)
     
-
     return popt, pcov, slope_linear
     
     
