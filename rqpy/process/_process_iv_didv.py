@@ -13,7 +13,7 @@ if HAS_SCDMSPYTOOLS:
 __all__ = ["process_ivsweep"]
 
 
-def _process_ivfile(filepath, channels, detectorid, rfb, loopgain, binstovolts, 
+def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts, 
                     rshunt, rbias, lgcHV):
     """
     Helper function to process data from noise or dIdV series as part of an IV/dIdV sweep. See Notes for 
@@ -23,7 +23,7 @@ def _process_ivfile(filepath, channels, detectorid, rfb, loopgain, binstovolts,
     ----------
     filepath : str
         Absolute path to the series folder
-    channels : list
+    chans : list
         List containing strings corresponding to the names of all the channels of interest
     detectorid : str
         The label of the detector, i.e. Z1, Z2, .. etc
@@ -72,12 +72,12 @@ def _process_ivfile(filepath, channels, detectorid, rfb, loopgain, binstovolts,
     
     """
     
-    if isinstance(channels, str):
-        channels = [channels]
+    if isinstance(chans, str):
+        chans = [chans]
     
-    detnum = detectorid[-1]
+    detnum = int(detectorid[-1])
     
-    nchan = len(channels)
+    nchan = len(chans)
     
     data_list = []
     if filepath[-1] == '/':
@@ -111,6 +111,14 @@ def _process_ivfile(filepath, channels, detectorid, rfb, loopgain, binstovolts,
         qetChanSelect1 =  odb_dict[odb_list[5]] #channel number
     else:
         qetChanSelect1 =  odb_dict[odb_list[4]] #channel number
+        
+    ### Load traces and channel names in order of loaded traces
+    events = getRawEvents(filepath, "", channelList=channels, detectorList=[detnum], outputFormat=3)
+    channels = events[detectorid]["pChan"] # we use the returned channels rather than the user 
+                                           # provided channel list because the order returned 
+                                           # from getRawEvents() is not nessesarily in the 
+                                           # expected order
+    traces = events[detectorid]["p"]
     
     settings = getDetectorSettings(filepath, "")
     detcodes = [settings[detectorid][ch]["channelNum"] for ch in channels]
@@ -119,8 +127,8 @@ def _process_ivfile(filepath, channels, detectorid, rfb, loopgain, binstovolts,
     fs = [1/settings[detectorid][ch]["timePerBin"] for ch in channels]
     
     
-    df = getRawEvents(filepath, "", channelList=channels, outputFormat=3)
-    traces = df[detectorid]["p"]
+    
+    
     
     if (not lgcGenEnable or not lgcQETEnable):
         for ii in range(nchan):
@@ -195,7 +203,7 @@ def _process_ivfile(filepath, channels, detectorid, rfb, loopgain, binstovolts,
     return data_list
 
 
-def process_ivsweep(ivfilepath, channels, detectorid="Z1", rfb=5000, loopgain=2.4, binstovolts=65536/2, 
+def process_ivsweep(ivfilepath, chans, detectorid="Z1", rfb=5000, loopgain=2.4, binstovolts=65536/2, 
                     rshunt=0.005, rbias=20000, lgcHV=False, nprocess=1, savepath='', savename='IV_dIdV_DF'):
     """
     Function to process data for an IV/dIdV sweep. See Notes for 
@@ -205,7 +213,7 @@ def process_ivsweep(ivfilepath, channels, detectorid="Z1", rfb=5000, loopgain=2.
     ----------
     ivfilepath : str
         Absolute path to the directory containing all the series in the sweep
-    channels : list
+    chans : list
         List containing strings corresponding to the names of all the channels of interest
     detectorid : str, optional
         The label of the detector, i.e. Z1, Z2, .. etc
@@ -271,11 +279,11 @@ def process_ivsweep(ivfilepath, channels, detectorid="Z1", rfb=5000, loopgain=2.
     if nprocess == 1:
         results = []
         for filepath in ivfilepath:
-            results.append(_process_ivfile(filepath, channels, detectorid, rfb, loopgain, binstovolts, 
+            results.append(_process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts, 
                  rshunt, rbias, lgcHV))
     else:
         pool = multiprocessing.Pool(processes = int(nprocess))
-        results = pool.starmap(_process_ivfile, zip(files, repeat(channels, detectorid, rfb, loopgain, binstovolts, 
+        results = pool.starmap(_process_ivfile, zip(files, repeat(chans, detectorid, rfb, loopgain, binstovolts, 
                  rshunt, rbias, lgcHV))) 
         pool.close()
         pool.join()
