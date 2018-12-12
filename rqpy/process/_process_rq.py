@@ -142,8 +142,11 @@ class SetupRQ(object):
         
         self.do_ofamp_pileup = True
         self.ofamp_pileup_nconstrain = [80]*self.nchan
-        
-        self.do_ofamp_nSmB = True
+
+        if background_templates is None:
+            self.do_ofamp_nSmB = False
+        else:
+            self.do_ofamp_nSmB = True
 
         self.do_chi2_nopulse = True
         
@@ -509,31 +512,26 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         
 
     if setup.do_ofamp_nSmB:
-        # define number of signal and number of backgrounds
-        nS = 1
-        nB = np.size(background_templates,1)
-        
+        psddnu,OFfiltf,sbTemplatef,sbTemplatet,iWt,iBB,nS,nB  =  qp.of_nSmB_setup(template,background_templates,psd, fs)
         amp_s_nsmb = np.zeros(len(signal))
         t0_s_nsmb = np.zeros(len(signal))
-        amps_nsmb = np.zeros((len(signal),(nB+nS)))        
+        amps_nsmb = np.zeros((len(signal),(nS+nB)))        
         chi2_nsmb = np.zeros(len(signal))
         chi2BOnly_nsmb = np.zeros(len(signal))
-        
         # allow signal template to move anywhere along trace
         indwindow = np.arange(0,len(template))
-        # make indwinow dims 1 X (time bins)
+        # make indwinow dimensions 1 X (time bins)
         indwindow = indwindow[:,None].T
-        
-        psddnu,OFfiltf,sbTemplatef,sbTemplatet,iWt,iBB =  qp.of_nSmB_setup(template,background_templates,psd, fs)
-        lgc_disp=False
-        # setup the ns
+
+        lgcplotnsmb=False
         for jj, s in enumerate(signal):
             amps_nsmb[jj,:],t0_s_nsmb[jj],chi2_nsmb[jj],_,_,_,chi2BOnly_nsmb[jj] = qp.of_nSmB_inside(
                 s, OFfiltf, sbTemplatef.T, sbTemplatet, iWt, iBB,
-                psddnu.T, fs, indwindow, nS,nB, lgc_interp=False,lgc_disp=lgc_disp)
-            
-            if lgc_disp:
-                if(jj==10):
+                psddnu.T, fs, indwindow, nS,nB, lgc_interp=False,lgcplot=lgcplotnsmb)
+            if lgcplotnsmb:
+                nPlots = 10
+                if(jj==nPlots):
+                    print('Warning: stopping at', nPlots, 'events to head off any memory problems')
                     break
         
         rq_dict[f'ofamp_s_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
