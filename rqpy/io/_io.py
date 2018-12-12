@@ -234,7 +234,7 @@ def get_trace_gain(path, chan, det, gainfactors = {'rfb': 5000, 'loopgain' : 2.4
     
     return convtoamps, drivergain, qetbias
 
-def get_traces_midgz(path, channels, det, convtoamps = 1, lgcskip_empty = False):
+def get_traces_midgz(path, channels, det, convtoamps=1, lgcskip_empty=False, lgcreturndict=True):
     """
     Function to return raw traces and event information for a single channel for mid.gz files.
     
@@ -257,12 +257,15 @@ def get_traces_midgz(path, channels, det, convtoamps = 1, lgcskip_empty = False)
         Boolean flag on whether or not to skip empty events. Should be set to false if user only wants the traces.
         If the user also wants to pull extra timing information (primarily for live time calculations), then set
         to True. Default is True.
+    lgcreturndict : bool, optional
+        Boolean flag on whether or not to return the info_dict that has extra information on every event.
+        By default, this is True, but the user may wish to set this to False for faster I/O.
     
     Returns
     -------
     x : ndarray
         Array of traces in the specified dump. Dimensions are (number of traces, number of channels, bins in each trace)
-    rq_dict : dict
+    info_dict : dict, optional
         Dictionary that contains extra information on each event. Includes timing and trigger information.
         The keys in the dictionary are as follows.
             'eventnumber' : The event number for each event
@@ -306,68 +309,7 @@ def get_traces_midgz(path, channels, det, convtoamps = 1, lgcskip_empty = False)
     
     events = getRawEvents(filepath='',files_series = path, channelList=channels, 
                           detectorList=dets, skipEmptyEvents=lgcskip_empty, outputFormat=3)
-    
-    columns = ["eventnumber", "seriesnumber", "eventtime", "triggertype", "pollingendtime", 
-               "triggertime", "triggeramp"]
-    
-    columns_trigveto = ["readoutstatus", "deadtime", "livetime", 
-                        "triggervetoreadouttime", "seriestime", "waveformreadendtime", 
-                        "waveformreadstarttime"]
-    
-    for item in columns_trigveto:
-        for d in set(det):
-            columns.append(f"{item}{d}")
-
-    rq_dict = {}
-    for item in columns:
-        rq_dict[item] = []
-    
-    for ev, trig, trigv in zip(events["event"], events["trigger"], events["trigger_veto"]):
-        rq_dict["eventnumber"].append(ev["EventNumber"])
-        rq_dict["seriesnumber"].append(ev["SeriesNumber"])
-        rq_dict["eventtime"].append(ev["EventTime"])
-        rq_dict["triggertype"].append(ev["TriggerType"])
-        rq_dict["triggeramp"].append(trig['TriggerAmplitude'])
-        rq_dict["pollingendtime"].append(ev["PollingEndTime"])
-
-        rq_dict["triggertime"].append(trig["TriggerTime"])
-
-        for d in set(det):
-            try:
-                rq_dict[f"readoutstatus{d}"].append(trigv[d]["ReadoutStatus"])
-            except:
-                rq_dict[f"readoutstatus{d}"].append(-999999.0)
-
-            try:
-                rq_dict[f"deadtime{d}"].append(trigv[d]["DeadTime0"])
-            except:
-                rq_dict[f"deadtime{d}"].append(-999999.0)
-
-            try:
-                rq_dict[f"livetime{d}"].append(trigv[d]["LiveTime0"])
-            except:
-                rq_dict[f"livetime{d}"].append(-999999.0)
-
-            try:
-                rq_dict[f"triggervetoreadouttime{d}"].append(trigv[d]["TriggerVetoReadoutTime0"])
-            except:
-                rq_dict[f"triggervetoreadouttime{d}"].append(-999999.0)
-
-            try:
-                rq_dict[f"seriestime{d}"].append(trigv[d]["SeriesTime"])
-            except:
-                rq_dict[f"seriestime{d}"].append(-999999.0)
-
-            try:
-                rq_dict[f"waveformreadendtime{d}"].append(trigv[d]["WaveformReadEndTime"])
-            except:
-                rq_dict[f"waveformreadendtime{d}"].append(-999999.0)
-
-            try:
-                rq_dict[f"waveformreadstarttime{d}"].append(trigv[d]["WaveformReadStartTime"])
-            except:
-                rq_dict[f"waveformreadstarttime{d}"].append(-999999.0)
-    
+        
     if len(set(dets))==1:
         if channels != events[det[0]]["pChan"]:
             chans = [events[det[0]]["pChan"].index(ch) for ch in channels]
@@ -380,35 +322,89 @@ def get_traces_midgz(path, channels, det, convtoamps = 1, lgcskip_empty = False)
         x = np.stack(x, axis=1)
         
     x*=convtoamps_arr
+    
+    if lgcreturndict:
+    
+        columns = ["eventnumber", "seriesnumber", "eventtime", "triggertype", "pollingendtime", 
+                   "triggertime", "triggeramp"]
+
+        columns_trigveto = ["readoutstatus", "deadtime", "livetime", 
+                            "triggervetoreadouttime", "seriestime", "waveformreadendtime", 
+                            "waveformreadstarttime"]
+
+        for item in columns_trigveto:
+            for d in set(det):
+                columns.append(f"{item}{d}")
+
+        info_dict = {}
+        for item in columns:
+            info_dict[item] = []
+
+        for ev, trig, trigv in zip(events["event"], events["trigger"], events["trigger_veto"]):
+            info_dict["eventnumber"].append(ev["EventNumber"])
+            info_dict["seriesnumber"].append(ev["SeriesNumber"])
+            info_dict["eventtime"].append(ev["EventTime"])
+            info_dict["triggertype"].append(ev["TriggerType"])
+            info_dict["triggeramp"].append(trig['TriggerAmplitude'])
+            info_dict["pollingendtime"].append(ev["PollingEndTime"])
+
+            info_dict["triggertime"].append(trig["TriggerTime"])
+
+            for d in set(det):
+                try:
+                    info_dict[f"readoutstatus{d}"].append(trigv[d]["ReadoutStatus"])
+                except:
+                    info_dict[f"readoutstatus{d}"].append(-999999.0)
+
+                try:
+                    info_dict[f"deadtime{d}"].append(trigv[d]["DeadTime0"])
+                except:
+                    info_dict[f"deadtime{d}"].append(-999999.0)
+
+                try:
+                    info_dict[f"livetime{d}"].append(trigv[d]["LiveTime0"])
+                except:
+                    info_dict[f"livetime{d}"].append(-999999.0)
+
+                try:
+                    info_dict[f"triggervetoreadouttime{d}"].append(trigv[d]["TriggerVetoReadoutTime0"])
+                except:
+                    info_dict[f"triggervetoreadouttime{d}"].append(-999999.0)
+
+                try:
+                    info_dict[f"seriestime{d}"].append(trigv[d]["SeriesTime"])
+                except:
+                    info_dict[f"seriestime{d}"].append(-999999.0)
+
+                try:
+                    info_dict[f"waveformreadendtime{d}"].append(trigv[d]["WaveformReadEndTime"])
+                except:
+                    info_dict[f"waveformreadendtime{d}"].append(-999999.0)
+
+                try:
+                    info_dict[f"waveformreadstarttime{d}"].append(trigv[d]["WaveformReadStartTime"])
+                except:
+                    info_dict[f"waveformreadstarttime{d}"].append(-999999.0)
         
-    return x, rq_dict
+        return x, info_dict
+    else:
+        return x
 
 
 def get_traces_npz(path):
     """
-    Function to return raw traces and event information for a single channel for mid.gz files.
+    Function to return raw traces and event information for a single channel for `npz` files.
     
     Parameters
     ----------
     path : str, list of str
         Absolute path, or list of paths, to the dump to open.
-    chan : str
-        Channel name, i.e. 'PDS1'
-    det : str
-        Detector name, i.e. 'Z1'
-    convtoamps : float, list of floats, optional
-        Conversion factor from ADC bins to TES current in Amps (units are [Amps]/[ADC bins]). Default is to 
-        keep in units of ADC bins (i.e. the traces are left in units of ADC bins)
-    lgcskip_empty : bool, optional
-        Boolean flag on whether or not to skip empty events. Should be set to false if user only wants the traces.
-        If the user also wants to pull extra timing information (primarily for live time calculations), then set
-        to True. Default is True.
     
     Returns
     -------
     traces : ndarray
         Array of traces in the specified dump. Dimensions are (number of traces, number of channels, bins in each trace)
-    rq_dict : dict
+    info_dict : dict
         Dictionary that contains extra information on each event. Includes timing and trigger information.
         The keys in the dictionary are as follows.
             'eventnumber' : The event number for each event
