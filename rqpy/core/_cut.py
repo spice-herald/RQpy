@@ -110,7 +110,7 @@ def baselinecut_tdep(t, b, cut=None, dt=1000, cut_eff=0.9, positive_pulses=True)
     
     return cbase
 
-def inrange(vals, bounds):
+def inrange(vals, lwrbnd, uprbnd):
     """
     Function for returning a boolean mask that specifies which values
     in an array are between the specified bounds (inclusive of the bounds).
@@ -119,11 +119,10 @@ def inrange(vals, bounds):
     ----------
     vals : array_like
         A 1-d array of values.
-    bounds : array_like
-        The bounds for which we will check if each value in vals
-        is in between. This should be an array of shape (2,). However,
-        a longer array will not throw an error, as the function will just
-        use the first two values
+    lwrbnd : float
+        The lower bound of the range that we are checking if vals is between.
+    uprbnd : float
+        The upper bound of the range that we are checking if vals is between.
             
     Returns
     -------
@@ -133,6 +132,6 @@ def inrange(vals, bounds):
     
     """
     
-    mask = np.array([bounds[0] <= val <= bounds[1] for val in vals])
+    mask = (vals >= lwrbnd) & (vals <= uprbnd)
     
     return mask
