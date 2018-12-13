@@ -528,7 +528,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
             amps_nsmb[jj,:],t0_s_nsmb[jj],chi2_nsmb[jj],_,_,_,chi2BOnly_nsmb[jj] = qp.of_nSmB_inside(
                 s, OFfiltf, sbTemplatef.T, sbTemplatet, iWt, iBB,
                 psddnu.T, fs, indwindow, nS,nB, lgc_interp=False,lgcplot=lgcplotnsmb)
-            if lgcplotnsmb:
+            if (lgcplotnsmb==True):
                 nPlots = 10
                 if(jj==nPlots):
                     print('Warning: stopping at', nPlots, 'events to head off any memory problems')
