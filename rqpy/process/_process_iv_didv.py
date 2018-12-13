@@ -18,7 +18,7 @@ __all__ = ["process_ivsweep"]
 
 
 def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts, 
-                    rshunt, rbias, lgcHV):
+                    rshunt, rbias, lgcHV, lgcverbose):
     """
     Helper function to process data from noise or dIdV series as part of an IV/dIdV sweep. See Notes for 
     more details on what parameters are calculated
@@ -45,6 +45,8 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
         If False (default), the detector is assumed to be operating in iZip mode, 
         If True, HV mode. Note, the channel names will be different between the 
         two modes, it is up to the user to make sure the channel names are correct
+    lgcverbose : bool
+        If True, the series number being processed will be displayed
         
     Returns
     -------
@@ -75,6 +77,10 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
 
     
     """
+    
+    if lgcverbose:
+        print(f'------------------\n Processing dumps in file: {filepath} \n------------------')
+    
     
     if isinstance(chans, str):
         chans = [chans]
@@ -144,7 +150,7 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
             try:
                 cut = autocuts(traces_temp, fs=fs[ii])
             except:
-                cut = np.ones_like(traces_temp, dtype=bool)
+                cut = np.ones(shape = traces_temp.shape[0], dtype=bool)
                 cut_pass = False 
             
             f, psd = calc_psd(traces_temp[cut], fs=fs[ii])
@@ -183,7 +189,7 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
                 try:
                     cut = autocuts(traces_temp, fs=fs[ii], is_didv=True, sgfreq=sgfreq)
                 except:
-                    cut = np.ones_like(traces_temp, dtype=bool)
+                    cut = np.ones(shape = traces_temp.shape[0], dtype=bool)
                     cut_pass = False 
 
                 offset, offset_err = calc_offset(traces_temp[cut], fs=fs[ii], sgfreq=sgfreq, is_didv=True)
@@ -208,7 +214,8 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
 
 
 def process_ivsweep(ivfilepath, chans, detectorid="Z1", rfb=5000, loopgain=2.4, binstovolts=65536/2, 
-                    rshunt=0.005, rbias=20000, lgcHV=False, nprocess=1, savepath='', savename='IV_dIdV_DF'):
+                    rshunt=0.005, rbias=20000, lgcHV=False, lgcverbose=False,
+                    nprocess=1, savepath='', savename='IV_dIdV_DF'):
     """
     Function to process data for an IV/dIdV sweep. See Notes for 
     more details on what parameters are calculated
@@ -235,7 +242,9 @@ def process_ivsweep(ivfilepath, chans, detectorid="Z1", rfb=5000, loopgain=2.4, 
         If False (default), the detector is assumed to be operating in iZip mode, 
         If True, HV mode. Note, the channel names will be different between the 
         two modes, it is up to the user to make sure the channel names are correct
-    nprocess : int
+    lgcverbose : bool, optional
+        If True, the series number being processed will be displayed
+    nprocess : int, optional
         Number of jobs to use to process IV dIdV sweep. If nprocess = 1, only a single
         core will be used. If more than one, Pool will be used for multiprocessing. 
         Note, if you are running this on a shared computer, no more than 4 jobs should be
@@ -286,11 +295,11 @@ def process_ivsweep(ivfilepath, chans, detectorid="Z1", rfb=5000, loopgain=2.4, 
         results = []
         for filepath in files:
             results.append(_process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts, 
-                 rshunt, rbias, lgcHV))
+                 rshunt, rbias, lgcHV, lgcverbose))
     else:
         pool = multiprocessing.Pool(processes = int(nprocess))
         results = pool.starmap(_process_ivfile, zip(files, repeat(chans, detectorid, rfb, loopgain, binstovolts, 
-                 rshunt, rbias, lgcHV))) 
+                 rshunt, rbias, lgcHV, lgcverbose))) 
         pool.close()
         pool.join()
         
