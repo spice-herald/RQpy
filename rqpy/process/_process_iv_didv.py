@@ -3,8 +3,12 @@ import pandas as pd
 import os
 import multiprocessing
 from itertools import repeat
+from glob import glob
+
 from rqpy import io
 from rqpy import HAS_SCDMSPYTOOLS
+from qetpy import calc_psd, autocuts, DIDV
+from qetpy.utils import calc_offset
 
 if HAS_SCDMSPYTOOLS:
     from scdmsPyTools.BatTools.IO import getRawEvents, getDetectorSettings
@@ -84,7 +88,7 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
         seriesnum = filepath[:-1].split('/')[-1]
     else:
         seriesnum = filepath.split('/')[-1]
-    reader = rawdata_reader.DataReader()
+    reader = rawdata.DataReader()
     settings_path = glob(f"{filepath}*")[0]
     reader.set_filename(settings_path)
 
@@ -113,7 +117,7 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
         qetChanSelect1 =  odb_dict[odb_list[4]] #channel number
         
     ### Load traces and channel names in order of loaded traces
-    events = getRawEvents(filepath, "", channelList=channels, detectorList=[detnum], outputFormat=3)
+    events = getRawEvents(filepath, "", channelList=chans, detectorList=[detnum], outputFormat=3)
     channels = events[detectorid]["pChan"] # we use the returned channels rather than the user 
                                            # provided channel list because the order returned 
                                            # from getRawEvents() is not nessesarily in the 
@@ -276,9 +280,11 @@ def process_ivsweep(ivfilepath, chans, detectorid="Z1", rfb=5000, loopgain=2.4, 
         raise ImportError("""Cannot use this IV processing because scdmsPyTools is not installed. 
                           More file types will be supported in future releases of RQpy.""")
     
+    files = sorted(glob(ivfilepath +'*/'))
+    
     if nprocess == 1:
         results = []
-        for filepath in ivfilepath:
+        for filepath in files:
             results.append(_process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts, 
                  rshunt, rbias, lgcHV))
     else:
