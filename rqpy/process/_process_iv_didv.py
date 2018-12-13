@@ -214,7 +214,7 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
 
 
 def process_ivsweep(ivfilepath, chans, detectorid="Z1", rfb=5000, loopgain=2.4, binstovolts=65536/2, 
-                    rshunt=0.005, rbias=20000, lgcHV=False, lgcverbose=False,
+                    rshunt=0.005, rbias=20000, lgcHV=False, lgcverbose=False, lgcsave=True,
                     nprocess=1, savepath='', savename='IV_dIdV_DF'):
     """
     Function to process data for an IV/dIdV sweep. See Notes for 
@@ -244,6 +244,8 @@ def process_ivsweep(ivfilepath, chans, detectorid="Z1", rfb=5000, loopgain=2.4, 
         two modes, it is up to the user to make sure the channel names are correct
     lgcverbose : bool, optional
         If True, the series number being processed will be displayed
+    lgcsave : bool, optional
+        If True, the processed DF is saved in the user specified directory
     nprocess : int, optional
         Number of jobs to use to process IV dIdV sweep. If nprocess = 1, only a single
         core will be used. If more than one, Pool will be used for multiprocessing. 
