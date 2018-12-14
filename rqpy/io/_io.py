@@ -234,7 +234,7 @@ def get_trace_gain(path, chan, det, gainfactors = {'rfb': 5000, 'loopgain' : 2.4
     
     return convtoamps, drivergain, qetbias
 
-def get_traces_midgz(path, channels, det, convtoamps=1, lgcskip_empty=False, lgcreturndict=True):
+def get_traces_midgz(path, channels, det, convtoamps=1, lgcskip_empty=True, lgcreturndict=False):
     """
     Function to return raw traces and event information for a single channel for mid.gz files.
     

@@ -707,7 +707,8 @@ def _rq(file, channels, det, setup, convtoamps, savepath, lgcsavedumps, filetype
         raise ValueError("channels and det should have the same length")
     
     if filetype == "mid.gz":
-        traces, info_dict = io.get_traces_midgz([file], channels=channels, det=det, convtoamps=convtoamps)
+        traces, info_dict = io.get_traces_midgz([file], channels=channels, det=det, convtoamps=convtoamps,
+                                                lgcskip_empty=False, lgcreturndict=True)
     elif filetype == "npz":
         traces, info_dict = io.get_traces_npz([file])
     
