@@ -55,10 +55,51 @@ def _check_df(df, channels=None):
 
 
 class IVanalysis(object):
+    """
+    Class to aid in the analysis of an IV/dIdV sweep as processed by
+    rqpy.proccess.process_ivsweep()
+    
+    Attributes
+    ----------
+    df : Pandas.core.DataFrame
+        DataFrame with the parameters returned by
+        rqpy.process.process_ivsweep()
+    channels : str or list
+        Channel names to analyze. If only interested in a single
+        channel, channels can be in the form a string. 
+    chname : str or list
+        The corresponding name of the channels if a 
+        different label from channels is desired for
+        plotting. Ex: PBS1 -> G147 channel 1
+    figsavepath : str
+        Path to where figures should be saved
+    noiseinds : array
+        Array of booleans corresponding to the rows
+        of the df that are noise type data
+    didvinds : array
+        Array of booleans corresponding to the rows
+        of the df that are didv type data
+    norminds : array
+        Array of booleans corresponding to the rows
+        of the didv df and noise df that are normal 
+        state
+    scinds : array
+        Array of booleans corresponding to the rows
+        of the didv df and noise df that are SC 
+        state
+    rshunt : float
+        The value of the shunt resistor in the TES circuit
+        in Ohms
+    rload : float
+        The value of the load resistor (rshunt + rp)
+    rp : float
+        The parasitic resistance in the TES line
+    
+    """
     
     
     
-    def __init__(self, df, channels=None, channelname = '', figsavepath = ''):
+    def __init__(self, df, norminds, scinds, channels=None, channelname='', rshunt=5e-3, figsavepath=''):
         
   
         check = _check_df(df, channels)
@@ -70,9 +111,17 @@ class IVanalysis(object):
         self.channels = channels
         self.chname = channelname
         self.figsavepath = figsavepath
+        self.rshunt = rshunt 
+        self.rload = None
+        self.rp = None
         
         self.noiseinds = (df.datatype == "noise")
         self.didvinds = (df.datatype == "didv")
+        
+        self.norminds = norminds
+        self.scinds = scinds
+        
+        
             
     
     def remove_bad_series(self):
@@ -87,14 +136,52 @@ class IVanalysis(object):
         cstd = self.df.offset_err == 0
         cbad = ccutfail | cstationary | cstd
         self.df = self.df[~cbad]
+        self.noiseinds = self.noiseinds[~cbad]
+        self.didvinds = self.didvinds[~cbad]
 
+    def fit_rload_didv(self, lgcplot=False, lgcsave=False, **kwargs):
+        """
+        Function to fit the SC dIdV series data and calculate rload. 
+        Note, if the fit is not good, you may need to speficy an initial
+        time offset using the **kwargs. Pass {'dt0' : 1.5e-6}# (or other value) 
+        
+        Parameters
+        ----------
+        lgcplot : bool, optional
+            If True, the plots are shown for each fit
+        lgcsave : Bool, optional
+            If True, all the plots will be saved in the a folder
+            Avetrace_noise/ within the user specified directory
+        lgcsave : 
+        **kwargs : dict
+            Additional key word arguments to be passed to didvinitfromdata()
+        
+        Returns
+        -------
+        None
+        """
+        
+        rload_list = []
+        for ind in (self.scinds):
+            didvsc = self.df[self.didvinds].iloc[ind]
+            didvobjsc = didvinitfromdata(didvsc.avgtrace[:len(didvsc.didvmean)], didvsc.didvmean, 
+                                         didvsc.didvstd, didvsc.offset, didvsc.offset_err, 
+                                         didvsc.fs, didvsc.sgfreq, didvsc.sgamp, 
+                                         rshunt = self.rshunt, **kwargs)
+            didvobjsc.dofit(1)
+            rload_list.append(didvobjsc.get_irwinparams_dict(1)["rtot"])
+            
+            if lgcplot:
+                didvobjsc.plot_full_trace(lgcsave=lgcsave, savepath=self.figsavepath,
+                                          savename=f'didv_{didvsc.qetbias:.3e}')
+        self.rload = np.mean(rload_list)
+        self.rp = self.rload - self.rshunt
         
     def make_noiseplots(self, lgcsave=False):
         """
         Helper function to plot average noise/didv traces in time domain, as well as 
         corresponding noise PSDs, for all QET bias points in IV/dIdV sweep.
-        Note, this function expects a DF with the parameters returned by
-        rqpy.process.process_ivsweep()
+        
 
         Parameters
         ----------
