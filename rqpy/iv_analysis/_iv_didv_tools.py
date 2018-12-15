@@ -74,6 +74,20 @@ class IVanalysis(object):
         self.noiseinds = (df.datatype == "noise")
         self.didvinds = (df.datatype == "didv")
             
+    
+    def remove_bad_series(self):
+        """
+        Function to remove series where the the squid lost lock, or the 
+        amplifier railed. This method will overwrite the parameter
+        self.df with a DF that has the bad series removed. 
+        
+        """
+        ccutfail = ~self.df.cut_pass 
+        cstationary = np.array([len(set(trace)) for trace in self.df.avgtrace]) < 100
+        cstd = self.df.offset_err == 0
+        cbad = ccutfail | cstationary | cstd
+        self.df = self.df[~cbad]
+
         
     def make_noiseplots(self, lgcsave=False):
         """
