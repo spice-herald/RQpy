@@ -94,6 +94,12 @@ class IVanalysis(object):
         The value of the load resistor (rshunt + rp)
     rp : float
         The parasitic resistance in the TES line
+    rn_didv : float
+        The normal state resistance of the TES,
+        calculated from fitting the dIdV
+    rn_iv : float
+        The normal state resistance of the TES,
+        calculated from the IV curve
     
     """
     
@@ -114,6 +120,8 @@ class IVanalysis(object):
         self.rshunt = rshunt 
         self.rload = None
         self.rp = None
+        self.rn_didv = None
+        self.rn_iv = None
         
         self.noiseinds = (df.datatype == "noise")
         self.didvinds = (df.datatype == "didv")
@@ -139,11 +147,12 @@ class IVanalysis(object):
         self.noiseinds = self.noiseinds[~cbad]
         self.didvinds = self.didvinds[~cbad]
 
-    def fit_rload_didv(self, lgcplot=False, lgcsave=False, **kwargs):
+    def _fit_rload_didv(self, lgcplot=False, lgcsave=False, **kwargs):
         """
         Function to fit the SC dIdV series data and calculate rload. 
         Note, if the fit is not good, you may need to speficy an initial
         time offset using the **kwargs. Pass {'dt0' : 1.5e-6}# (or other value) 
+        or additionally try {'add180phase' : False}
         
         Parameters
         ----------
@@ -176,6 +185,80 @@ class IVanalysis(object):
                                           savename=f'didv_{didvsc.qetbias:.3e}')
         self.rload = np.mean(rload_list)
         self.rp = self.rload - self.rshunt
+        
+    def _fit_rn_didv(self, lgcplot=False, lgcsave=False, **kwargs):
+        """
+        Function to fit the Normal dIdV series data and calculate rn. 
+        Note, if the fit is not good, you may need to speficy an initial
+        time offset using the **kwargs. Pass {'dt0' : 1.5e-6}# (or other value) 
+        or additionally try {'add180phase' : False}
+
+        Parameters
+        ----------
+        lgcplot : bool, optional
+            If True, the plots are shown for each fit
+        lgcsave : Bool, optional
+            If True, all the plots will be saved in the a folder
+            Avetrace_noise/ within the user specified directory
+        lgcsave : 
+        **kwargs : dict
+            Additional key word arguments to be passed to didvinitfromdata()
+
+        Returns
+        -------
+        None
+        """
+        if self.rload is None:
+            raise ValueError('rload has not been calculated yet, please fit rload first')
+        rn_list = []
+        for ind in (self.norminds):
+            didvn = self.df[self.didvinds].iloc[ind]
+            didvobjn = didvinitfromdata(didvn.avgtrace[:len(didvn.didvmean)], didvn.didvmean, 
+                                         didvn.didvstd, didvn.offset, didvn.offset_err, 
+                                         didvn.fs, didvn.sgfreq, didvn.sgamp, 
+                                         rshunt = self.rshunt, rload=self.rload, **kwargs)
+            didvobjn.dofit(1)
+            rn=didvobjn.fitparams1[0]
+            rn_list.append(rn)
+
+            if lgcplot:
+                didvobjn.plot_full_trace(lgcsave=lgcsave, savepath=self.figsavepath,
+                                          savename=f'didv_{didvn.qetbias:.3e}')
+        self.rn_didv = np.mean(rn_list) - self.rload
+ 
+        
+    def fit_rload_rn(self, lgcplot=False, lgcsave=False, **kwargs):
+        """
+        Function to fit the SC dIdV series data  and the Normal dIdV series 
+        data and calculate rload, rp, and rn. 
+        
+        This is just a wrapper function that calls _fit_rload_didv() and
+        _fit_rn_didv().
+        
+        Note, if the fit is not good, you may need to speficy an initial
+        time offset using the **kwargs. Pass {'dt0' : 1.5e-6}# (or other value)
+        or additionally try {'add180phase' : False}
+
+        Parameters
+        ----------
+        lgcplot : bool, optional
+            If True, the plots are shown for each fit
+        lgcsave : Bool, optional
+            If True, all the plots will be saved in the a folder
+            Avetrace_noise/ within the user specified directory
+        lgcsave : 
+        **kwargs : dict
+            Additional key word arguments to be passed to didvinitfromdata()
+
+        Returns
+        -------
+        None
+        """     
+        
+        self._fit_rload_didv(lgcplot, lgcsave, **kwargs)
+        self._fit_rn_didv(lgcplot, lgcsave, **kwargs)
+        
+        
         
     def make_noiseplots(self, lgcsave=False):
         """
