@@ -105,7 +105,7 @@ class IVanalysis(object):
     
     
     
-    def __init__(self, df, norminds, scinds, channels=None, channelname='', rshunt=5e-3, figsavepath=''):
+    def __init__(self, df, nnorm, nsc, channels=None, channelname='', rshunt=5e-3, figsavepath=''):
         
   
         check = _check_df(df, channels)
@@ -126,13 +126,13 @@ class IVanalysis(object):
         self.noiseinds = (df.datatype == "noise")
         self.didvinds = (df.datatype == "didv")
         
-        self.norminds = norminds
-        self.scinds = scinds
+        self.norminds = range(nnorm)
+        self.scinds = range(len(df)//2-nsc, len(df)//2)
         
         
             
     
-    def remove_bad_series(self):
+    def _remove_bad_series(self):
         """
         Function to remove series where the the squid lost lock, or the 
         amplifier railed. This method will overwrite the parameter
@@ -146,6 +146,8 @@ class IVanalysis(object):
         self.df = self.df[~cbad]
         self.noiseinds = self.noiseinds[~cbad]
         self.didvinds = self.didvinds[~cbad]
+        self.norminds = range(len(self.norminds))
+        self.scinds = range(len(self.df)//2-len(self.scinds), len(self.df)//2)
 
     def _fit_rload_didv(self, lgcplot=False, lgcsave=False, **kwargs):
         """
