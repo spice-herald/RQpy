@@ -3,7 +3,7 @@ import pandas as pd
 from qetpy.cut import removeoutliers
 from scipy import stats, interpolate
 
-__all__ = ["binned_cut", "baselinecut", "inrange"]
+__all__ = ["binnedcut", "baselinecut", "inrange"]
 
 
 def baselinecut(arr, r0, i0, rload, dr=0.1e-3, cut=None):
@@ -50,7 +50,7 @@ def baselinecut(arr, r0, i0, rload, dr=0.1e-3, cut=None):
     return cbase
 
 
-def binned_cut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True):
+def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True):
     """
     Function for calculating a baseline cut over time based on a given percentile.
     
