@@ -3,10 +3,10 @@ import pandas as pd
 from qetpy.cut import removeoutliers
 from scipy import stats, interpolate
 
-__all__ = ["baselinecut_tdep", "baselinecut_dr", "inrange"]
+__all__ = ["binnedcut", "baselinecut", "inrange"]
 
 
-def baselinecut_dr(arr, r0, i0, rload, dr = 0.1e-3, cut = None):
+def baselinecut(arr, r0, i0, rload, dr=0.1e-3, cut=None):
     """
     Function to automatically generate the pre-pulse baseline cut. 
     The value where the cut is placed is set by dr, which is the user
@@ -31,7 +31,7 @@ def baselinecut_dr(arr, r0, i0, rload, dr = 0.1e-3, cut = None):
             
     Returns:
     --------
-    cbase_pre: ndarray
+    cbase : ndarray
         Array of type bool, corresponding to values which pass the 
         pre-pulse baseline cut
             
@@ -45,70 +45,68 @@ def baselinecut_dr(arr, r0, i0, rload, dr = 0.1e-3, cut = None):
     
     di = -(dr/(r0+dr+rload)*i0)
     
-    cbase_pre = (arr < (meanval + di))
+    cbase = (arr < (meanval + di))
     
-    return cbase_pre
+    return cbase
 
 
-def baselinecut_tdep(t, b, cut=None, dt=1000, cut_eff=0.9, positive_pulses=True):
+def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True):
     """
     Function for calculating a baseline cut over time based on a given percentile.
     
     Parameters
     ----------
-    t : array_like
-        Array of time values, should be in units of s.
-    b : array_like
-        Array of baselines to cut, any units.
+    x : array_like
+        Array of x-values to bin in.
+    y : array_like
+        Array of y-values to cut.
     cut : array_like, optional
-        Boolean mask of values to keep for determination of baseline cut. Useful if 
-        doing cut in a certain order. The baseline cut will be added to this cut.
-    dt : float, optional
-        Length in time that the baselines should be binned in. Should be in units of s.
-        Determines the number of bins by (time elapsed)/dt.
+        Boolean mask of values to keep for determination of the binned cut. Useful if 
+        doing cut in a certain order. The binned cut will be added to this cut.
+    nbins : float, optional
+        The number of bins to use in the cut
     cut_eff : float, optional
         The desired cut efficiency, should be a value between 0 and 1.
-    positive_pulses : bool, optional
-        The direction of the pulses in the data, which determines the direction of the 
-        tails of the baseline distributions and which values should be kept.
+    keep_large_vals : bool, optional
+        Whether or not the cut should keep the smaller values or the larger values
+        of `y`. If True, the larger values of `y` pass the cut based on `cut_eff`. 
+        If False, the smaller values of `y` pass the cut based on `cut_eff`. Default
+        is True.
         
     Returns
     -------
-    cbase : array_like
+    cbinned : array_like
         A boolean mask indicating which data points passed the baseline cut.
     
     """
     
     if (cut_eff > 1) or (cut_eff < 0):
         raise ValueError("cut_eff must be a value between 0 and 1")
-    
+
     if cut is None:
-        cut = np.ones(len(b), dtype=bool)
-    
-    if isinstance(t, pd.core.series.Series):
-        t_elapsed = t[cut].iloc[-1] - t[cut].iloc[0]
-    else:
-        t_elapsed = t[cut][-1] - t[cut][0]
-    
-    nbins = int(t_elapsed/dt)
-    
-    if not positive_pulses:
+        cut = np.ones(len(x), dtype=bool)
+
+    if keep_large_vals:
         cut_eff = 1 - cut_eff
-    
-    st = lambda x: x[np.argpartition(x, int(len(x)*cut_eff))][int(len(x)*cut_eff)]
-    
-    cutoffs, bin_edges, _ = stats.binned_statistic(t[cut], b[cut], bins=nbins,
-                                                   statistic=st)
-    f = interpolate.interp1d(bin_edges[:-1], cutoffs, kind='next', 
-                             bounds_error=False, fill_value=(cutoffs[0], cutoffs[-1]),
-                             assume_sorted=True)
-    
-    if positive_pulses:
-        cbase = (b < f(t)) & cut
+
+    st = lambda var: np.partition(var, int(len(var)*cut_eff))[int(len(var)*cut_eff)]
+
+    if nbins==1:
+        f = lambda var: st(x)*np.ones(len(x))
     else:
-        cbase = (b > f(t)) & cut
+        cutoffs, bin_edges, _ = stats.binned_statistic(x[cut], y[cut], bins=nbins,
+                                                       statistic=st)
+        cutoffs = np.pad(cutoffs, (1, 0), 'constant', constant_values=(cutoffs[0], 0))
+        f = interpolate.interp1d(bin_edges, cutoffs, kind='next', 
+                                 bounds_error=False, fill_value=(cutoffs[0], cutoffs[-1]),
+                                 assume_sorted=True)
+
+    if keep_large_vals:
+        cbinned = (y > f(x)) & cut
+    else:
+        cbinned = (y < f(x)) & cut
     
-    return cbase
+    return cbinned
 
 def inrange(vals, lwrbnd, uprbnd):
     """
