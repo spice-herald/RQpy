@@ -8,11 +8,10 @@ from rqpy import utils
 __all__ = ["hist", "scatter", "densityplot", "plot_gauss", "plot_n_gauss", "plot_saturation_correction"]
 
 
-def hist(arr, nbins='sqrt', xlims=None, cutold=None, cutnew=None, lgcrawdata=True, 
-         lgceff=True, lgclegend=True, labeldict=None, ax=None):
+def hist(arr, nbins='sqrt', xlims=None, cuts=None, lgcrawdata=True, 
+         lgceff=True, lgclegend=True, labeldict=None, ax=None, cmap="viridis"):
     """
-    Function to plot histogram of RQ data. The bins are set such that all bins have the same size
-    as the raw data
+    Function to plot histogram of RQ data with multiple cuts.
     
     Parameters
     ----------
@@ -22,10 +21,9 @@ def hist(arr, nbins='sqrt', xlims=None, cutold=None, cutnew=None, lgcrawdata=Tru
         This is the same as plt.hist() bins parameter. Defaults is 'sqrt'.
     xlims : list of float, optional
         The xlimits of the histogram. This is passed to plt.hist() range parameter.
-    cutold : array of bool, optional
-        Mask of values to be plotted
-    cutnew : array of bool, optional
-        Mask of values to be plotted. This mask is added to cutold if cutold is not None. 
+    cuts : list, optional
+        List of masks of values to be plotted. The cuts will be applied in the order that they are listed, such
+        that ay number of cuts can be plotted
     lgcrawdata : bool, optional
         If True, the raw data is plotted
     lgceff : bool, optional
@@ -35,12 +33,14 @@ def hist(arr, nbins='sqrt', xlims=None, cutold=None, cutnew=None, lgcrawdata=Tru
     lgclegend : bool, optional
         If True, the legend is plotted.
     labeldict : dict, optional
-        Dictionary to overwrite the labels of the plot. defaults are : 
+        Dictionary to overwrite the labels of the plot. defaults are: 
             labels = {'title' : 'Histogram', 'xlabel' : 'variable', 'ylabel' : 'Count', 
-            'cutnew' : 'current', 'cutold' : 'previous'}
+                      'cut0' : '1st', 'cut1' : '2nd', ...}
         Ex: to change just the title, pass: labeldict = {'title' : 'new title'}, to histrq()
     ax : axes.Axes object, optional
         Option to pass an existing Matplotlib Axes object to plot over, if it already exists.
+    cmap : str, optional
+        The colormap to use for plotting each cut. Default is 'viridis'.
     
     Returns
     -------
@@ -51,15 +51,31 @@ def hist(arr, nbins='sqrt', xlims=None, cutold=None, cutnew=None, lgcrawdata=Tru
         
     """
     
+    if not isinstance(cuts, list):
+        cuts = [cuts]
+    
     labels = {'title'  : 'Histogram', 
               'xlabel' : 'variable', 
-              'ylabel' : 'Count', 
-              'cutnew' : 'current', 
-              'cutold' : 'previous'}
+              'ylabel' : 'Count'}
     
+    
+    for ii in range(len(cuts)):
+        
+        num_str = str(ii+1)
+        
+        if num_str[-1]=='1':
+            num_str+="st"
+        elif num_str[-1]=='2':
+            num_str+="nd"
+        elif num_str[-1]=='3':
+            num_str+="rd"
+        else:
+            num_str+="th"
+        
+        labels[f"cut{ii}"] = num_str
+        
     if labeldict is not None:
-        for key in labeldict:
-            labels[key] = labeldict[key]
+        labels.update(labeldict)
     
     if ax is None:
         fig, ax = plt.subplots(figsize=(9, 6))
@@ -73,65 +89,44 @@ def hist(arr, nbins='sqrt', xlims=None, cutold=None, cutnew=None, lgcrawdata=Tru
     if lgcrawdata:
         if xlims is None:
             hist, bins, _ = ax.hist(arr, bins=nbins, histtype='step', 
-                                    label='full data', linewidth=2, color='b')
+                                    label='Full data', linewidth=2, color=plt.cm.get_cmap(cmap)(0))
             xlims = (bins.min(), bins.max())
         else:
             hist, bins, _ = ax.hist(arr, bins=nbins, range=xlims, histtype='step', 
-                                    label='full data', linewidth=2, color='b')            
-    if cutold is not None:
-        oldsum = cutold.sum()
-        if cutnew is None:
-            cuteff = oldsum/cutold.shape[0]
-            cutefftot = cuteff
-        if lgcrawdata:
-            nbins = bins
-        label = f"Data passing {labels['cutold']} cut"
-        if xlims is not None:
-            ax.hist(arr[cutold], bins=nbins, range=xlims, histtype='step', 
-                    label=label, linewidth=2, color='r')
-        else:
-            res = ax.hist(arr[cutold], bins=nbins, histtype='step', 
-                    label=label, linewidth=2, color='r')
-            xlims = (res[1].min(), res[1].max())
-    if cutnew is not None:
-        newsum = cutnew.sum()
-        if cutold is not None:
-            cutnew = cutnew & cutold
-            cuteff = cutnew.sum()/oldsum
-            cutefftot = cutnew.sum()/cutnew.shape[0]
-        else:
-            cuteff = newsum/cutnew.shape[0]
-            cutefftot = cuteff
-        if lgcrawdata:
-            nbins = bins
-        if lgceff:
-            label = f"Data passing {labels['cutnew']} cut, eff :  {cuteff:.3f}"
-        else:
-            label = f"Data passing {labels['cutnew']} cut "
-        if xlims is not None:
-            ax.hist(arr[cutnew], bins=nbins, range=xlims, histtype='step', 
-                    linewidth=2, color='g', label=label)
-        else:
-            res = ax.hist(arr[cutnew], bins=nbins, histtype='step', 
-                    linewidth=2, color='g', label=label)
-            xlims = (res[1].min(), res[1].max())
-    elif (cutnew is None) & (cutold is None):
-        cuteff = 1
-        cutefftot = 1
+                                    label='Full data', linewidth=2, color=plt.cm.get_cmap(cmap)(0))
+            
+    colors = plt.cm.get_cmap(cmap)(np.linspace(0.1, 0.9, len(cuts)))
         
+    ctemp = np.ones(len(arr), dtype=bool)
+    
+    for ii, cut in enumerate(cuts):
+        oldsum = ctemp.sum()
+        ctemp = ctemp & cut
+        newsum = ctemp.sum()
+        cuteff = newsum/oldsum * 100
+        label = f"Data passing {labels[f'cut{ii}']} cut"
+        
+        if lgceff:
+            label+=f", Eff = {cuteff:.1f}%"
+            
+        if xlims is not None:
+            ax.hist(arr[ctemp], bins=nbins, range=xlims, histtype='step', 
+                    label=label, linewidth=2, color=colors[ii])
+        else:
+            res = ax.hist(arr[ctemp], bins=nbins, histtype='step', 
+                    label=label, linewidth=2, color=colors[ii])
+            xlims = (res[1].min(), res[1].max())
+    
     ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
     ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
     ax.tick_params(which="both", direction="in", right=True, top=True)
     ax.grid(linestyle="dashed")
     
-    if lgceff:
-        ax.plot([], [], linestyle=' ', label=f'Efficiency of total cut: {cutefftot:.3f}')
     if lgclegend:
-        ax.legend()
+        ax.legend(loc="best")
+        
     return fig, ax
     
-
-
 
 def scatter(xvals, yvals, xlims=None, ylims=None, cutold=None, cutnew=None, 
             lgcrawdata=True, lgceff=True, lgclegend=True, labeldict=None, ms=1, a=.3, ax=None):
