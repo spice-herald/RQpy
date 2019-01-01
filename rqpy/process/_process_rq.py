@@ -49,18 +49,33 @@ class SetupRQ(object):
     do_ofamp_nodelay : bool
         Boolean flag for whether or not to do the optimum filter fit with no time
         shifting.
+    do_ofamp_nodelay_smooth : bool
+        Boolean flag for whether or not the optimum filter fit with no time
+        shifting should be calculated with a smoothed PSD. Useful in the case 
+        where the PSD for a channel has large spike(s) in order to suppress echoes 
+        elsewhere in the trace.
     ofamp_nodelay_lowfreqchi2 : bool
         Boolean flag for whether or not to calculate the low frequency chi-squared for 
         the optimum filter fit with no time shifting.
     do_ofamp_unconstrained : bool
         Boolean flag for whether or not to do the optimum filter fit with unconstrained time
         shifting.
+    do_ofamp_unconstrained_smooth : bool
+        Boolean flag for whether or not the optimum filter fit with unconstrained time
+        shifting should be calculated with a smoothed PSD. Useful in the case 
+        where the PSD for a channel has large spike(s) in order to suppress echoes 
+        elsewhere in the trace.
     ofamp_unconstrained_lowfreqchi2 : bool
         Boolean flag for whether or not to calculate the low frequency chi-squared for 
         the optimum filter fit with unconstrained time shifting.
     do_ofamp_constrained : bool
         Boolean flag for whether or not to do the optimum filter fit with constrained time
         shifting.
+    do_ofamp_constrained_smooth : bool
+        Boolean flag for whether or not the optimum filter fit with constrained time
+        shifting should be calculated with a smoothed PSD. Useful in the case 
+        where the PSD for a channel has large spike(s) in order to suppress echoes 
+        elsewhere in the trace.
     ofamp_constrained_lowfreqchi2 : bool
         Boolean flag for whether or not to calculate the low frequency chi-squared for 
         the optimum filter fit with constrained time shifting.
@@ -69,17 +84,29 @@ class SetupRQ(object):
         the possible time shift values to when doing the optimum filter fit with constrained time shifting.
     do_ofamp_pileup : bool
         Boolean flag for whether or not to do the pileup optimum filter fit.
+    do_ofamp_pileup_smooth : bool
+        Boolean flag for whether or not the pileup optimum filter fit should be calculated 
+        with a smoothed PSD. Useful in the case where the PSD for a channel has large spike(s) 
+        in order to suppress echoes elsewhere in the trace.
     ofamp_pileup_nconstrain : list
         The length of the window (in bins), centered on the middle of the trace, outside of which to 
         constrain the possible time shift values to when searching for a pileup pulse using ofamp_pileup.
     do_chi2_nopulse : bool
         Boolean flag for whether or not to calculate the chi^2 for no pulse.
+    do_chi2_nopulse_smooth : bool
+        Boolean flag for whether or not the chi^2 for no pulse should be calculated 
+        with a smoothed PSD. Useful in the case where the PSD for a channel has large 
+        spike(s) in order to suppress echoes elsewhere in the trace.
     do_chi2_lowfreq : bool
         Boolean flag for whether or not to calculate the low frequency chi^2 for any of the fits.
     chi2_lowfreq_fcutoff : list
         The frequency cutoff for the calculation of the low frequency chi^2, units of Hz.
     do_ofamp_baseline : bool
         Boolean flag for whether or not to do the optimum filter fit with fixed baseline.
+    do_ofamp_baseline_smooth : bool
+        Boolean flag for whether or not the optimum filter fit with fixed baseline
+        should be calculated with a smoothed PSD. Useful in the case where the PSD for a 
+        channel has large spike(s) in order to suppress echoes elsewhere in the trace.
     ofamp_baseline_nconstrain : list
         The length of the window (in bins), centered on the middle of the trace, to constrain 
         the possible time shift values to when doing the optimum filter fit with fixed baseline.
@@ -92,6 +119,10 @@ class SetupRQ(object):
     do_ofamp_shifted : bool
         Boolean flag for whether or not the shifted optimum filter fit should be calculated for
         the non-trigger channels. If set to True, then self.trigger must have been set to a value.
+    do_ofamp_shifted_smooth : bool
+        Boolean flag for whether or not the shifted optimum filter fit should be calculated 
+        with a smoothed PSD. Useful in the case where the PSD for a channel has large spike(s) 
+        in order to suppress echoes elsewhere in the trace.
     shifted_fit : str
         String specifying which fit that the time shift should be pulled from if the shifted
         optimum filter fit will be calculated. Should be "nodelay", "constrained", or "unconstrained",
@@ -155,24 +186,30 @@ class SetupRQ(object):
             self.calcsum=True
         
         self.do_ofamp_nodelay = True
+        self.do_ofamp_nodelay_smooth = False
         self.ofamp_nodelay_lowfreqchi2 = False
         
         self.do_ofamp_unconstrained = True
+        self.do_ofamp_unconstrained_smooth = False
         self.ofamp_unconstrained_lowfreqchi2 = False
         
         self.do_ofamp_constrained = True
+        self.do_ofamp_constrained_smooth = False
         self.ofamp_constrained_lowfreqchi2 = True
         self.ofamp_constrained_nconstrain = [80]*self.nchan
         
         self.do_ofamp_pileup = True
+        self.do_ofamp_pileup_smooth = False
         self.ofamp_pileup_nconstrain = [80]*self.nchan
         
         self.do_chi2_nopulse = True
+        self.do_chi2_nopulse_smooth = False
         
         self.do_chi2_lowfreq = True
         self.chi2_lowfreq_fcutoff = [10000]*self.nchan
         
         self.do_ofamp_baseline = False
+        self.do_ofamp_baseline_smooth = False
         self.ofamp_baseline_nconstrain = [80]*self.nchan
         
         self.do_baseline = True
@@ -181,6 +218,7 @@ class SetupRQ(object):
         self.do_integral = True
         
         self.do_ofamp_shifted = False
+        self.do_ofamp_shifted_smooth = False
         self.which_fit = "constrained"
         self.t0_shifted = None
         
@@ -214,7 +252,7 @@ class SetupRQ(object):
         else:
             self.calcsum = lgcsum
         
-    def adjust_ofamp_nodelay(self, lgcrun=True, calc_lowfreqchi2=False):
+    def adjust_ofamp_nodelay(self, lgcrun=True, lgcrun_smooth=False, calc_lowfreqchi2=False):
         """
         Method for adjusting the calculation of the optimum filter fit with no time
         shifting.
@@ -224,6 +262,11 @@ class SetupRQ(object):
         lgcrun : bool, optional
             Boolean flag for whether or not the optimum filter fit with no time
             shifting should be calculated.
+        lgcrun_smooth : bool, optional
+            Boolean flag for whether or not the optimum filter fit with no time
+            shifting should be calculated with a smoothed PSD. Useful in the case 
+            where the PSD for a channel has large spike(s) in order to suppress echoes 
+            elsewhere in the trace.
         calc_lowfreqchi2 : bool, optional
             Boolean flag for whether or not the low frequency chi^2 of this fit 
             should be calculated. The low frequency chi^2 calculation should be adjusted
@@ -232,9 +275,10 @@ class SetupRQ(object):
         """
         
         self.do_ofamp_nodelay = lgcrun
+        self.do_ofamp_nodelay_smooth = lgcrun_smooth
         self.ofamp_nodelay_lowfreqchi2 = calc_lowfreqchi2
         
-    def adjust_ofamp_unconstrained(self, lgcrun=True, calc_lowfreqchi2=False):
+    def adjust_ofamp_unconstrained(self, lgcrun=True, lgcrun_smooth=False, calc_lowfreqchi2=False):
         """
         Method for adjusting the calculation of the optimum filter fit with unconstrained 
         time shifting.
@@ -244,6 +288,11 @@ class SetupRQ(object):
         lgcrun : bool, optional
             Boolean flag for whether or not the optimum filter fit with unconstrained 
             time shifting should be calculated.
+        lgcrun_smooth : bool, optional
+            Boolean flag for whether or not the optimum filter fit with unconstrained time
+            shifting should be calculated with a smoothed PSD. Useful in the case 
+            where the PSD for a channel has large spike(s) in order to suppress echoes 
+            elsewhere in the trace.
         calc_lowfreqchi2 : bool, optional
             Boolean flag for whether or not the low frequency chi^2 of this fit 
             should be calculated. The low frequency chi^2 calculation should be adjusted
@@ -252,9 +301,10 @@ class SetupRQ(object):
         """
         
         self.do_ofamp_unconstrained = lgcrun
+        self.do_ofamp_unconstrained_smooth = lgcrun_smooth
         self.ofamp_unconstrained_lowfreqchi2 = calc_lowfreqchi2
         
-    def adjust_ofamp_constrained(self, lgcrun=True, calc_lowfreqchi2=True, nconstrain=80):
+    def adjust_ofamp_constrained(self, lgcrun=True, lgcrun_smooth=False, calc_lowfreqchi2=True, nconstrain=80):
         """
         Method for adjusting the calculation of the optimum filter fit with constrained 
         time shifting.
@@ -264,6 +314,11 @@ class SetupRQ(object):
         lgcrun : bool, optional
             Boolean flag for whether or not the optimum filter fit with constrained 
             time shifting should be calculated.
+        lgcrun_smooth : bool, optional
+            Boolean flag for whether or not the optimum filter fit with constrained time
+            shifting should be calculated with a smoothed PSD. Useful in the case 
+            where the PSD for a channel has large spike(s) in order to suppress echoes 
+            elsewhere in the trace.
         calc_lowfreqchi2 : bool, optional
             Boolean flag for whether or not the low frequency chi^2 of this fit 
             should be calculated. The low frequency chi^2 calculation should be adjusted
@@ -284,10 +339,11 @@ class SetupRQ(object):
             raise ValueError("The length of nconstrain is not equal to the number of channels")
         
         self.do_ofamp_constrained = lgcrun
+        self.do_ofamp_constrained_smooth = lgcrun_smooth
         self.ofamp_constrained_lowfreqchi2 = calc_lowfreqchi2
         self.ofamp_constrained_nconstrain = nconstrain
         
-    def adjust_ofamp_baseline(self, lgcrun=True, nconstrain=80):
+    def adjust_ofamp_baseline(self, lgcrun=True, lgcrun_smooth=False, nconstrain=80):
         """
         Method for adjusting the calculation of the optimum filter fit with fixed 
         baseline.
@@ -297,6 +353,10 @@ class SetupRQ(object):
         lgcrun : bool, optional
             Boolean flag for whether or not the optimum filter fit with fixed baseline 
             should be calculated.
+        lgcrun_smooth : bool, optional
+            Boolean flag for whether or not the optimum filter fit with fixed baseline
+            should be calculated with a smoothed PSD. Useful in the case where the PSD for a 
+            channel has large spike(s) in order to suppress echoes elsewhere in the trace.
         nconstrain : int, list of int, optional
             The length of the window (in bins), centered on the middle of the trace, 
             to constrain the possible time shift values to when doing the optimum filter 
@@ -313,9 +373,10 @@ class SetupRQ(object):
             raise ValueError("The length of nconstrain is not equal to the number of channels")
         
         self.do_ofamp_baseline = lgcrun
+        self.do_ofamp_baseline_smooth = lgcrun_smooth
         self.ofamp_baseline_nconstrain = nconstrain
         
-    def adjust_ofamp_pileup(self, lgcrun=True, nconstrain=80):
+    def adjust_ofamp_pileup(self, lgcrun=True, lgcrun_smooth=False, nconstrain=80):
         """
         Method for adjusting the calculation of the pileup optimum filter fit.
         
@@ -323,6 +384,10 @@ class SetupRQ(object):
         ----------
         lgcrun : bool, optional
             Boolean flag for whether or not the pileup optimum filter fit should be calculated.
+        lgcrun_smooth : bool, optional
+            Boolean flag for whether or not the pileup optimum filter fit should be calculated 
+            with a smoothed PSD. Useful in the case where the PSD for a channel has large spike(s) 
+            in order to suppress echoes elsewhere in the trace.
         nconstrain : int, list of int, optional
             The length of the window (in bins), centered on the middle of the trace, outside 
             of which to constrain the possible time shift values to when searching for a 
@@ -339,9 +404,10 @@ class SetupRQ(object):
             raise ValueError("The length of nconstrain is not equal to the number of channels")
         
         self.do_ofamp_pileup = lgcrun
+        self.do_ofamp_pileup_smooth = lgcrun_smooth
         self.ofamp_pileup_nconstrain = nconstrain
         
-    def adjust_chi2_nopulse(self, lgcrun=True):
+    def adjust_chi2_nopulse(self, lgcrun=True, lgcrun_smooth=False):
         """
         Method for adjusting the calculation of the no pulse chi^2.
         
@@ -349,10 +415,15 @@ class SetupRQ(object):
         ----------
         lgcrun : bool, optional
             Boolean flag for whether or not to calculate the chi^2 for no pulse.
+        lgcrun_smooth : bool, optional
+            Boolean flag for whether or not the chi^2 for no pulse should be calculated 
+            with a smoothed PSD. Useful in the case where the PSD for a channel has large 
+            spike(s) in order to suppress echoes elsewhere in the trace.
         
         """
         
         self.do_chi2_nopulse = lgcrun
+        self.do_chi2_nopulse_smooth = lgcrun_smooth
         
     def adjust_chi2_lowfreq(self, lgcrun=True, fcutoff=10000):
         """
@@ -421,7 +492,7 @@ class SetupRQ(object):
         
         self.do_integral = lgcrun
         
-    def adjust_ofamp_shifted(self, lgcrun=True, which_fit="constrained"):
+    def adjust_ofamp_shifted(self, lgcrun=True, lgcrun_smooth=False, which_fit="constrained"):
         """
         Method for adjusting the calculation of the shifted optimum filter fit.
         
@@ -430,6 +501,10 @@ class SetupRQ(object):
         lgcrun : bool, optional
             Boolean flag for whether or not the shifted optimum filter fit should be calculated for
             the non-trigger channels. If set to True, then self.trigger must have been set to a value.
+        lgcrun_smooth : bool, optional
+            Boolean flag for whether or not the shifted optimum filter fit should be calculated 
+            with a smoothed PSD. Useful in the case where the PSD for a channel has large spike(s) 
+            in order to suppress echoes elsewhere in the trace.
         which_fit : str, optional
             String specifying which fit that the time shift should be pulled from if the shifted
             optimum filter fit will be calculated. Should be "nodelay", "constrained", or "unconstrained",
@@ -452,6 +527,24 @@ class SetupRQ(object):
 
             if which_fit == "nodelay" and not self.do_ofamp_nodelay:
                 raise ValueError("which_fit was set to 'nodelay', but that fit has been set to not be calculated")
+                
+        self.do_ofamp_shifted_smooth = lgcrun_smooth
+        
+        if self.do_ofamp_shifted_smooth:
+            if which_fit not in ["constrained", "unconstrained", "nodelay"]:
+                raise ValueError("which_fit should be set to 'constrained', 'unconstrained', or 'nodelay'")
+
+            if which_fit == "constrained" and not self.do_ofamp_constrained_smooth:
+                raise ValueError("""which_fit was set to 'constrained', but that fit (using the smoothed PSD) 
+                                 has been set to not be calculated""")
+
+            if which_fit == "unconstrained" and not self.do_ofamp_unconstrained_smooth:
+                raise ValueError("""which_fit was set to 'constrained', but that fit (using the smoothed PSD) 
+                                 has been set to not be calculated""")
+
+            if which_fit == "nodelay" and not self.do_ofamp_nodelay_smooth:
+                raise ValueError("""which_fit was set to 'nodelay', but that fit (using the smoothed PSD) 
+                                 has been set to not be calculated""")
             
         self.shifted_fit = which_fit
         
@@ -509,33 +602,51 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
     # initialize variables for the various OFs
     if setup.do_chi2_nopulse:
         chi0 = np.zeros(len(signal))
+    if setup.do_chi2_nopulse_smooth:
+        chi0_smooth = np.zeros(len(signal))
     
     if setup.do_ofamp_nodelay:
         amp_nodelay = np.zeros(len(signal))
         chi2_nodelay = np.zeros(len(signal))
-    
-    if setup.do_chi2_lowfreq:
-        chi2low = np.zeros(len(signal))
+    if setup.do_ofamp_nodelay_smooth:
+        amp_nodelay_smooth = np.zeros(len(signal))
+        chi2_nodelay_smooth = np.zeros(len(signal))
     
     if setup.do_ofamp_unconstrained:
         amp_noconstrain = np.zeros(len(signal))
         t0_noconstrain = np.zeros(len(signal))
         chi2_noconstrain = np.zeros(len(signal))
+    if setup.do_ofamp_unconstrained_smooth:
+        amp_noconstrain_smooth = np.zeros(len(signal))
+        t0_noconstrain_smooth = np.zeros(len(signal))
+        chi2_noconstrain_smooth = np.zeros(len(signal))
     
     if setup.do_ofamp_constrained:
         amp_constrain = np.zeros(len(signal))
         t0_constrain = np.zeros(len(signal))
         chi2_constrain = np.zeros(len(signal))
+    if setup.do_ofamp_constrained_smooth:
+        amp_constrain_smooth = np.zeros(len(signal))
+        t0_constrain_smooth = np.zeros(len(signal))
+        chi2_constrain_smooth = np.zeros(len(signal))
     
     if setup.do_ofamp_pileup:
         amp_pileup = np.zeros(len(signal))
         t0_pileup = np.zeros(len(signal))
         chi2_pileup = np.zeros(len(signal))
+    if setup.do_ofamp_pileup_smooth:
+        amp_pileup_smooth = np.zeros(len(signal))
+        t0_pileup_smooth = np.zeros(len(signal))
+        chi2_pileup_smooth = np.zeros(len(signal))
     
     if setup.do_ofamp_baseline:
         amp_baseline = np.zeros(len(signal))
         t0_baseline = np.zeros(len(signal))
         chi2_baseline = np.zeros(len(signal))
+    if setup.do_ofamp_baseline_smooth:
+        amp_baseline_smooth = np.zeros(len(signal))
+        t0_baseline_smooth = np.zeros(len(signal))
+        chi2_baseline_smooth = np.zeros(len(signal))
         
     if setup.do_chi2_lowfreq:
         if setup.ofamp_nodelay_lowfreqchi2:
@@ -549,16 +660,25 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
     
     # run the OF class for each trace
     OF = qp.OptimumFilter(signal[0], template, psd, fs)
+    psd_smooth = qp.smooth_psd(psd)
+    OF_smooth = qp.OptimumFilter(signal[0], template, psd_smooth, fs)
     
     for jj, s in enumerate(signal):
         if jj!=0:
             OF.update_signal(s)
+            OF_smooth.update_signal(s)
         
         if setup.do_chi2_nopulse:
             chi0[jj] = OF.chi2_nopulse()
+            
+        if setup.do_chi2_nopulse_smooth:
+            chi0_smooth[jj] = OF_smooth.chi2_nopulse()
         
         if setup.do_ofamp_nodelay:
             amp_nodelay[jj], chi2_nodelay[jj] = OF.ofamp_nodelay()
+            
+        if setup.do_ofamp_nodelay_smooth:
+            amp_nodelay_smooth[jj], chi2_nodelay_smooth[jj] = OF_smooth.ofamp_nodelay()
         
         if setup.ofamp_nodelay_lowfreqchi2 and setup.do_chi2_lowfreq:
             chi2low_nodelay[jj] = OF.chi2_lowfreq(amp_nodelay[jj], 0, 
@@ -566,6 +686,9 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         
         if setup.do_ofamp_unconstrained:
             amp_noconstrain[jj], t0_noconstrain[jj], chi2_noconstrain[jj] = OF.ofamp_withdelay()
+            
+        if setup.do_ofamp_unconstrained_smooth:
+            amp_noconstrain_smooth[jj], t0_noconstrain_smooth[jj], chi2_noconstrain_smooth[jj] = OF_smooth.ofamp_withdelay()
         
         if setup.ofamp_unconstrained_lowfreqchi2 and setup.do_chi2_lowfreq:
             chi2low_unconstrain[jj] = OF.chi2_lowfreq(amp_noconstrain[jj], t0_noconstrain[jj], 
@@ -573,6 +696,10 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
 
         if setup.do_ofamp_constrained:
             amp_constrain[jj], t0_constrain[jj], chi2_constrain[jj] = OF.ofamp_withdelay(
+                                                                      nconstrain=setup.ofamp_constrained_nconstrain[chan_num])
+            
+        if setup.do_ofamp_constrained_smooth:
+            amp_constrain_smooth[jj], t0_constrain_smooth[jj], chi2_constrain_smooth[jj] = OF_smooth.ofamp_withdelay(
                                                                       nconstrain=setup.ofamp_constrained_nconstrain[chan_num])
         
         if setup.ofamp_constrained_lowfreqchi2 and setup.do_chi2_lowfreq:
@@ -582,22 +709,38 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         if setup.do_ofamp_pileup:
             amp_pileup[jj], t0_pileup[jj], chi2_pileup[jj] = OF.ofamp_pileup_iterative(amp_constrain[jj], t0_constrain[jj],
                                                                nconstrain=setup.ofamp_pileup_nconstrain[chan_num])
+            
+        if setup.do_ofamp_pileup_smooth:
+            amp_pileup_smooth[jj], t0_pileup_smooth[jj], chi2_pileup_smooth[jj] = OF_smooth.ofamp_pileup_iterative(
+                                                               amp_constrain_smooth[jj], t0_constrain_smooth[jj],
+                                                               nconstrain=setup.ofamp_pileup_nconstrain[chan_num])
         
         if setup.do_ofamp_baseline:
             amp_baseline[jj], t0_baseline[jj], chi2_baseline[jj] = OF.ofamp_baseline(
+                                                                   nconstrain=setup.ofamp_baseline_nconstrain[chan_num])
+            
+        if setup.do_ofamp_baseline_smooth:
+            amp_baseline_smooth[jj], t0_baseline_smooth[jj], chi2_baseline_smooth[jj] = OF_smooth.ofamp_baseline(
                                                                    nconstrain=setup.ofamp_baseline_nconstrain[chan_num])
     
     # save variables to dict
     if setup.do_chi2_nopulse:
         rq_dict[f'chi2_nopulse_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'chi2_nopulse_{chan}{det}'][readout_inds] = chi0
+    if setup.do_chi2_nopulse_smooth:
+        rq_dict[f'chi2_nopulse_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2_nopulse_smooth_{chan}{det}'][readout_inds] = chi0_smooth
     
     if setup.do_ofamp_nodelay:
         rq_dict[f'ofamp_nodelay_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'ofamp_nodelay_{chan}{det}'][readout_inds] = amp_nodelay
         rq_dict[f'chi2_nodelay_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'chi2_nodelay_{chan}{det}'][readout_inds] = chi2_nodelay
-    
+    if setup.do_ofamp_nodelay_smooth:
+        rq_dict[f'ofamp_nodelay_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'ofamp_nodelay_smooth_{chan}{det}'][readout_inds] = amp_nodelay_smooth
+        rq_dict[f'chi2_nodelay_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2_nodelay_smooth_{chan}{det}'][readout_inds] = chi2_nodelay_smooth
     
     if setup.do_ofamp_unconstrained:
         rq_dict[f'ofamp_unconstrain_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
@@ -606,6 +749,13 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         rq_dict[f't0_unconstrain_{chan}{det}'][readout_inds] = t0_noconstrain
         rq_dict[f'chi2_unconstrain_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'chi2_unconstrain_{chan}{det}'][readout_inds] = chi2_noconstrain
+    if setup.do_ofamp_unconstrained_smooth:
+        rq_dict[f'ofamp_unconstrain_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'ofamp_unconstrain_smooth_{chan}{det}'][readout_inds] = amp_noconstrain_smooth
+        rq_dict[f't0_unconstrain_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f't0_unconstrain_smooth_{chan}{det}'][readout_inds] = t0_noconstrain_smooth
+        rq_dict[f'chi2_unconstrain_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2_unconstrain_smooth_{chan}{det}'][readout_inds] = chi2_noconstrain_smooth
     
     if setup.do_ofamp_constrained:
         rq_dict[f'ofamp_constrain_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
@@ -614,6 +764,13 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         rq_dict[f't0_constrain_{chan}{det}'][readout_inds] = t0_constrain
         rq_dict[f'chi2_constrain_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'chi2_constrain_{chan}{det}'][readout_inds] = chi2_constrain
+    if setup.do_ofamp_constrained_smooth:
+        rq_dict[f'ofamp_constrain_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'ofamp_constrain_{chan}{det}'][readout_inds] = amp_constrain_smooth
+        rq_dict[f't0_constrain_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f't0_constrain_smooth_{chan}{det}'][readout_inds] = t0_constrain_smooth
+        rq_dict[f'chi2_constrain_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2_constrain_smooth_{chan}{det}'][readout_inds] = chi2_constrain_smooth
         
     if setup.do_chi2_lowfreq:
         if setup.ofamp_nodelay_lowfreqchi2:
@@ -635,6 +792,13 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         rq_dict[f't0_pileup_{chan}{det}'][readout_inds] = t0_pileup
         rq_dict[f'chi2_pileup_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'chi2_pileup_{chan}{det}'][readout_inds] = chi2_pileup
+    if setup.do_ofamp_pileup_smooth:
+        rq_dict[f'ofamp_pileup_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'ofamp_pileup_smooth_{chan}{det}'][readout_inds] = amp_pileup_smooth
+        rq_dict[f't0_pileup_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f't0_pileup_smooth_{chan}{det}'][readout_inds] = t0_pileup_smooth
+        rq_dict[f'chi2_pileup_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2_pileup_smooth_{chan}{det}'][readout_inds] = chi2_pileup_smooth
         
     if setup.do_ofamp_baseline:
         rq_dict[f'ofamp_baseline_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
@@ -643,6 +807,13 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         rq_dict[f't0_baseline_{chan}{det}'][readout_inds] = t0_baseline
         rq_dict[f'chi2_baseline_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'chi2_baseline_{chan}{det}'][readout_inds] = chi2_baseline
+    if setup.do_ofamp_baseline_smooth:
+        rq_dict[f'ofamp_baseline_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'ofamp_baseline_smooth_{chan}{det}'][readout_inds] = amp_baseline_smooth
+        rq_dict[f't0_baseline_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f't0_baseline_smooth_{chan}{det}'][readout_inds] = t0_baseline_smooth
+        rq_dict[f'chi2_baseline_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2_baseline_smooth_{chan}{det}'][readout_inds] = chi2_baseline_smooth
     
     if setup.do_ofamp_shifted and setup.trigger is not None:
         # do the shifted OF on each trace
@@ -667,6 +838,31 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
             rq_dict[f't0_shifted_{chan}{det}'][readout_inds] = setup.t0_shifted
             rq_dict[f'chi2_shifted_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
             rq_dict[f'chi2_shifted_{chan}{det}'][readout_inds] = chi2_shifted
+            
+    if setup.do_ofamp_shifted_smooth and setup.trigger is not None:
+        # do the shifted OF on each trace
+        if chan_num==setup.trigger:
+            if not setup.do_ofamp_shifted:
+                if setup.shifted_fit=="nodelay" and setup.do_ofamp_nodelay_smooth:
+                    setup.t0_shifted = np.zeros(len(signal))
+                elif setup.shifted_fit=="constrained" and setup.do_ofamp_constrained_smooth:
+                    setup.t0_shifted = t0_constrain
+                elif setup.shifted_fit=="unconstrained" and setup.do_ofamp_unconstrained_smooth:
+                    setup.t0_shifted = t0_unconstrain
+        else:
+            amp_shifted_smooth = np.zeros(len(signal))
+            chi2_shifted_smooth = np.zeros(len(signal))
+
+            for jj, s in enumerate(signal):
+                amp_shifted_smooth[jj], _, chi2_shifted_smooth[jj] = qp.ofamp(s, rp.shift(template, int(setup.t0_shifted[jj]*fs)), 
+                                                                              psd_smooth, fs, withdelay=False)
+
+            rq_dict[f'ofamp_shifted_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f'ofamp_shifted_smooth_{chan}{det}'][readout_inds] = amp_shifted_smooth
+            rq_dict[f't0_shifted_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f't0_shifted_smooth_{chan}{det}'][readout_inds] = setup.t0_shifted
+            rq_dict[f'chi2_shifted_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f'chi2_shifted_smooth_{chan}{det}'][readout_inds] = chi2_shifted_smooth
     
     return rq_dict
     
@@ -716,7 +912,7 @@ def _calc_rq(traces, channels, det, setup, readout_inds=None):
             psd = setup.psds[ii]
 
             chan_dict = _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ii, d)
-
+            
             rq_dict.update(chan_dict)
             
     if setup.calcsum:
