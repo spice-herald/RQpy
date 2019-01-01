@@ -78,6 +78,11 @@ class SetupRQ(object):
         Boolean flag for whether or not to calculate the low frequency chi^2 for any of the fits.
     chi2_lowfreq_fcutoff : list
         The frequency cutoff for the calculation of the low frequency chi^2, units of Hz.
+    do_ofamp_baseline : bool
+        Boolean flag for whether or not to do the optimum filter fit with fixed baseline.
+    ofamp_baseline_nconstrain : list
+        The length of the window (in bins), centered on the middle of the trace, to constrain 
+        the possible time shift values to when doing the optimum filter fit with fixed baseline.
     do_baseline : bool
         Boolean flag for whether or not to calculate the DC baseline for each trace.
     baseline_indbasepre : int
@@ -166,6 +171,9 @@ class SetupRQ(object):
         
         self.do_chi2_lowfreq = True
         self.chi2_lowfreq_fcutoff = [10000]*self.nchan
+        
+        self.do_ofamp_baseline = False
+        self.ofamp_baseline_nconstrain = [80]*self.nchan
         
         self.do_baseline = True
         self.baseline_indbasepre = [16000]*self.nchan
@@ -278,6 +286,34 @@ class SetupRQ(object):
         self.do_ofamp_constrained = lgcrun
         self.ofamp_constrained_lowfreqchi2 = calc_lowfreqchi2
         self.ofamp_constrained_nconstrain = nconstrain
+        
+    def adjust_ofamp_baseline(self, lgcrun=True, nconstrain=80):
+        """
+        Method for adjusting the calculation of the optimum filter fit with fixed 
+        baseline.
+        
+        Parameters
+        ----------
+        lgcrun : bool, optional
+            Boolean flag for whether or not the optimum filter fit with fixed baseline 
+            should be calculated.
+        nconstrain : int, list of int, optional
+            The length of the window (in bins), centered on the middle of the trace, 
+            to constrain the possible time shift values to when doing the optimum filter 
+            fit with fixed baseline. Can be set to a list of values, if the 
+            constrain window should be different for each channel. The length of the list should
+            be the same length as the number of channels.
+        
+        """
+        
+        if np.isscalar(nconstrain):
+            nconstrain = [nconstrain]*self.nchan
+        
+        if len(nconstrain)!=self.nchan:
+            raise ValueError("The length of nconstrain is not equal to the number of channels")
+        
+        self.do_ofamp_baseline = lgcrun
+        self.ofamp_baseline_nconstrain = nconstrain
         
     def adjust_ofamp_pileup(self, lgcrun=True, nconstrain=80):
         """
@@ -495,6 +531,11 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         amp_pileup = np.zeros(len(signal))
         t0_pileup = np.zeros(len(signal))
         chi2_pileup = np.zeros(len(signal))
+    
+    if setup.do_ofamp_baseline:
+        amp_baseline = np.zeros(len(signal))
+        t0_baseline = np.zeros(len(signal))
+        chi2_baseline = np.zeros(len(signal))
         
     if setup.do_chi2_lowfreq:
         if setup.ofamp_nodelay_lowfreqchi2:
@@ -541,6 +582,10 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         if setup.do_ofamp_pileup:
             amp_pileup[jj], t0_pileup[jj], chi2_pileup[jj] = OF.ofamp_pileup_iterative(amp_constrain[jj], t0_constrain[jj],
                                                                nconstrain=setup.ofamp_pileup_nconstrain[chan_num])
+        
+        if setup.do_ofamp_baseline:
+            amp_baseline[jj], t0_baseline[jj], chi2_baseline[jj] = OF.ofamp_baseline(
+                                                                   nconstrain=setup.ofamp_baseline_nconstrain[chan_num])
     
     # save variables to dict
     if setup.do_chi2_nopulse:
@@ -590,6 +635,14 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         rq_dict[f't0_pileup_{chan}{det}'][readout_inds] = t0_pileup
         rq_dict[f'chi2_pileup_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'chi2_pileup_{chan}{det}'][readout_inds] = chi2_pileup
+        
+    if setup.do_ofamp_baseline:
+        rq_dict[f'ofamp_baseline_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'ofamp_baseline_{chan}{det}'][readout_inds] = amp_baseline
+        rq_dict[f't0_baseline_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f't0_baseline_{chan}{det}'][readout_inds] = t0_baseline
+        rq_dict[f'chi2_baseline_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2_baseline_{chan}{det}'][readout_inds] = chi2_baseline
     
     if setup.do_ofamp_shifted and setup.trigger is not None:
         # do the shifted OF on each trace
