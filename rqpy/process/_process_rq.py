@@ -766,7 +766,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         rq_dict[f'chi2_constrain_{chan}{det}'][readout_inds] = chi2_constrain
     if setup.do_ofamp_constrained_smooth:
         rq_dict[f'ofamp_constrain_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'ofamp_constrain_{chan}{det}'][readout_inds] = amp_constrain_smooth
+        rq_dict[f'ofamp_constrain_smooth_{chan}{det}'][readout_inds] = amp_constrain_smooth
         rq_dict[f't0_constrain_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f't0_constrain_smooth_{chan}{det}'][readout_inds] = t0_constrain_smooth
         rq_dict[f'chi2_constrain_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
