@@ -53,7 +53,9 @@ def hist(arr, nbins='sqrt', xlims=None, cuts=None, lgcrawdata=True,
         
     """
     
-    if not isinstance(cuts, list):
+    if cuts is None:
+        cuts = []
+    elif not isinstance(cuts, list):
         cuts = [cuts]
     
     labels = {'title'  : 'Histogram', 
@@ -189,7 +191,9 @@ def scatter(xvals, yvals, xlims=None, ylims=None, cuts=None, lgcrawdata=True, lg
         
     """
 
-    if not isinstance(cuts, list):
+    if cuts is None:
+        cuts = []
+    elif not isinstance(cuts, list):
         cuts = [cuts]
     
     labels = {'title'  : 'Scatter Plot',
@@ -235,7 +239,7 @@ def scatter(xvals, yvals, xlims=None, ylims=None, cuts=None, lgcrawdata=True, lg
     
     limitcut = xlimitcut & ylimitcut
     
-    if lgcrawdata and cuts is not None: 
+    if lgcrawdata and len(cuts) > 0: 
         ax.scatter(xvals[limitcut & ~cuts[0]], yvals[limitcut & ~cuts[0]], 
                    label='Full Data', c='b', s=ms, alpha=a)
     elif lgcrawdata:
@@ -265,20 +269,20 @@ def scatter(xvals, yvals, xlims=None, ylims=None, cuts=None, lgcrawdata=True, lg
                    label=label, c=colors[ii], s=ms, alpha=a)
         
     if xlims is None:
-        if lgcrawdata and cuts is None:
+        if lgcrawdata and len(cuts)==0:
             xrange = xvals.max()-xvals.min()
             ax.set_xlim([xvals.min()-0.05*xrange, xvals.max()+0.05*xrange])
-        elif cuts is not None:
+        elif len(cuts)>0:
             xrange = xvals[cuts[0]].max()-xvals[cuts[0]].min()
             ax.set_xlim([xvals[cuts[0]].min()-0.05*xrange, xvals[cuts[0]].max()+0.05*xrange])
     else:
         ax.set_xlim(xlims)
         
     if ylims is None:
-        if lgcrawdata and cuts is None:
+        if lgcrawdata and len(cuts)==0:
             yrange = yvals.max()-yvals.min()
             ax.set_ylim([yvals.min()-0.05*yrange, yvals.max()+0.05*yrange])
-        elif cuts is not None:
+        elif len(cuts)>0:
             yrange = yvals[cuts[0]].max()-yvals[cuts[0]].min()
             ax.set_ylim([yvals[cuts[0]].min()-0.05*yrange, yvals[cuts[0]].max()+0.05*yrange])
     else:
