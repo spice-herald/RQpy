@@ -168,10 +168,11 @@ def _normal_noise(freqs, squiddc, squidpole, squidn, rload, tload, rn, tc, induc
     -------
     s_tot : array
         Array of values corresponding to the theortical 
-        normal stat noise. 
+        normal state noise. 
 
     """
-
+    
+    
     omega = 2.0*np.pi*freqs
     dIdVnormal = 1.0/(rload+rn+1.0j*omega*inductance)
     s_vload = 4.0*constants.k*tload*rload * np.ones_like(freqs)
@@ -182,6 +183,45 @@ def _normal_noise(freqs, squiddc, squidpole, squidn, rload, tload, rn, tc, induc
     s_tot = s_iloadnormal+s_itesnormal+s_isquid
 
     return s_tot
+
+def _sc_noise(freqs, tload, squiddc, squidpole, squidn, rload, inductance):
+    """
+    Functional form of the Super Conducting state noise. Including
+    the johnson noise for the load resistor and the SQUID + downstream 
+    electronics noise. See QETpy.TESnoise class for more info.
+
+    Parameters
+    ----------
+    freqs : array
+        Array of frequencies
+    tload : float
+        The temeperature of the load resistor in Kelvin
+    squiddc : float
+        The average value for the white noise from the squid 
+        (ignoring the 1/f component)
+    squidpole : float
+        The knee for the 1/f component of the noise
+    squidn : float
+        The factor for the 1/f^n noise
+    rload : float
+        Value of the load resistor in Ohms
+    inductance : float
+        The inductance of the TES line
+
+    Returns
+    -------
+    s_tot : array
+        Array of values corresponding to the theortical 
+        SC state noise. 
+
+    """
+    omega = 2.0*np.pi*freqs
+    dIdVsc = 1.0/(rload+1.0j*omega*inductance)
+    s_vload = 4.0*constants.k*tload*rload * np.ones_like(freqs)    
+    s_iloadsc = s_vload*np.abs(dIdVsc)**2.0 
+    s_isquid = (squiddc*(1.0+(squidpole/freqs)**squidn))**2.0
+    return s_iloadsc+s_isquid
+    
 
 class IVanalysis(object):
     """
@@ -257,6 +297,8 @@ class IVanalysis(object):
         The knee for the squid 1/f noise
     squidn : float
         The power of the 1/f^n noise for the squid
+    self.inductance : float
+        The inductance of the TES line
     """
     
     
@@ -315,6 +357,11 @@ class IVanalysis(object):
         self.tbath = tbath
         self.tc = tc
         self.Gta = Gta
+        
+        
+        ##############
+        self.inductance = 2e-7
+        ##############
         
      
     def _fit_rload_didv(self, lgcplot=False, lgcsave=False, **kwargs):
@@ -540,7 +587,8 @@ class IVanalysis(object):
         
     
     
-    def fit_normal_noise(self, fit_range=(10, 3e4), squiddc0=6e-12, squidpole0=200, squidn0=0.7):
+    def fit_normal_noise(self, fit_range=(10, 3e4), squiddc0=6e-12, squidpole0=200, squidn0=0.7,
+                        lgcplot=False, lgcsave=False):
         """
         Function to fit the noise components of the SQUID+Electronics. Fits all normal noise PSDs
         and stores the average value for squiddc, squidpole, and squidn as attributes of the class.
@@ -555,6 +603,10 @@ class IVanalysis(object):
             Initial guess for the squidpole parameter
         squidn0 : float, optional
             Initial guess for the squidn paramter
+        lgcplot : bool, optional
+            If True, a plot of the fit is shown
+        lgcsave : bool, optiona
+            If True, the figure is saved
         
         Returns
         -------
@@ -565,6 +617,7 @@ class IVanalysis(object):
         squidpole_list = []
         squidn_list = []
         
+        inductance = self.inductance
         for ind in self.norminds:
             noise_row = self.df[self.noiseinds].iloc[ind]
             f = noise_row.f
@@ -579,7 +632,7 @@ class IVanalysis(object):
             model = Model(_normal_noise, independent_vars=['freqs'])
             params = model.make_params(squiddc=squiddc0, squidpole=squidpole0,squidn=squidn0,
                                         rload = self.rload, tload = 0.0, rn = self.rn_iv, tc = self.tc,
-                                        inductance = 2e-7)
+                                        inductance = inductance)
             params['tc'].vary = False
             params['tload'].vary = False
             params['rload'].vary = False
@@ -589,7 +642,7 @@ class IVanalysis(object):
             
             fitvals = result.values
     
-            noise_sim = TESnoise(rload=self.rload, r0=self.rn_iv, rshunt=self.rshunt, inductance=2e-7, 
+            noise_sim = TESnoise(rload=self.rload, r0=self.rn_iv, rshunt=self.rshunt, inductance=inductance, 
                           beta=0, loopgain=0, tau0=0, G=0,qetbias=noise_row.qetbias, tc=self.tc, tload=0,
                           tbath=self.tbath, squiddc=fitvals['squiddc'], squidpole=fitvals['squidpole'], 
                           squidn=fitvals['squidn'])
@@ -598,21 +651,95 @@ class IVanalysis(object):
             squidpole_list.append(fitvals['squidpole'])
             squidn_list.append(fitvals['squidn'])
             
-            plt.figure(figsize=(11,6))
-            plt.grid(True, linestyle = '--')
-            plt.loglog(f, psd, alpha = .5, label = 'Raw Data)
-            plt.loglog(xdata, ydata)
-            plt.loglog(f, noise_sim.s_isquid(f), label = 'Squid+Electronics')
-            plt.loglog(f, noise_sim.s_itesnormal(f),label= 'TES_johnson')
-            plt.loglog(f, noise_sim.s_iloadnormal(f),label= 'Load')
-            plt.loglog(f, noise_sim.s_itotnormal(f),label= 'Total Noise')
-            plt.legend()
-            plt.ylim(1e-23, 5e-21)
+            if lgcplot:
+                plt.figure(figsize=(11,6))
+                plt.grid(True, linestyle = '--')
+                plt.loglog(f, psd, alpha = .5, label = 'Raw Data')
+                plt.loglog(xdata, ydata)
+                plt.loglog(f, noise_sim.s_isquid(f), label = 'Squid+Electronics')
+                plt.loglog(f, noise_sim.s_itesnormal(f),label= 'TES_johnson')
+                plt.loglog(f, noise_sim.s_iloadnormal(f),label= 'Load')
+                plt.loglog(f, noise_sim.s_itotnormal(f),label= 'Total Noise')
+                plt.legend()
+                plt.ylim(1e-23, 5e-21)
+                if lgcsave:
+                    plt.savefig(f'{self.figsavepath}{Normal_noise_qetbias{noise_row.qetbias}')
             
         self.squiddc = np.mean(squiddc_list)
         self.squidpole = np.mean(squidpole_list)
         self.squidn = np.mean(squidn_list)
+                       
+                       
+    def fit_sc_noise(self, fit_range=(3e3, 3e4), lgcplot=False, lgcsave=False):
+        """
+        Function to fit the components of the SC Noise. Fits all SC noise PSDs
+        and stores the average value for tload as an attribute of the class.
         
+        Parameters
+        ----------
+        fit_range : tuple, optional
+            The frequency range over which to do the fit
+        lgcplot : bool, optional
+            If True, a plot of the fit is shown
+        lgcsave : bool, optiona
+            If True, the figure is saved
+            
+        Returns
+        -------
+        None
+        """
+        
+        if self.squidpole is None:
+            raise AttributeError('You must fit the normal noise before fitting the SC noise')
+                       
+        tload_list = []
+        
+        inductance = self.inductance
+        for ind in self.scinds:
+            noise_row = self.df[self.noiseinds].iloc[ind]
+            f = noise_row.f
+            psd = noise_row.psd
+            
+            ind_lower = (np.abs(f - fit_range[0])).argmin()
+            ind_upper = (np.abs(f - fit_range[1])).argmin()
+
+            xdata = f[ind_lower:ind_upper]
+            ydata = _flatten_psd(f,psd)[ind_lower:ind_upper]
+
+            model = Model(_sc_noise, independent_vars=['freqs'])
+            params = model.make_params(tload = 0.03, squiddc=self.squiddc, squidpole=self.squidpole,
+                                       squidn=self.squidn, rload=self.rload, inductance=inductance)
+
+            params['squiddc'].vary = False
+            params['squidpole'].vary = False
+            params['squidn'].vary = False
+            params['rload'].vary = False
+            params['inductance'].vary = False
+            result = model.fit(ydata, params, freqs = xdata)
+            
+            fitvals = result.values
+    
+            noise_sim = TESnoise(rload=self.rload, r0=0.0001, rshunt=self.rshunt, inductance=inductance, 
+                          beta=0, loopgain=0, tau0=0, G=0,qetbias=noise_row.qetbias, tc=self.tc, 
+                          tload=fitvals['tload'], tbath=self.tbath, squiddc=self.squiddc, 
+                          squidpole=self.squidpole, squidn=self.squidn)
+            
+            tload_list.append(fitvals['tload'])
+            
+            if lgcsave:
+                plt.figure(figsize=(11,6))
+                plt.grid(True, linestyle = '--')
+                plt.loglog(f, psd, alpha = .5, label = 'Raw Data')
+                plt.loglog(xdata, ydata)
+                plt.loglog(f, noise_sim.s_isquid(f), label = 'Squid+Electronics')
+                plt.loglog(f, noise_sim.s_iloadsc(f),label= 'Load')
+                plt.loglog(f, noise_sim.s_itotsc(f),label= 'Total Noise')
+                plt.legend()
+                plt.ylim(1e-23, 5e-21)
+                if lgcsave:
+                    plt.savefig(f'{self.figsavepath}{SC_noise_qetbias{noise_row.qetbias}')
+            
+        self.tload = np.mean(tload_list)
         
     def model_noise(self, collection_eff):
         """
