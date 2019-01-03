@@ -96,6 +96,8 @@ def hist(arr, nbins='sqrt', xlims=None, cuts=None, lgcrawdata=True,
         else:
             hist, bins, _ = ax.hist(arr, bins=nbins, range=xlims, histtype='step', 
                                     label='Full data', linewidth=2, color=plt.cm.get_cmap(cmap)(0))
+        if nbins=="sqrt":
+            nbins = len(bins)
             
     colors = plt.cm.get_cmap(cmap)(np.linspace(0.1, 0.9, len(cuts)))
         
@@ -111,13 +113,16 @@ def hist(arr, nbins='sqrt', xlims=None, cuts=None, lgcrawdata=True,
         if lgceff:
             label+=f", Eff = {cuteff:.1f}%"
             
-        if xlims is not None:
-            ax.hist(arr[ctemp], bins=nbins, range=xlims, histtype='step', 
-                    label=label, linewidth=2, color=colors[ii])
+        if xlims is None:
+            hist, bins, _  = ax.hist(arr[ctemp], bins=nbins, histtype='step', 
+                                     label=label, linewidth=2, color=colors[ii])
+            xlims = (bins.min(), bins.max())
         else:
-            res = ax.hist(arr[ctemp], bins=nbins, histtype='step', 
-                    label=label, linewidth=2, color=colors[ii])
-            xlims = (res[1].min(), res[1].max())
+            hist, bins, _  = ax.hist(arr[ctemp], bins=nbins, range=xlims, histtype='step', 
+                                     label=label, linewidth=2, color=colors[ii])
+            
+        if nbins=="sqrt":
+            nbins = len(bins)
     
     ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
     ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
