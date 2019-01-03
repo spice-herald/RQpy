@@ -6,15 +6,19 @@ from glob import glob
 import sys
 from collections import Counter
 import pprint
+from scipy import constants
+from scipy.signal import savgol_filter
+
+from lmfit import Model
 
 from qetpy import IV, DIDV, Noise, didvinitfromdata, autocuts
 from qetpy.sim import TESnoise, loadfromdidv
 from qetpy.plotting import plot_noise_sim
-from qetpy.utils import align_traces
+from qetpy.utils import align_traces, make_decreasing
 import rqpy as rp
 
 
-__all__ = ["IVanalysis"]
+__all__ = ["IVanalysis", "_flatten_psd"]
 
 def _check_df(df, channels=None):
     """
@@ -100,6 +104,84 @@ def _sort_df(df):
     
     return sorteddf
 
+def _flatten_psd(f, psd):
+    """
+    Helper function to smooth out all the spikes
+    in a single sided psd in order to more easily fit the 
+    SC and Normal state noise
+    
+    Parameters
+    ----------
+    f: array
+        Array of frequency values
+    psd : array
+        Array of one sided psd values
+        
+    Returns
+    -------
+    flattened_psd : array
+        Array of values of smoothed psd
+        
+    """
+    
+    sav = np.zeros(psd.shape)
+    div = int(.0025*len(psd))
+    sav_lower = savgol_filter(psd[1:], 3, 1, mode = 'interp', deriv=0)
+    sav_upper = savgol_filter(psd[1:], 45, 1, mode = 'interp', deriv=0)
+    sav[1:div+1] = sav_lower[:div]
+    sav[1+div:] = sav_upper[div:]
+    sav[0] = psd[0]
+    flattened_psd = make_decreasing(sav, x=f)
+    
+    return flattened_psd
+
+def _normal_noise(freqs, squiddc, squidpole, squidn, rload, tload, rn, tc, inductance):
+    """
+    Functional form of the normal state noise. Including
+    the johnson noise for the load resistor, the johnson 
+    noise for the TES, and the SQUID + downstream electronics 
+    noise. See QETpy.TESnoise class for more info.
+
+    Parameters
+    ----------
+    freqs : array
+        Array of frequencies
+    squiddc : float
+        The average value for the white noise from the squid 
+        (ignoring the 1/f component)
+    squidpole : float
+        The knee for the 1/f component of the noise
+    squidn : float
+        The factor for the 1/f^n noise
+    rload : float
+        Value of the load resistor in Ohms
+    tload : float
+        The temeperature of the load resistor in Kelvin
+    rn : float
+        The value of the resistance of the TES when normal
+    tc : float
+        The SC transistion temperature of the TES
+    inductance : float
+        The inductance of the TES line
+
+    Returns
+    -------
+    s_tot : array
+        Array of values corresponding to the theortical 
+        normal stat noise. 
+
+    """
+
+    omega = 2.0*np.pi*freqs
+    dIdVnormal = 1.0/(rload+rn+1.0j*omega*inductance)
+    s_vload = 4.0*constants.k*tload*rload * np.ones_like(freqs)
+    s_iloadnormal = s_vload*np.abs(dIdVnormal)**2.0
+    s_vtesnormal = 4.0*constants.k*tc*rn * np.ones_like(freqs)
+    s_itesnormal = s_vtesnormal*np.abs(dIdVnormal)**2.0
+    s_isquid = (squiddc*(1.0+(squidpole/freqs)**squidn))**2.0
+    s_tot = s_iloadnormal+s_itesnormal+s_isquid
+
+    return s_tot
 
 class IVanalysis(object):
     """
@@ -161,13 +243,26 @@ class IVanalysis(object):
         Array of DC offsets for IV/didv data
     dites : array
         Array of uncertainties in the DC offsets
-    
+    tbath : float
+        The bath temperature of the fridge
+    tc : float
+        The super conducting temperature of the 
+        TESs
+    Gta : float
+        The thermal conductance of the TESs to the
+        absorber
+    squiddc : float
+        The DC component of the squid+electronics noise
+    squidpole : float
+        The knee for the squid 1/f noise
+    squidn : float
+        The power of the 1/f^n noise for the squid
     """
     
     
     
     def __init__(self, df, nnorm, nsc, channels=None, channelname='', rshunt=5e-3, 
-                 rshunt_err = 0.05*5e-3, lgcremove_badseries = True, figsavepath=''):
+                 rshunt_err = 0.05*5e-3, tbath=0, tc=0, Gta=0, lgcremove_badseries = True, figsavepath=''):
         
         df = _sort_df(df)
         
@@ -189,6 +284,9 @@ class IVanalysis(object):
         self.rn_iv = None
         self.rn_iv_err = None
         self.rtot_list = None
+        self.squiddc = None
+        self.squidpole = None
+        self.squidn = None
         
         if lgcremove_badseries:
             self.df = _remove_bad_series(df)
@@ -213,6 +311,10 @@ class IVanalysis(object):
         self.vb_err = vb_err
         self.dites = dites
         self.dites_err = dites_err
+        
+        self.tbath = tbath
+        self.tc = tc
+        self.Gta = Gta
         
      
     def _fit_rload_didv(self, lgcplot=False, lgcsave=False, **kwargs):
@@ -259,7 +361,7 @@ class IVanalysis(object):
         """
         Function to fit the Normal dIdV series data and calculate rn. 
         Note, if the fit is not good, you may need to speficy an initial
-        time offset using the **kwargs. Pass {'dt0' : 1.5e-6}# (or other value) 
+        time offset using the **kwargs. Pass {'dt0' : 1.5e-6} (or other value) 
         or additionally try {'add180phase' : False}
 
         Parameters
@@ -377,6 +479,180 @@ class IVanalysis(object):
             ivobj.plot_all_curves(lgcsave=lgcsave, savepath=self.figsavepath, savename=self.chname)
             
         
+    
+    
+    
+    def fit_didv(self, lgcplot=False, lgcsave=False):
+        """
+        Function to fit all the didv data in the IV sweep data
+        
+  
+        Parameters
+        ----------
+        lgcplot : bool, optional
+            If True, the plots are shown for each fit
+        lgcsave : Bool, optional
+            If True, all the plots will be saved in the a folder
+            Avetrace_noise/ within the user specified directory
+        
+        Returns
+        -------
+        None
+        
+        """ 
+    
+        didvobjs = []
+        
+        for ii, (_, row) in enumerate(self.df[self.didvinds].iterrows()):
+            r0 = row.r0
+            dr0 = row.r0_err
+            priors = np.zeros(7)
+            invpriorsCov = np.zeros((7,7))
+            priors[0] = self.rload
+            priors[1] = row.r0
+            invpriorsCov[0,0] = 1.0/self.rshunt_err**2
+            invpriorsCov[1,1] = 1.0/(dr0)**2
+
+
+            didvobj = didvinitfromdata(row.avgtrace[:len(row.didvmean)], row.didvmean, row.didvstd, row.offset, 
+                                       row.offset_err, row.fs, row.sgfreq, row.sgamp, rshunt=self.rshunt,  
+                                       rload=self.rload, rload_err = self.rshunt_err, r0=r0, r0_err=dr0,
+                                       priors = priors, invpriorscov = invpriorsCov)
+            if ii in self.norminds or ii in self.scinds:
+                poles=1
+            else:
+                poles=2
+                didvobj.dopriorsfit()
+            didvobj.dofit(poles)
+            didvobjs.append(didvobj)
+            if lgcplot:
+                didvobj.plot_full_trace(lgcsave=lgcsave, savepath=self.figsavepath,
+                                          savename=f'didv_{didvn.qetbias:.3e}')
+                didvobj.plot_re_im_didv(poles='all', plotpriors=True, lgcsave=lgcsave, 
+                                        savepath=self.figsavepath,
+                                        savename=f'didv_{didvn.qetbias:.3e}')
+
+        self.df.loc[self.didvinds, 'didvobj'] =  didvobjs
+        self.df.loc[self.noiseinds, 'didvobj'] =  didvobjs
+        
+        
+        
+        
+    
+    
+    def fit_normal_noise(self, fit_range=(10, 3e4), squiddc0=6e-12, squidpole0=200, squidn0=0.7):
+        """
+        Function to fit the noise components of the SQUID+Electronics. Fits all normal noise PSDs
+        and stores the average value for squiddc, squidpole, and squidn as attributes of the class.
+        
+        Parameters
+        ----------
+        fit_range : tuple, optional
+            The frequency range over which to do the fit
+        squiddc0 : float, optional
+            Initial guess for the squiddc parameter
+        squidpole0 : float, optional
+            Initial guess for the squidpole parameter
+        squidn0 : float, optional
+            Initial guess for the squidn paramter
+        
+        Returns
+        -------
+        None
+        """
+        
+        squiddc_list = []
+        squidpole_list = []
+        squidn_list = []
+        
+        for ind in self.norminds:
+            noise_row = self.df[self.noiseinds].iloc[ind]
+            f = noise_row.f
+            psd = noise_row.psd
+            
+            ind_lower = (np.abs(f - fit_range[0])).argmin()
+            ind_upper = (np.abs(f - fit_range[1])).argmin()
+
+            xdata = f[ind_lower:ind_upper]
+            ydata = _flatten_psd(f,psd)[ind_lower:ind_upper]
+
+            model = Model(_normal_noise, independent_vars=['freqs'])
+            params = model.make_params(squiddc=squiddc0, squidpole=squidpole0,squidn=squidn0,
+                                        rload = self.rload, tload = 0.0, rn = self.rn_iv, tc = self.tc,
+                                        inductance = 2e-7)
+            params['tc'].vary = False
+            params['tload'].vary = False
+            params['rload'].vary = False
+            params['rn'].vary = False
+            params['inductance'].vary = False
+            result = model.fit(ydata, params, freqs = xdata)
+            
+            fitvals = result.values
+    
+            noise_sim = TESnoise(rload=self.rload, r0=self.rn_iv, rshunt=self.rshunt, inductance=2e-7, 
+                          beta=0, loopgain=0, tau0=0, G=0,qetbias=noise_row.qetbias, tc=self.tc, tload=0,
+                          tbath=self.tbath, squiddc=fitvals['squiddc'], squidpole=fitvals['squidpole'], 
+                          squidn=fitvals['squidn'])
+            
+            squiddc_list.append(fitvals['squiddc'])
+            squidpole_list.append(fitvals['squidpole'])
+            squidn_list.append(fitvals['squidn'])
+            
+            plt.figure(figsize=(11,6))
+            plt.grid(True, linestyle = '--')
+            plt.loglog(f, psd, alpha = .5, label = 'Raw Data)
+            plt.loglog(xdata, ydata)
+            plt.loglog(f, noise_sim.s_isquid(f), label = 'Squid+Electronics')
+            plt.loglog(f, noise_sim.s_itesnormal(f),label= 'TES_johnson')
+            plt.loglog(f, noise_sim.s_iloadnormal(f),label= 'Load')
+            plt.loglog(f, noise_sim.s_itotnormal(f),label= 'Total Noise')
+            plt.legend()
+            plt.ylim(1e-23, 5e-21)
+            
+        self.squiddc = np.mean(squiddc_list)
+        self.squidpole = np.mean(squidpole_list)
+        self.squidn = np.mean(squidn_list)
+        
+        
+    def model_noise(self, collection_eff):
+        """
+        Function to plot noise PSD with all the theoretical noise
+        components (calculated from the didv fits) shown
+        
+        """
+        
+        qets = []
+        ress = []
+        r0s = []
+        
+        for ii, didv in enumerate(self.df.loc[self.noiseinds,'didvobj']):
+
+            row = df.iloc[ind]
+            f = row.f[1:]
+            psd = row.psd[1:]
+            qetbias = row.qetbias
+
+            if ii in self.scinds:
+                noisetype = 'superconducting'
+                lgcpriors = False
+            elif ii in self.norminds:
+                noisetype = 'normal'
+                lgcpriors = False
+            else:
+                noisetype = 'transition'
+                lgcpriors = True
+
+            noise_sim = loadfromdidv(didvobjs[ii], G=self.Gta, qetbias=row.qetbias, tc=self.tc, 
+                                     tload=self.tload, tbath=self.tbath, squiddc=self.squiddc, 
+                                     squidpole=self.squidpole, squidn=self.squidn,
+                                     noisetype=noisetype, lgcpriors = lgcpriors)
+
+
+            res = energy_res(self.tau_rise,self.tau_fall, 2*np.pi*f, 
+                             psd/(np.abs(noise_sim.dIdP(f))**2),collection_eff)
+
+      
+        
         
     def make_noiseplots(self, lgcsave=False):
         """
@@ -445,6 +721,7 @@ class IVanalysis(object):
         Returns
         -------
         None
+        
         """
         
         fig, axes = plt.subplots(1,2, figsize = (16,6))
