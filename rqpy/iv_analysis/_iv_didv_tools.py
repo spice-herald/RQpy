@@ -8,17 +8,18 @@ from collections import Counter
 import pprint
 from scipy import constants
 from scipy.signal import savgol_filter
-
 from lmfit import Model
 
+import rqpy as rp
+from rqpy.plotting import _plot_rload_rn_qetbias, _make_iv_noiseplots, _plot_energy_res_vs_bias, _plot_n_noise, _plot_sc_noise
 from qetpy import IV, DIDV, Noise, didvinitfromdata, autocuts
 from qetpy.sim import TESnoise, loadfromdidv, energy_res_estimate
-from qetpy.plotting import plot_noise_sim, _plot_rload_rn_qetbias, _make_iv_noiseplots, _plot_energy_res_vs_bias
+from qetpy.plotting import plot_noise_sim
 from qetpy.utils import align_traces, make_decreasing
-import rqpy as rp
 
 
-__all__ = ["IVanalysis", "_flatten_psd"]
+
+__all__ = ["IVanalysis"]
 
 def _check_df(df, channels=None):
     """
@@ -215,6 +216,7 @@ def _sc_noise(freqs, tload, squiddc, squidpole, squidn, rload, inductance):
         SC state noise. 
 
     """
+    
     omega = 2.0*np.pi*freqs
     dIdVsc = 1.0/(rload+1.0j*omega*inductance)
     s_vload = 4.0*constants.k*tload*rload * np.ones_like(freqs)    
@@ -226,7 +228,8 @@ def _sc_noise(freqs, tload, squiddc, squidpole, squidn, rload, inductance):
 class IVanalysis(object):
     """
     Class to aid in the analysis of an IV/dIdV sweep as processed by
-    rqpy.proccess.process_ivsweep()
+    rqpy.proccess.process_ivsweep(). Currently only supports a single
+    channel
     
     Attributes
     ----------
@@ -306,6 +309,44 @@ class IVanalysis(object):
     
     def __init__(self, df, nnorm, nsc, channels=None, channelname='', rshunt=5e-3, 
                  rshunt_err = 0.05*5e-3, tbath=0, tc=0, Gta=0, lgcremove_badseries = True, figsavepath=''):
+        """
+        Initialization of IVanalysis object. Note, currently only single channel analysis is supported
+        
+        Parameters
+        ----------
+        df : Pandas.core.DataFrame
+            DataFrame of a processed IV/dIdV sweep returned from 
+            rqpy._process_iv_didv.process_ivsweep()
+        nnorm : int
+            Number bias values where the TES was normal,
+            Note: count only one per noise and didv point (don't double count!)
+        nsc : int
+            Number of bias values where the TES was Super Conducting,
+            Note: count only one per noise and didv point (don't double count!)
+        channels : list, optional
+            A list of strings correponding to the channels to analyze. 
+            Note, currently only single channel analysis is supported
+        channelname : str, optional
+            This is used if the user wished to label the channel as something
+            other than the stored channel name. ie. channel = PBS1, channelname = PD2
+        rshunt : float, optional
+            The value of the shunt resistor in Ohms
+        rshunt_err : float, optional
+            The unccertainty in the value of the shunt resistor
+        tbath : float, optional
+            The temperature of the detector stack in Kelvin
+        tc : float, optional
+            The temperature of the SC transition for the TES
+        Gta : float, optional
+            The theremal conductance between the TES and the 
+            absorber
+        lgcremove_badseries : bool, optional
+            If True, series where the SQUID lost lock, or the amplifier railed 
+            are removed
+        figsavepath : str, optional
+            The path to the directory where the figures should be saved.
+        
+        """
         
         df = _sort_df(df)
         
@@ -360,10 +401,11 @@ class IVanalysis(object):
         self.tc = tc
         self.Gta = Gta
         
+        tempdidv = DIDV(1,1,1,1,1)
+        self.df = self.df.assign(didvobj = tempdidv)
         
-        ##############
-        self.inductance = 2e-7
-        ##############
+        
+        
         
      
     def _fit_rload_didv(self, lgcplot=False, lgcsave=False, **kwargs):
@@ -399,12 +441,20 @@ class IVanalysis(object):
             didvobjsc.dofit(1)
             rload_list.append(didvobjsc.get_irwinparams_dict(1)["rtot"])
             
+            self.df.iat[int(np.flatnonzero(self.didvinds)[ind]), self.df.columns.get_loc('didvobj')] = didvobjsc
+            self.df.iat[int(np.flatnonzero(self.noiseinds)[ind]), self.df.columns.get_loc('didvobj')] = didvobjsc
+            
             if lgcplot:
                 didvobjsc.plot_full_trace(lgcsave=lgcsave, savepath=self.figsavepath,
                                           savename=f'didv_{didvsc.qetbias:.3e}')
+                
+        
+        
         self.rload = np.mean(rload_list)
         self.rload_list = rload_list
         self.rp = self.rload - self.rshunt
+        
+        
         
     def _fit_rn_didv(self, lgcplot=False, lgcsave=False, **kwargs):
         """
@@ -431,7 +481,7 @@ class IVanalysis(object):
         if self.rload is None:
             raise ValueError('rload has not been calculated yet, please fit rload first')
         rtot_list = []
-        for ind in (self.norminds):
+        for ind in self.norminds:
             didvn = self.df[self.didvinds].iloc[ind]
             didvobjn = didvinitfromdata(didvn.avgtrace[:len(didvn.didvmean)], didvn.didvmean, 
                                          didvn.didvstd, didvn.offset, didvn.offset_err, 
@@ -441,6 +491,10 @@ class IVanalysis(object):
             rtot=didvobjn.fitparams1[0]
             rtot_list.append(rtot)
 
+            self.df.iat[int(np.flatnonzero(self.didvinds)[ind]), self.df.columns.get_loc('didvobj')] = didvobjn
+            self.df.iat[int(np.flatnonzero(self.noiseinds)[ind]), self.df.columns.get_loc('didvobj')] = didvobjn
+
+            
             if lgcplot:
                 didvobjn.plot_full_trace(lgcsave=lgcsave, savepath=self.figsavepath,
                                           savename=f'didv_{didvn.qetbias:.3e}')
@@ -531,7 +585,7 @@ class IVanalysis(object):
     
     
     
-    def fit_didv(self, lgcplot=False, lgcsave=False):
+    def fit_tran_didv(self, lgcplot=False, lgcsave=False):
         """
         Function to fit all the didv data in the IV sweep data
         
@@ -550,9 +604,9 @@ class IVanalysis(object):
         
         """ 
     
-        didvobjs = []
-        
-        for ii, (_, row) in enumerate(self.df[self.didvinds].iterrows()):
+        for ind in (self.traninds):
+    
+            row = self.df[self.didvinds].iloc[ind]
             r0 = row.r0
             dr0 = row.r0_err
             priors = np.zeros(7)
@@ -567,13 +621,14 @@ class IVanalysis(object):
                                        row.offset_err, row.fs, row.sgfreq, row.sgamp, rshunt=self.rshunt,  
                                        rload=self.rload, rload_err = self.rshunt_err, r0=r0, r0_err=dr0,
                                        priors = priors, invpriorscov = invpriorsCov)
-            if ii in self.norminds or ii in self.scinds:
-                poles=1
-            else:
-                poles=2
-                didvobj.dopriorsfit()
-            didvobj.dofit(poles)
-            didvobjs.append(didvobj)
+
+            didvobj.dopriorsfit()
+            didvobj.dofit(poles=2)
+            
+            self.df.iat[int(np.flatnonzero(self.didvinds)[ind]), self.df.columns.get_loc('didvobj')] = didvobj
+            self.df.iat[int(np.flatnonzero(self.noiseinds)[ind]), self.df.columns.get_loc('didvobj')] = didvobj
+            
+            
             if lgcplot:
                 didvobj.plot_full_trace(lgcsave=lgcsave, savepath=self.figsavepath,
                                           savename=f'didv_{didvn.qetbias:.3e}')
@@ -581,13 +636,7 @@ class IVanalysis(object):
                                         savepath=self.figsavepath,
                                         savename=f'didv_{didvn.qetbias:.3e}')
 
-        self.df.loc[self.didvinds, 'didvobj'] =  didvobjs
-        self.df.loc[self.noiseinds, 'didvobj'] =  didvobjs
-        
-        
-        
-        
-    
+                
     
     def fit_normal_noise(self, fit_range=(10, 3e4), squiddc0=6e-12, squidpole0=200, squidn0=0.7,
                         lgcplot=False, lgcsave=False):
@@ -619,11 +668,13 @@ class IVanalysis(object):
         squidpole_list = []
         squidn_list = []
         
-        inductance = self.inductance
+        
         for ind in self.norminds:
             noise_row = self.df[self.noiseinds].iloc[ind]
             f = noise_row.f
             psd = noise_row.psd
+            
+            inductance = noise_row.didvobj.get_irwinparams_dict(1)["L"]
             
             ind_lower = (np.abs(f - fit_range[0])).argmin()
             ind_upper = (np.abs(f - fit_range[1])).argmin()
@@ -654,18 +705,8 @@ class IVanalysis(object):
             squidn_list.append(fitvals['squidn'])
             
             if lgcplot:
-                plt.figure(figsize=(11,6))
-                plt.grid(True, linestyle = '--')
-                plt.loglog(f, psd, alpha = .5, label = 'Raw Data')
-                plt.loglog(xdata, ydata)
-                plt.loglog(f, noise_sim.s_isquid(f), label = 'Squid+Electronics')
-                plt.loglog(f, noise_sim.s_itesnormal(f),label= 'TES_johnson')
-                plt.loglog(f, noise_sim.s_iloadnormal(f),label= 'Load')
-                plt.loglog(f, noise_sim.s_itotnormal(f),label= 'Total Noise')
-                plt.legend()
-                plt.ylim(1e-23, 5e-21)
-                if lgcsave:
-                    plt.savefig(f'{self.figsavepath}Normal_noise_qetbias{noise_row.qetbias}')
+                _plot_n_noise(f, psd, noise_sim, noise_row.qetbias, self.figsavepath, lgcsave)
+                
             
         self.squiddc = np.mean(squiddc_list)
         self.squidpole = np.mean(squidpole_list)
@@ -696,11 +737,12 @@ class IVanalysis(object):
                        
         tload_list = []
         
-        inductance = self.inductance
+        
         for ind in self.scinds:
             noise_row = self.df[self.noiseinds].iloc[ind]
             f = noise_row.f
             psd = noise_row.psd
+            inductance = noise_row.didvobj.get_irwinparams_dict(1)["L"]
             
             ind_lower = (np.abs(f - fit_range[0])).argmin()
             ind_upper = (np.abs(f - fit_range[1])).argmin()
@@ -729,17 +771,7 @@ class IVanalysis(object):
             tload_list.append(fitvals['tload'])
             
             if lgcplot:
-                plt.figure(figsize=(11,6))
-                plt.grid(True, linestyle = '--')
-                plt.loglog(f, psd, alpha = .5, label = 'Raw Data')
-                plt.loglog(xdata, ydata)
-                plt.loglog(f, noise_sim.s_isquid(f), label = 'Squid+Electronics')
-                plt.loglog(f, noise_sim.s_iloadsc(f),label= 'Load')
-                plt.loglog(f, noise_sim.s_itotsc(f),label= 'Total Noise')
-                plt.legend()
-                plt.ylim(1e-23, 5e-21)
-                if lgcsave:
-                    plt.savefig(f'{self.figsavepath}SC_noise_qetbias{noise_row.qetbias}')
+                _plot_sc_noise(f, psd, noise_sim, noise_row.qetbias, self.figsavepath, lgcsave)
             
         self.tload = np.mean(tload_list)
         
@@ -753,7 +785,7 @@ class IVanalysis(object):
         ----------
         tau_collect : float, optional
             The phonon collection time of the detector
-        collection_eff : float, optiona
+        collection_eff : float, optional
             The absolute phonon collection efficiency of the detector
         lgcplot : bool, optional
             If True, a plot of the fit is shown
