@@ -21,6 +21,20 @@ from qetpy.utils import align_traces, make_decreasing
 
 __all__ = ["IVanalysis"]
 
+
+
+class Error(Exception):
+   """Base class for other exceptions"""
+   pass
+
+
+class AnalysisError(Error):
+   """
+   Raised when there is an error in one of the steps 
+   in the automated analysis
+   """
+   pass
+
 def _check_df(df, channels=None):
     """
     Simple helper function to check number of 
@@ -936,5 +950,82 @@ class IVanalysis(object):
         
         
             
-
+    def do_full_analysis(self, collection_eff=1, lgcplot=True, lgcsave=True):
+        """
+        Function to perform full IV/dIdV analysis. This function simply 
+        calls all the individual functions in this class in the 
+        proper order.
+        
+        Note, if any step in the analysis fails, the analysis will stop
+        and the user will need to do the analysis in parts. 
+        
+        Prameters
+        ---------
+        collection_eff : float, optional
+            The absolute phonon collection efficiency of the detector
+        lgcplot : bool, optional
+            If True, a plot of the fit is shown
+        lgcsave : bool, optional
+            If True, the figure is saved
+        
+        Returns
+        -------
+        success : bool
+            Will return True if the full analysis is successful.
+            
+        """
+        
+        success = False
+        
+        try:
+            self._fit_rload_didv(lgcplot=lgcplot, lgcsave=lgcsave)
+        except:
+            raise AnalysisError('An error occurred when fitting the SC dIdV to determine Rload. \n Please make sure the SC indices (scinds) are correct')
+        
+        try:
+            self._fit_rn_didv(lgcplot=lgcplot, lgcsave=lgcsave)
+        except:
+            raise AnalysisError('An error occurred when fitting the Normal dIdV to determine Rn. \n Please make sure the Normal indices (norminds) are correct')
+            
+        try:
+            self.analyze_sweep(lgcplot=lgcplot, lgcsave=lgcsave)
+        except:
+            raise AnalysisError('An error occurred when fitting the IV curve')
+        
+        try:
+            self.plot_rload_rn_qetbias(lgcsave=lgcsave)
+        except:
+            raise AnalysisError('An error occurred when plotting Rload and Rn vs applied QETbias')
+            
+        try:
+            self.fit_normal_noise(lgcplot=lcgplot, lgcsave=lgcsave)
+        except:
+            raise AnalysisError('An error occurred when trying to fit the SQUID and Electronics components \n of the normal state noise')
+        
+        try:
+            self.fit_sc_noise(lgcplot=lgcplot, lgcsave=lgcsave)
+        except:
+            raise AnalysisError('An error occurred when trying to fit the temperature of the load resistor \n from the SC state noise')
+            
+        try:
+            self.fit_tran_didv(lgcplot=lgcplot, lgcsave=lgcsave)
+        except:
+            raise AnalysisError('An error occurred when trying to fit the Transition state dIdV. \n Try changing the dt0 or add180phase parameter for the DIDV fits')
+        
+        try:
+            self.model_noise(collection_eff=collection_eff, lgcplot=lgcplot, lgcsave=lgcsave)
+        except:
+            raise AnalysisError('An error occurred when trying to model the Transition state noise and estimate the theoretical energy resolution')
+        
+        try:
+            self.find_optimum_bias()
+        except:
+            raise AnalysisError('An error occurred when fiding the optimum QET bias')
+            
+         
+        success = True
+        
+        return success
+            
+            
         
