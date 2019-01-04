@@ -817,27 +817,70 @@ class IVanalysis(object):
         optimum_bias : float
             The QET bias (in Amperes) corresponding to the 
             lowest energy resolution
+        optimum_r0 : float
+            The resistance of the TES (in Ohms) corresponding to the 
+            lowest energy resolution
+        optimum_e : float
+            The energy resolution (in eV) at the optimum bias point
         
         """
         
         trandf = self.df.loc[self.noiseinds].iloc[self.traninds]
-        r0s = trandf.r0.values
+        r0s = trandf.r0.values*1e3
         energy_res = trandf.energy_res.values
-        qets = trandf.qetbias.values
-        minind = np.argmin(energy_res)
-        
+        qets = trandf.qetbias.values*1e6
+        qets = qets.astype(int)
+
+
+        emin_list = []
+        r0min_list = []
+        qetmin_list = []
+
+        for ii in range(len(r0s)):
+            if (ii+2) < len(r0s):
+                x = r0s[ii:ii+3]
+                q = qets[ii:ii+3]
+                y = energy_res[ii:ii+3]
+
+                xfit = np.linspace(x[0], x[-1], 25)
+                qetfit = np.linspace(q[0], q[-1], 25)
+                poly = np.polyfit(x, y, 2)
+                yfit = np.poly1d(poly)(xfit)
+
+                eminind = np.argmin(yfit)
+                emin_list.append(yfit[eminind])
+                r0min_list.append(xfit[eminind])
+                qetmin_list.append(qetfit[eminind])
+
+        eminind = np.argmin(emin_list)
+
         fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(9, 6))
-        
         ax.plot(r0s, energy_res, linestyle = ' ', marker = '.', ms = 10, c='g')
         ax.plot(r0s, energy_res, linestyle = '-', marker = ' ', alpha = .3, c='g')
         ax.grid(True, which = 'both', linestyle = '--')
-        
-        ax.set_xlabel('QET bias [μA]')
+        ax.set_xlabel('$R_0$ [mΩ]')
         ax.set_ylabel(r'$σ_E$ [eV]')
-        ax.axvline(r0s[minind], linestyle = '--', color = 'r', label = r'Optimum QET bias (minumum $σ_E$)')
-        ax.set_title('Expected Energy Resolution vs QET bias')
+        ax2 = ax.twiny()
+        ax2.plot(qets[::-1], energy_res, linestyle = ' ')
+        ax2.xaxis.set_ticks_position('bottom') # set the position of the second x-axis to bottom
+        ax2.xaxis.set_label_position('bottom') # set the position of the second x-axis to bottom
+        ax2.spines['bottom'].set_position(('outward', 36))
+        ax2.set_xlabel('QET bias [μA]')
+        ax3 = plt.gca()
+        plt.draw()
+        ax3.get_xticklabels()
+        newlabels = [thing for thing in ax3.get_xticklabels()][::-1]
+        ax2.set_xticklabels(newlabels)
+
+        ax.axvline(r0min_list[eminind], linestyle = '--', color = 'r', label = r'Optimum QET bias (minumum $σ_E$)')
+        ax.set_title('Expected Energy Resolution vs QET bias and $R_0$')
         ax.legend()
-        return(qets[minind], r0s[minind])
+        
+        optimum_bias = qetmin_list[eminind]*1e-6
+        optimum_r0 = r0min_list[eminind]*1e-3
+        optimum_e = emin_list[eminind]
+        
+        return optimum_bias, optimum_r0, optimum_e
 
         
     def make_noiseplots(self, lgcsave=False):
