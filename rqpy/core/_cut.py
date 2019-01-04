@@ -50,7 +50,7 @@ def baselinecut(arr, r0, i0, rload, dr=0.1e-3, cut=None):
     return cbase
 
 
-def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True):
+def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgcequaldensitybins=False):
     """
     Function for calculating a baseline cut over time based on a given percentile.
     
@@ -94,8 +94,16 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True):
     if nbins==1:
         f = lambda var: st(x)*np.ones(len(x))
     else:
+        
+        if lgcequaldensitybins:
+            histbins_equal = lambda var, nbin: np.interp(np.linspace(0, len(var), nbin + 1),
+                                                         np.arange(len(var)),
+                                                         np.sort(var))
+            nbins = histbins_equal(x[cut], nbins)
+        
         cutoffs, bin_edges, _ = stats.binned_statistic(x[cut], y[cut], bins=nbins,
                                                        statistic=st)
+        
         cutoffs = np.pad(cutoffs, (1, 0), 'constant', constant_values=(cutoffs[0], 0))
         f = interpolate.interp1d(bin_edges, cutoffs, kind='next', 
                                  bounds_error=False, fill_value=(cutoffs[0], cutoffs[-1]),
