@@ -12,7 +12,7 @@ from scipy.signal import savgol_filter
 from lmfit import Model
 
 from qetpy import IV, DIDV, Noise, didvinitfromdata, autocuts
-from qetpy.sim import TESnoise, loadfromdidv
+from qetpy.sim import TESnoise, loadfromdidv, energy_res_estimate
 from qetpy.plotting import plot_noise_sim
 from qetpy.utils import align_traces, make_decreasing
 import rqpy as rp
@@ -248,14 +248,15 @@ class IVanalysis(object):
     didvinds : array
         Array of booleans corresponding to the rows
         of the df that are didv type data
-    norminds : array
-        Array of booleans corresponding to the rows
-        of the didv df and noise df that are normal 
-        state
-    scinds : array
-        Array of booleans corresponding to the rows
-        of the didv df and noise df that are SC 
-        state
+    norminds : range
+        python built-in range type corresponding 
+        to normal data points of the didv
+    scinds : range
+        python built-in range type corresponding 
+        to SC data points of the didv
+    traninds : range
+        python built-in range type corresponding 
+        to transition data points of the didv
     rshunt : float
         The value of the shunt resistor in the TES circuit
         in Ohms
@@ -337,6 +338,7 @@ class IVanalysis(object):
         self.didvinds = (self.df.datatype == "didv")
         self.norminds = range(nnorm)
         self.scinds = range(len(self.df)//2-nsc, len(self.df)//2)
+        self.traninds = range(self.norminds[-1]+1, self.scinds[0])
     
         vb = np.zeros((1,2,self.noiseinds.sum()))
         vb_err = np.zeros(vb.shape)
@@ -605,7 +607,7 @@ class IVanalysis(object):
             Initial guess for the squidn paramter
         lgcplot : bool, optional
             If True, a plot of the fit is shown
-        lgcsave : bool, optiona
+        lgcsave : bool, optional
             If True, the figure is saved
         
         Returns
@@ -663,14 +665,14 @@ class IVanalysis(object):
                 plt.legend()
                 plt.ylim(1e-23, 5e-21)
                 if lgcsave:
-                    plt.savefig(f'{self.figsavepath}{Normal_noise_qetbias{noise_row.qetbias}')
+                    plt.savefig(f'{self.figsavepath}Normal_noise_qetbias{noise_row.qetbias}')
             
         self.squiddc = np.mean(squiddc_list)
         self.squidpole = np.mean(squidpole_list)
         self.squidn = np.mean(squidn_list)
                        
                        
-    def fit_sc_noise(self, fit_range=(3e3, 3e4), lgcplot=False, lgcsave=False):
+    def fit_sc_noise(self, fit_range=(3e3, 1e5), lgcplot=False, lgcsave=False):
         """
         Function to fit the components of the SC Noise. Fits all SC noise PSDs
         and stores the average value for tload as an attribute of the class.
@@ -681,7 +683,7 @@ class IVanalysis(object):
             The frequency range over which to do the fit
         lgcplot : bool, optional
             If True, a plot of the fit is shown
-        lgcsave : bool, optiona
+        lgcsave : bool, optional
             If True, the figure is saved
             
         Returns
@@ -726,7 +728,7 @@ class IVanalysis(object):
             
             tload_list.append(fitvals['tload'])
             
-            if lgcsave:
+            if lgcplot:
                 plt.figure(figsize=(11,6))
                 plt.grid(True, linestyle = '--')
                 plt.loglog(f, psd, alpha = .5, label = 'Raw Data')
@@ -737,49 +739,106 @@ class IVanalysis(object):
                 plt.legend()
                 plt.ylim(1e-23, 5e-21)
                 if lgcsave:
-                    plt.savefig(f'{self.figsavepath}{SC_noise_qetbias{noise_row.qetbias}')
+                    plt.savefig(f'{self.figsavepath}SC_noise_qetbias{noise_row.qetbias}')
             
         self.tload = np.mean(tload_list)
         
-    def model_noise(self, collection_eff):
+    def model_noise(self, tau_collect=20e-6, collection_eff=1, lgcplot=False, lgcsave=False):
         """
         Function to plot noise PSD with all the theoretical noise
-        components (calculated from the didv fits) shown
+        components (calculated from the didv fits). This function also estimates
+        the expected energy resolution based on the power noise spectrum
+        
+        Parameters
+        ----------
+        tau_collect : float, optional
+            The phonon collection time of the detector
+        collection_eff : float, optiona
+            The absolute phonon collection efficiency of the detector
+        lgcplot : bool, optional
+            If True, a plot of the fit is shown
+        lgcsave : bool, optional
+            If True, the figure is saved
+            
+        Returns
+        -------
+        None 
         
         """
         
-        qets = []
-        ress = []
-        r0s = []
         
-        for ii, didv in enumerate(self.df.loc[self.noiseinds,'didvobj']):
-
-            row = df.iloc[ind]
-            f = row.f[1:]
-            psd = row.psd[1:]
-            qetbias = row.qetbias
-
-            if ii in self.scinds:
-                noisetype = 'superconducting'
-                lgcpriors = False
-            elif ii in self.norminds:
-                noisetype = 'normal'
-                lgcpriors = False
-            else:
-                noisetype = 'transition'
-                lgcpriors = True
-
-            noise_sim = loadfromdidv(didvobjs[ii], G=self.Gta, qetbias=row.qetbias, tc=self.tc, 
+        energy_res_arr = np.full(shape = sum(self.noiseinds), fill_value = np.nan)
+        tau_eff_arr = np.full(shape = sum(self.noiseinds), fill_value = np.nan)
+        for ind in self.traninds:
+            noise_row = self.df[self.noiseinds].iloc[ind]
+            f = noise_row.f
+            psd = noise_row.psd
+            didvobj = noise_row.didvobj
+            
+            noise_sim = loadfromdidv(didvobj, G=self.Gta, qetbias=noise_row.qetbias, tc=self.tc, 
                                      tload=self.tload, tbath=self.tbath, squiddc=self.squiddc, 
                                      squidpole=self.squidpole, squidn=self.squidn,
-                                     noisetype=noisetype, lgcpriors = lgcpriors)
-
-
-            res = energy_res(self.tau_rise,self.tau_fall, 2*np.pi*f, 
-                             psd/(np.abs(noise_sim.dIdP(f))**2),collection_eff)
-
-      
+                                     noisetype='transition', lgcpriors = True)
+            if lgcplot:
+                fig, ax = plot_noise_sim(f, psd, noise_sim, 'current')
+                fig, ax = plot_noise_sim(f, psd, noise_sim, 'power')
+                if lgcsave:
+                    plt.savefig(f'{self.figsavepath}T_noise_qetbias{noise_row.qetbias}')
+                
+            res = energy_res_estimate(freqs= f, tau_collect = tau_collect,
+                                      Sp = psd/(np.abs(noise_sim.dIdP(f))**2),
+                                      collection_eff = collection_eff)
+            energy_res_arr[ind] = res
+            
+            tau_eff = didvobj.get_irwinparams_dict(2)['tau_eff']
+            tau_eff_arr[ind] = tau_eff
+            
+            
+        self.df.loc[self.noiseinds, 'energy_res'] =  energy_res_arr
+        self.df.loc[self.didvinds, 'energy_res'] =  energy_res_arr
+        self.df.loc[self.noiseinds, 'tau_eff'] =  tau_eff_arr
+        self.df.loc[self.didvinds, 'tau_eff'] =  tau_eff_arr
         
+    
+    def find_optimum_bias(self, lgcplot=False, lgcsave=False):
+        """
+        Function to find the QET bias with the lowest energy 
+        resolution. 
+        
+        Parameters
+        ----------
+        lgcplot : bool, optional
+            If True, a plot of the fit is shown
+        lgcsave : bool, optional
+            If True, the figure is saved
+        
+        Returns
+        -------
+        optimum_bias : float
+            The QET bias (in Amperes) corresponding to the 
+            lowest energy resolution
+        
+        """
+        
+        trandf = self.df.loc[self.noiseinds].iloc[self.traninds]
+        r0s = trandf.r0.values
+        energy_res = trandf.energy_res.values
+        qets = trandf.qetbias.values
+        minind = np.argmin(energy_res)
+        
+        fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(9, 6))
+        
+        ax.plot(r0s, energy_res, linestyle = ' ', marker = '.', ms = 10, c='g')
+        ax.plot(r0s, energy_res, linestyle = '-', marker = ' ', alpha = .3, c='g')
+        ax.grid(True, which = 'both', linestyle = '--')
+        
+        ax.set_xlabel('QET bias [μA]')
+        ax.set_ylabel(r'$σ_E$ [eV]')
+        ax.axvline(r0s[minind], linestyle = '--', color = 'r', label = r'Optimum QET bias (minumum $σ_E$)')
+        ax.set_title('Expected Energy Resolution vs QET bias')
+        ax.legend()
+        return(qets[minind], r0s[minind])
+
         
     def make_noiseplots(self, lgcsave=False):
         """
