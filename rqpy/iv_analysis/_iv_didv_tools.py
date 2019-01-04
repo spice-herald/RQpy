@@ -13,7 +13,7 @@ from lmfit import Model
 
 from qetpy import IV, DIDV, Noise, didvinitfromdata, autocuts
 from qetpy.sim import TESnoise, loadfromdidv, energy_res_estimate
-from qetpy.plotting import plot_noise_sim
+from qetpy.plotting import plot_noise_sim, _plot_rload_rn_qetbias, _make_iv_noiseplots, _plot_energy_res_vs_bias
 from qetpy.utils import align_traces, make_decreasing
 import rqpy as rp
 
@@ -853,32 +853,12 @@ class IVanalysis(object):
                 qetmin_list.append(qetfit[eminind])
 
         eminind = np.argmin(emin_list)
-
-        fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(9, 6))
-        ax.plot(r0s, energy_res, linestyle = ' ', marker = '.', ms = 10, c='g')
-        ax.plot(r0s, energy_res, linestyle = '-', marker = ' ', alpha = .3, c='g')
-        ax.grid(True, which = 'both', linestyle = '--')
-        ax.set_xlabel('$R_0$ [mΩ]')
-        ax.set_ylabel(r'$σ_E$ [eV]')
-        ax2 = ax.twiny()
-        ax2.plot(qets[::-1], energy_res, linestyle = ' ')
-        ax2.xaxis.set_ticks_position('bottom') # set the position of the second x-axis to bottom
-        ax2.xaxis.set_label_position('bottom') # set the position of the second x-axis to bottom
-        ax2.spines['bottom'].set_position(('outward', 36))
-        ax2.set_xlabel('QET bias [μA]')
-        ax3 = plt.gca()
-        plt.draw()
-        ax3.get_xticklabels()
-        newlabels = [thing for thing in ax3.get_xticklabels()][::-1]
-        ax2.set_xticklabels(newlabels)
-
-        ax.axvline(r0min_list[eminind], linestyle = '--', color = 'r', label = r'Optimum QET bias (minumum $σ_E$)')
-        ax.set_title('Expected Energy Resolution vs QET bias and $R_0$')
-        ax.legend()
-        
         optimum_bias = qetmin_list[eminind]*1e-6
         optimum_r0 = r0min_list[eminind]*1e-3
         optimum_e = emin_list[eminind]
+        
+        if lgcplot:
+            _plot_energy_res_vs_bias(r0s, energy_res, qets, optimum_r0, self.figsavepath, lgcsave)
         
         return optimum_bias, optimum_r0, optimum_e
 
@@ -900,41 +880,8 @@ class IVanalysis(object):
         None
 
         """
-        for (noiseind, noiserow), (didvind, didvrow) in zip(self.df[self.noiseinds].iterrows(), self.df[self.didvinds].iterrows()):
-            fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(16, 6))
-
-            t = np.arange(0,len(noiserow.avgtrace))/noiserow.fs
-            tdidv = np.arange(0, len(didvrow.avgtrace))/noiserow.fs
-            axes[0].set_title(f"{noiserow.seriesnum} Avg Trace, QET bias = {noiserow.qetbias*1e6:.2f} $\mu A$")
-            axes[0].plot(t*1e6, noiserow.avgtrace * 1e6, label=f"{self.chname} Noise", alpha=0.5)
-            axes[0].plot(tdidv*1e6, didvrow.avgtrace * 1e6, label=f"{self.chname} dIdV", alpha=0.5)
-            axes[0].grid(which="major")
-            axes[0].grid(which="minor", linestyle="dotted", alpha=0.5)
-            axes[0].tick_params(axis="both", direction="in", top=True, right=True, which="both")
-            axes[0].set_ylabel("Current [μA]", fontsize = 14)
-            axes[0].set_xlabel("Time [μs]", fontsize = 14)
-            axes[0].legend()
-
-            axes[1].loglog(noiserow.f, noiserow.psd**0.5 * 1e12, label=f"{self.chname} PSD")
-            axes[1].set_title(f"{noiserow.seriesnum} PSD, QET bias = {noiserow.qetbias*1e6:.2f} $\mu A$")
-            axes[1].grid(which="major")
-            axes[1].grid(which="minor", linestyle="dotted", alpha=0.5)
-            axes[1].set_ylim(1, 1e3)
-            axes[1].tick_params(axis="both", direction="in", top=True, right=True, which="both")
-            axes[1].set_ylabel(r"PSD [pA/$\sqrt{\mathrm{Hz}}$]", fontsize = 14)
-            axes[1].set_xlabel("Frequency [Hz]", fontsize = 14)
-            axes[1].legend()
-
-            plt.tight_layout()
-            if lgcsave:
-                if not savepath.endswith('/'):
-                    savepath += '/'
-                fullpath = f'{savepath}avetrace_noise/'
-                if not os.path.isdir(fullpath):
-                    os.makedirs(fulpath)
-
-                plt.savefig(fullpath + f'{noiserow.qetbias*1e6:.2f}_didvnoise.png')
-            plt.show()
+        
+        _make_iv_noiseplots(self, lgcsave)
     
     def plot_rload_rn_qetbias(self, lgcsave=False):
         """
@@ -953,28 +900,9 @@ class IVanalysis(object):
         
         """
         
-        fig, axes = plt.subplots(1,2, figsize = (16,6))
-        fig.suptitle("Rload and Rtot from dIdV Fits", fontsize = 18)
+        _plot_rload_rn_qetbias(self, lgcsave)
         
-        axes[0].errorbar(self.vb[0,0,self.scinds]*1e6,np.array(self.rload_list)*1e3, 
-                       yerr = self.rshunt_err*1e3, linestyle = '', marker = '.', ms = 10)
-        axes[0].grid(True, linestyle = 'dashed')
-        axes[0].set_title('Rload vs Vbias', fontsize = 14)
-        axes[0].set_ylabel(r'$R_ℓ$ [mΩ]', fontsize = 14)
-        axes[0].set_xlabel(r'$V_{bias}$ [μV]', fontsize = 14)
-        axes[0].tick_params(axis="both", direction="in", top=True, right=True, which="both")
         
-        axes[1].errorbar(self.vb[0,0,self.norminds]*1e6,np.array(self.rtot_list)*1e3, 
-                       yerr = self.rshunt_err*1e3, linestyle = '', marker = '.', ms = 10)
-        axes[1].grid(True, linestyle = 'dashed')
-        axes[1].set_title('Rtotal vs Vbias', fontsize = 14)
-        axes[1].set_ylabel(r'$R_{N} + R_ℓ$ [mΩ]', fontsize = 14)
-        axes[1].set_xlabel(r'$V_{bias}$ [μV]', fontsize = 14)
-        axes[1].tick_params(axis="both", direction="in", top=True, right=True, which="both")
-        
-        plt.tight_layout()
-        if lgcsave:
-            plt.savefig(self.figsavepath + 'rload_rtot_variation.png')
             
 
         
