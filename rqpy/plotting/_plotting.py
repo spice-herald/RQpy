@@ -5,7 +5,7 @@ from matplotlib import colors
 from rqpy import utils
 
 
-__all__ = ["hist", "scatter", "densityplot", "plot_gauss", "plot_n_gauss", "plot_saturation_correction"]
+__all__ = ["hist", "scatter", "densityplot", "plot_gauss", "plot_n_gauss", "plot_saturation_correction", "_make_iv_noiseplots", "_plot_energy_res_vs_bias", "_plot_n_noise", "_plot_sc_noise", "_plot_rload_rn_qetbias"]
 
 
 def hist(arr, nbins='sqrt', xlims=None, cuts=None, lgcrawdata=True, 
@@ -591,3 +591,239 @@ def plot_saturation_correction(x, y, yerr, popt, pcov, labeldict, ax = None):
     return fig, ax
 
     
+    
+def _make_iv_noiseplots(IVanalysisOBJ, lgcsave=False):
+    """
+    Helper function to plot average noise/didv traces in time domain, as well as 
+    corresponding noise PSDs, for all QET bias points in IV/dIdV sweep.
+
+    Parameters
+    ----------
+    IVanalysisOBJ : rqpy.IVanalysis
+         The IV analysis object that contains the data to use for plotting.
+    lgcsave : bool, optional
+        If True, all the plots will be saved in the a folder
+        Avetrace_noise/ within the user specified directory
+
+    Returns
+    -------
+    None
+
+    """
+
+    for (noiseind, noiserow), (didvind, didvrow) in zip(IVanalysisOBJ.df[IVanalysisOBJ.noiseinds].iterrows(), IVanalysisOBJ.df[IVanalysisOBJ.didvinds].iterrows()):
+        fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(16, 6))
+
+        t = np.arange(0,len(noiserow.avgtrace))/noiserow.fs
+        tdidv = np.arange(0, len(didvrow.avgtrace))/noiserow.fs
+        axes[0].set_title(f"{noiserow.seriesnum} Avg Trace, QET bias = {noiserow.qetbias*1e6:.2f} $\mu A$")
+        axes[0].plot(t*1e6, noiserow.avgtrace * 1e6, label=f"{self.chname} Noise", alpha=0.5)
+        axes[0].plot(tdidv*1e6, didvrow.avgtrace * 1e6, label=f"{self.chname} dIdV", alpha=0.5)
+        axes[0].grid(which="major")
+        axes[0].grid(which="minor", linestyle="dotted", alpha=0.5)
+        axes[0].tick_params(axis="both", direction="in", top=True, right=True, which="both")
+        axes[0].set_ylabel("Current [μA]", fontsize = 14)
+        axes[0].set_xlabel("Time [μs]", fontsize = 14)
+        axes[0].legend()
+
+        axes[1].loglog(noiserow.f, noiserow.psd**0.5 * 1e12, label=f"{self.chname} PSD")
+        axes[1].set_title(f"{noiserow.seriesnum} PSD, QET bias = {noiserow.qetbias*1e6:.2f} $\mu A$")
+        axes[1].grid(which="major")
+        axes[1].grid(which="minor", linestyle="dotted", alpha=0.5)
+        axes[1].set_ylim(1, 1e3)
+        axes[1].tick_params(axis="both", direction="in", top=True, right=True, which="both")
+        axes[1].set_ylabel(r"PSD [pA/$\sqrt{\mathrm{Hz}}$]", fontsize = 14)
+        axes[1].set_xlabel("Frequency [Hz]", fontsize = 14)
+        axes[1].legend()
+
+        plt.tight_layout()
+        if lgcsave:
+            if not savepath.endswith('/'):
+                savepath += '/'
+            fullpath = f'{IVanalysisOBJ.figsavepath}avetrace_noise/'
+            if not os.path.isdir(fullpath):
+                os.makedirs(fullpath)
+
+            plt.savefig(fullpath + f'{noiserow.qetbias*1e6:.2f}_didvnoise.png')
+        plt.show()
+            
+def _plot_rload_rn_qetbias(IVanalysisOBJ, lgcsave=False):
+    """
+    Helper function to plot rload and rnormal as a function of
+    QETbias from the didv fits of SC and Normal data for IVanalysis object.
+
+    Parameters
+    ----------
+    IVanalysisOBJ : rqpy.IVanalysis
+         The IV analysis object that contains the data to use for plotting.
+    lgcsave : bool, optional
+        If True, all the plots will be saved 
+
+    Returns
+    -------
+    None
+
+    """
+
+    fig, axes = plt.subplots(1,2, figsize = (16,6))
+    fig.suptitle("Rload and Rtot from dIdV Fits", fontsize = 18)
+
+    axes[0].errorbar(IVanalysisOBJ.vb[0,0,IVanalysisOBJ.scinds]*1e6,
+                     np.array(IVanalysisOBJ.rload_list)*1e3, 
+                     yerr = IVanalysisOBJ.rshunt_err*1e3, linestyle = '', marker = '.', ms = 10)
+    axes[0].grid(True, linestyle = 'dashed')
+    axes[0].set_title('Rload vs Vbias', fontsize = 14)
+    axes[0].set_ylabel(r'$R_ℓ$ [mΩ]', fontsize = 14)
+    axes[0].set_xlabel(r'$V_{bias}$ [μV]', fontsize = 14)
+    axes[0].tick_params(axis="both", direction="in", top=True, right=True, which="both")
+
+    axes[1].errorbar(IVanalysisOBJ.vb[0,0,IVanalysisOBJ.norminds]*1e6,
+                     np.array(IVanalysisOBJ.rtot_list)*1e3, 
+                     yerr = IVanalysisOBJ.rshunt_err*1e3, linestyle = '', marker = '.', ms = 10)
+    axes[1].grid(True, linestyle = 'dashed')
+    axes[1].set_title('Rtotal vs Vbias', fontsize = 14)
+    axes[1].set_ylabel(r'$R_{N} + R_ℓ$ [mΩ]', fontsize = 14)
+    axes[1].set_xlabel(r'$V_{bias}$ [μV]', fontsize = 14)
+    axes[1].tick_params(axis="both", direction="in", top=True, right=True, which="both")
+
+    plt.tight_layout()
+    if lgcsave:
+        plt.savefig(IVanalysisOBJ.figsavepath + 'rload_rtot_variation.png')
+            
+            
+def _plot_energy_res_vs_bias(r0s, energy_res, qets, optimum_r0, figsavepath, lgcsave):
+    """
+    Helper function for the IVanalysis class to plot the expected energy resolution as 
+    a function of QET bias and TES resistance.
+    
+    Parameters
+    ----------
+    r0s : array
+        Array of r0 values
+    energy_res : array
+        Array of expected energy resolutions
+    qets : array
+        Array of QET bias values
+    optimum_r0 : float
+        The TES resistance corresponding to the 
+        lowest energy resolution
+    figsavepath : str
+        Directory to save the figure
+    lgcsave : bool
+        If true, the figure is saved
+        
+    Returns
+    -------
+    None
+
+    """
+
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(9, 6))
+    ax.plot(r0s, energy_res, linestyle = ' ', marker = '.', ms = 10, c='g')
+    ax.plot(r0s, energy_res, linestyle = '-', marker = ' ', alpha = .3, c='g')
+    ax.grid(True, which = 'both', linestyle = '--')
+    ax.set_xlabel('$R_0$ [mΩ]')
+    ax.set_ylabel(r'$σ_E$ [eV]')
+    ax2 = ax.twiny()
+    ax2.plot(qets[::-1], energy_res, linestyle = ' ')
+    ax2.xaxis.set_ticks_position('bottom')
+    ax2.xaxis.set_label_position('bottom') 
+    ax2.spines['bottom'].set_position(('outward', 36))
+    ax2.set_xlabel('QET bias [μA]')
+    ax3 = plt.gca()
+    plt.draw()
+    ax3.get_xticklabels()
+    newlabels = [thing for thing in ax3.get_xticklabels()][::-1]
+    ax2.set_xticklabels(newlabels)
+    ax.axvline(optimum_r0, linestyle = '--', color = 'r', label = r'Optimum QET bias (minumum $σ_E$)')
+    ax.set_title('Expected Energy Resolution vs QET bias and $R_0$')
+    ax.legend()
+
+    if lgcsave:
+        plt.savefig(f'{figsavepath}energy_res_vs_bias')
+        
+        
+        
+def _plot_sc_noise(f, psd, noise_sim, qetbias, figsavepath, lgcsave):
+    """
+    Helper function to plot SC noise for IVanalysis class
+    
+    Parameters
+    ----------
+    f : array
+        Array of frequency values
+    psd : array
+        One sided Power spectral density
+    noise_sim : TESnoise object
+        The noise simulation object
+    qetbias : float
+        Applied QET bias
+    figsavepath : str
+        Directory to save the figure
+    lgcsave : bool
+        If true, the figure is saved
+    
+    Returns
+    -------
+    None
+
+    """
+
+    f = f[1:]
+    psd = psd[1:]
+    fig, ax = plt.subplots(1,1, figsize=(11,6))
+    ax.grid(True, linestyle = '--')
+    ax.loglog(f, np.sqrt(psd), alpha = .5, label = 'Raw Data')
+    ax.loglog(f, np.sqrt(noise_sim.s_isquid(f)), label = 'Squid+Electronics Noise')
+    ax.loglog(f, np.sqrt(noise_sim.s_iloadsc(f)),label= 'Load Noise')
+    ax.loglog(f, np.sqrt(noise_sim.s_itotsc(f)),label= 'Total Noise')
+    ax.legend()
+    ax.set_xlabel('Frequency [Hz]')
+    ax.set_ylabel('Input Referenced Current Noise [A/$\sqrt{\mathrm{Hz}}$]')
+    ax.set_title(f'Normal State noise for QETbias: {qetbias*1e6} $\mu$A')
+    
+    if lgcsave:
+        plt.savefig(f'{figsavepath}SC_noise_qetbias{qetbias}')
+        
+        
+def _plot_n_noise(f, psd, noise_sim, qetbias, figsavepath, lgcsave):
+    """
+    Helper function to plot normal state noise for IVanalysis class
+    
+    Parameters
+    ----------
+    f : array
+        Array of frequency values
+    psd : array
+        One sided Power spectral density
+    noise_sim : TESnoise object
+        The noise simulation object
+    qetbias : float
+        Applied QET bias
+    figsavepath : str
+        Directory to save the figure
+    lgcsave : bool
+        If true, the figure is saved
+    
+    Returns
+    -------
+    None
+
+    """   
+
+    f = f[1:]
+    psd = psd[1:]
+    fig, ax = plt.subplots(1,1, figsize=(11,6))
+    ax.grid(True, linestyle = '--')
+    ax.loglog(f, np.sqrt(psd), alpha = .5, label = 'Raw Data')
+    ax.loglog(f, np.sqrt(noise_sim.s_isquid(f)), label = 'Squid+Electronics Noise')
+    ax.loglog(f, np.sqrt(noise_sim.s_itesnormal(f)),label= 'TES johnson Noise')
+    ax.loglog(f, np.sqrt(noise_sim.s_iloadnormal(f)),label= 'Load Noise')
+    ax.loglog(f, np.sqrt(noise_sim.s_itotnormal(f)),label= 'Total Noise')
+    ax.legend()
+    ax.set_xlabel('Frequency [Hz]')
+    ax.set_ylabel('Input Referenced Current Noise [A/$\sqrt{\mathrm{Hz}}$]')
+    ax.set_title(f'Normal State noise for QETbias: {qetbias*1e6} $\mu$A')
+    
+    if lgcsave:
+        plt.savefig(f'{figsavepath}Normal_noise_qetbias{qetbias}')
