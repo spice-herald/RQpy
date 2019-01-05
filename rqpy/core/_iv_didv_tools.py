@@ -83,7 +83,6 @@ def _remove_bad_series(df):
     df : Pandas.core.DataFrame
         DataFrame of processed IV/dIdV sweep data
 
-
     Returns
     -------
     newdf : Pandas.core.DataFrame
@@ -127,14 +126,14 @@ def _flatten_psd(f, psd):
     
     Parameters
     ----------
-    f: array
+    f: ndarray
         Array of frequency values
-    psd : array
+    psd : ndarray
         Array of one sided psd values
         
     Returns
     -------
-    flattened_psd : array
+    flattened_psd : ndarray
         Array of values of smoothed psd
         
     """
@@ -155,7 +154,7 @@ def _normal_noise(freqs, squiddc, squidpole, squidn, rload, tload, rn, tc, induc
     Functional form of the normal state noise. Including
     the johnson noise for the load resistor, the johnson 
     noise for the TES, and the SQUID + downstream electronics 
-    noise. See QETpy.TESnoise class for more info.
+    noise. See qetpy.sim.TESnoise class for more info.
 
     Parameters
     ----------
@@ -187,7 +186,6 @@ def _normal_noise(freqs, squiddc, squidpole, squidn, rload, tload, rn, tc, induc
 
     """
     
-    
     omega = 2.0*np.pi*freqs
     dIdVnormal = 1.0/(rload+rn+1.0j*omega*inductance)
     s_vload = 4.0*constants.k*tload*rload * np.ones_like(freqs)
@@ -203,7 +201,7 @@ def _sc_noise(freqs, tload, squiddc, squidpole, squidn, rload, inductance):
     """
     Functional form of the Super Conducting state noise. Including
     the johnson noise for the load resistor and the SQUID + downstream 
-    electronics noise. See QETpy.TESnoise class for more info.
+    electronics noise. See qetpy.sim.TESnoise class for more info.
 
     Parameters
     ----------
@@ -259,10 +257,10 @@ class IVanalysis(object):
         plotting. Ex: PBS1 -> G147 channel 1
     figsavepath : str
         Path to where figures should be saved
-    noiseinds : array
+    noiseinds : ndarray
         Array of booleans corresponding to the rows
         of the df that are noise type data
-    didvinds : array
+    didvinds : ndarray
         Array of booleans corresponding to the rows
         of the df that are didv type data
     norminds : range
@@ -293,13 +291,13 @@ class IVanalysis(object):
     rn_iv_err : float
         The uncertainty in the normal state resistance 
         of the TES, calculated from the IV curve
-    vb : array
+    vb : ndarray
         Array of bias voltages
-    vb_err : array
+    vb_err : ndarray
         Array of uncertainties in the bais voltage
-    dites : array
+    dites : ndarray
         Array of DC offsets for IV/didv data
-    dites : array
+    dites : ndarray
         Array of uncertainties in the DC offsets
     tbath : float
         The bath temperature of the fridge
@@ -315,11 +313,10 @@ class IVanalysis(object):
         The knee for the squid 1/f noise
     squidn : float
         The power of the 1/f^n noise for the squid
-    self.inductance : float
+    inductance : float
         The inductance of the TES line
+        
     """
-    
-    
     
     def __init__(self, df, nnorm, nsc, channels=None, channelname='', rshunt=5e-3, 
                  rshunt_err = 0.05*5e-3, tbath=0, tc=0, Gta=0, lgcremove_badseries = True, figsavepath=''):
@@ -418,10 +415,7 @@ class IVanalysis(object):
         tempdidv = DIDV(1,1,1,1,1)
         self.df = self.df.assign(didvobj = tempdidv)
         
-        
-        
-        
-     
+    
     def _fit_rload_didv(self, lgcplot=False, lgcsave=False, **kwargs):
         """
         Function to fit the SC dIdV series data and calculate rload. 
@@ -433,16 +427,16 @@ class IVanalysis(object):
         ----------
         lgcplot : bool, optional
             If True, the plots are shown for each fit
-        lgcsave : Bool, optional
+        lgcsave : bool, optional
             If True, all the plots will be saved in the a folder
             Avetrace_noise/ within the user specified directory
-        lgcsave : 
         **kwargs : dict
             Additional key word arguments to be passed to didvinitfromdata()
         
         Returns
         -------
         None
+        
         """
         
         rload_list = []
@@ -481,17 +475,18 @@ class IVanalysis(object):
         ----------
         lgcplot : bool, optional
             If True, the plots are shown for each fit
-        lgcsave : Bool, optional
+        lgcsave : bool, optional
             If True, all the plots will be saved in the a folder
             Avetrace_noise/ within the user specified directory
-        lgcsave : 
         **kwargs : dict
             Additional key word arguments to be passed to didvinitfromdata()
 
         Returns
         -------
         None
+        
         """
+        
         if self.rload is None:
             raise ValueError('rload has not been calculated yet, please fit rload first')
         rtot_list = []
@@ -531,7 +526,7 @@ class IVanalysis(object):
         ----------
         lgcplot : bool, optional
             If True, the plots are shown for each fit
-        lgcsave : Bool, optional
+        lgcsave : bool, optional
             If True, all the plots will be saved in the a folder
             Avetrace_noise/ within the user specified directory
         **kwargs : dict
@@ -540,6 +535,7 @@ class IVanalysis(object):
         Returns
         -------
         None
+        
         """     
         
         self._fit_rload_didv(lgcplot, lgcsave, **kwargs)
@@ -564,7 +560,7 @@ class IVanalysis(object):
         ----------
         lgcplot : bool, optional
             If True, the plots are shown for each fit
-        lgcsave : Bool, optional
+        lgcsave : bool, optional
             If True, all the plots will be saved in the a folder
             Avetrace_noise/ within the user specified directory
         
@@ -602,13 +598,12 @@ class IVanalysis(object):
     def fit_tran_didv(self, lgcplot=False, lgcsave=False):
         """
         Function to fit all the didv data in the IV sweep data
-        
   
         Parameters
         ----------
         lgcplot : bool, optional
             If True, the plots are shown for each fit
-        lgcsave : Bool, optional
+        lgcsave : bool, optional
             If True, all the plots will be saved in the a folder
             Avetrace_noise/ within the user specified directory
         
@@ -676,6 +671,7 @@ class IVanalysis(object):
         Returns
         -------
         None
+        
         """
         
         squiddc_list = []
@@ -744,6 +740,7 @@ class IVanalysis(object):
         Returns
         -------
         None
+        
         """
         
         if self.squidpole is None:
@@ -913,11 +910,10 @@ class IVanalysis(object):
         """
         Helper function to plot average noise/didv traces in time domain, as well as 
         corresponding noise PSDs, for all QET bias points in IV/dIdV sweep.
-        
 
         Parameters
         ----------
-        lgcsave : Bool, optional
+        lgcsave : bool, optional
             If True, all the plots will be saved in the a folder
             Avetrace_noise/ within the user specified directory
 
@@ -933,11 +929,10 @@ class IVanalysis(object):
         """
         Helper function to plot rload and rnormal as a function of
         QETbias from the didv fits of SC and Normal data
-        
 
         Parameters
         ----------
-        lgcsave : Bool, optional
+        lgcsave : bool, optional
             If True, all the plots will be saved 
             
         Returns
@@ -959,10 +954,10 @@ class IVanalysis(object):
         Note, if any step in the analysis fails, the analysis will stop
         and the user will need to do the analysis in parts. 
         
-        Prameters
-        ---------
+        Parameters
+        ----------
         collection_eff : float, optional
-            The absolute phonon collection efficiency of the detector
+            The absolute phonon collection efficiency of the detector, should be a float from 0 to 1.
         lgcplot : bool, optional
             If True, a plot of the fit is shown
         lgcsave : bool, optional
