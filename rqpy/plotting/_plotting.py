@@ -597,10 +597,11 @@ def _make_iv_noiseplots(IVanalysisOBJ, lgcsave=False):
     Helper function to plot average noise/didv traces in time domain, as well as 
     corresponding noise PSDs, for all QET bias points in IV/dIdV sweep.
 
-
     Parameters
     ----------
-    lgcsave : Bool, optional
+    IVanalysisOBJ : rqpy.IVanalysis
+         The IV analysis object that contains the data to use for plotting.
+    lgcsave : bool, optional
         If True, all the plots will be saved in the a folder
         Avetrace_noise/ within the user specified directory
 
@@ -609,6 +610,7 @@ def _make_iv_noiseplots(IVanalysisOBJ, lgcsave=False):
     None
 
     """
+
     for (noiseind, noiserow), (didvind, didvrow) in zip(IVanalysisOBJ.df[IVanalysisOBJ.noiseinds].iterrows(), IVanalysisOBJ.df[IVanalysisOBJ.didvinds].iterrows()):
         fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(16, 6))
 
@@ -650,10 +652,11 @@ def _plot_rload_rn_qetbias(IVanalysisOBJ, lgcsave=False):
     Helper function to plot rload and rnormal as a function of
     QETbias from the didv fits of SC and Normal data for IVanalysis object.
 
-
     Parameters
     ----------
-    lgcsave : Bool, optional
+    IVanalysisOBJ : rqpy.IVanalysis
+         The IV analysis object that contains the data to use for plotting.
+    lgcsave : bool, optional
         If True, all the plots will be saved 
 
     Returns
@@ -709,8 +712,11 @@ def _plot_energy_res_vs_bias(r0s, energy_res, qets, optimum_r0, figsavepath, lgc
     lgcsave : bool
         If true, the figure is saved
         
+    Returns
+    -------
+    None
+
     """
-        
 
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(9, 6))
     ax.plot(r0s, energy_res, linestyle = ' ', marker = '.', ms = 10, c='g')
@@ -757,7 +763,12 @@ def _plot_sc_noise(f, psd, noise_sim, qetbias, figsavepath, lgcsave):
     lgcsave : bool
         If true, the figure is saved
     
+    Returns
+    -------
+    None
+
     """
+
     f = f[1:]
     psd = psd[1:]
     fig, ax = plt.subplots(1,1, figsize=(11,6))
@@ -794,7 +805,12 @@ def _plot_n_noise(f, psd, noise_sim, qetbias, figsavepath, lgcsave):
     lgcsave : bool
         If true, the figure is saved
     
+    Returns
+    -------
+    None
+
     """   
+
     f = f[1:]
     psd = psd[1:]
     fig, ax = plt.subplots(1,1, figsize=(11,6))
