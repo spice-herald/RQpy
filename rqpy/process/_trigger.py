@@ -191,7 +191,7 @@ class OptimumFilt(object):
             
     """
 
-    def __init__(self, fs, template, noisepsd, tracelength, trigtemplate=None):
+    def __init__(self, fs, template, noisepsd, tracelength, trigtemplate=None, lgcoverlap=True):
         """
         Initialization of the FIR filter.
         
@@ -208,6 +208,8 @@ class OptimumFilt(object):
         trigtemplate : NoneType, ndarray, optional
             The template for the trigger channel pulse. If left as None, then the trigger channel will not
             be analyzed.
+        lgcoverlap : bool, optional
+            If False, in eventtrigger skip events that overlap, based on tracelength, with the previous event.
         
         """
         
@@ -215,6 +217,7 @@ class OptimumFilt(object):
         self.fs = fs
         self.template = template
         self.noisepsd = noisepsd
+        self.lgcoverlap = lgcoverlap
         
         # calculate the time-domain optimum filter
         self.phi = ifft(fft(self.template)/self.noisepsd).real
@@ -406,6 +409,23 @@ class OptimumFilt(object):
                         else:
                             evt_ind = evt_inds[np.argmin(filt[evt_inds])]
 
+                    if (self.lgcoverlap is False):
+                        if (irange==0):
+                            # save evt_ind for first event above threshold
+                            # for subsequent checking for overlap
+                            lastevt_ind = evt_ind
+                        else:
+                            # check if bins between this event and previous
+                            # is smaller than tracelength
+                            if ((evt_ind - lastevt_ind) < self.tracelength):
+                                # skip this event
+                                continue
+                            else:
+                                # there is no overlap so update lastevt_ind
+                                # and precede with trigger code
+                                lastevt_ind = evt_ind
+                     
+                    
                     if rangetypes[irange][1] and rangetypes[irange][2]:
                         # both are triggered
                         if positivepulses:
@@ -437,6 +457,7 @@ class OptimumFilt(object):
                     traces.extend([self.traces[ii, ..., 
                                               evt_ind - self.tracelength//2:evt_ind + self.tracelength//2 \
                                               + (self.tracelength)%2]])
+                    
 
         self.pulsetimes = pulsetimes
         self.pulseamps = pulseamps
@@ -587,7 +608,7 @@ def acquire_randoms(filelist, n, l, datashape=None, iotype="stanford", savepath=
     
 def acquire_pulses(filelist, template, noisepsd, tracelength, thresh, nchan=2, trigtemplate=None, 
                    trigthresh=None, positivepulses=True, iotype="stanford", savepath=None, 
-                   savename=None, dumpnum=1, maxevts=1000):
+                   savename=None, dumpnum=1, maxevts=1000, lgcoverlap=True):
     """
     Function for running the continuous trigger on many different files and saving the events 
     to .npz files for later processing.
@@ -631,6 +652,8 @@ def acquire_pulses(filelist, template, noisepsd, tracelength, thresh, nchan=2, t
     maxevts : int, optional
         The maximum number of events that should be stored in each dump when saving. Default
         is 1000.
+    lgcoverlap : bool, optional
+            If False, in eventtrigger skip events that overlap, based on tracelength, with the previous event.
             
     """
     
@@ -665,7 +688,7 @@ def acquire_pulses(filelist, template, noisepsd, tracelength, thresh, nchan=2, t
         else:
             raise ValueError("Unrecognized iotype inputted.")
             
-        filt = OptimumFilt(fs, template, noisepsd, tracelength, trigtemplate=trigtemplate)
+        filt = OptimumFilt(fs, template, noisepsd, tracelength, trigtemplate=trigtemplate, lgcoverlap=lgcoverlap)
         filt.filtertraces(traces, times, trig=trig)
         filt.eventtrigger(thresh, trigthresh=trigthresh, positivepulses=positivepulses)
         
@@ -674,6 +697,7 @@ def acquire_pulses(filelist, template, noisepsd, tracelength, thresh, nchan=2, t
         evt_counter += numevts
         
         if evt_counter < maxevts:
+
             pulsetimes[evt_counter-numevts:evt_counter] = filt.pulsetimes
             pulseamps[evt_counter-numevts:evt_counter] = filt.pulseamps
             trigtimes[evt_counter-numevts:evt_counter] = filt.trigtimes
@@ -682,7 +706,6 @@ def acquire_pulses(filelist, template, noisepsd, tracelength, thresh, nchan=2, t
             trigtypes[evt_counter-numevts:evt_counter] = filt.trigtypes
         
         elif evt_counter >= maxevts:
-            
             numextra = evt_counter - maxevts
             numtoadd = maxevts - (evt_counter - numevts)
             
