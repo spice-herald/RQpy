@@ -3,7 +3,7 @@ import pandas as pd
 from qetpy.cut import removeoutliers
 from scipy import stats, interpolate
 
-__all__ = ["binnedcut", "baselinecut", "inrange"]
+__all__ = ["binnedcut", "baselinecut", "inrange", "passage_fraction"]
 
 
 def baselinecut(arr, r0, i0, rload, dr=0.1e-3, cut=None):
@@ -73,6 +73,9 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgce
         of `y`. If True, the larger values of `y` pass the cut based on `cut_eff`. 
         If False, the smaller values of `y` pass the cut based on `cut_eff`. Default
         is True.
+    lgcequaldensitybins : bool, optional
+        If set to True, the bin widths are set such that each bin has the same number
+        of data points within it. If left as False, then a constant bin width is used.
     xlwrlim : NoneType, float, optional
         The lower limit on `x` such that the cut at this value is applied to any values of `x`
         less than this. Default is None, where no lower limit is applied.
@@ -156,3 +159,50 @@ def inrange(vals, lwrbnd, uprbnd):
     mask = (vals >= lwrbnd) & (vals <= uprbnd)
     
     return mask
+
+def passage_fraction(x, cut, basecut=None, nbins=100, lgcequaldensitybins=False):
+    """
+    Function for returning the passage fraction of a cut as a function of the specified
+    variable `x`.
+    
+    Parameters
+    ----------
+    x : array_like
+        Array of values to be binned and plotted
+    cut : array_like
+        Mask of values to calculate passage fraction for.
+    basecut : NoneType, array_like, optional
+        A cut to use as the comparison for the passage fraction. If left as None,
+        then the passage fraction is calculated using all of the inputted data.
+    nbins : int, optional
+        The number of bins that should be created. Default is 100.
+    lgcequaldensitybins : bool, optional
+        If set to True, the bin widths are set such that each bin has the same number
+        of data points within it. If left as False, then a constant bin width is used.
+    
+    Returns
+    -------
+    x_binned : ndarray
+        The corresponding `x` values for each passage fraction, corresponding to the
+        center of the bin.
+    frac_binned : ndarray
+        The passage fractions for each value of `x_binned` for the given `cut` and `basecut`.
+    
+    """
+    
+    if basecut is None:
+        basecut = np.ones(len(x), dtype=bool)
+    
+    if lgcequaldensitybins:
+        histbins_equal = lambda var, nbin: np.interp(np.linspace(0, len(var), nbin + 1),
+                                                     np.arange(len(var)),
+                                                     np.sort(var))
+        nbins = histbins_equal(x[basecut], nbins)
+    
+    hist_vals_base, x_binned = np.histogram(x[basecut], bins=nbins)
+    hist_vals, _ = np.histogram(x[basecut & cut], bins=x_binned)
+    
+    frac_binned = hist_vals/hist_vals_base
+    x_binned = (x_binned[:-1]+x_binned[1:])/2
+    
+    return x_binned, frac_binned

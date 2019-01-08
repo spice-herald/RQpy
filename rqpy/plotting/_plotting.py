@@ -2,10 +2,13 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib import colors
+import rqpy as rp
 from rqpy import utils
 
 
-__all__ = ["hist", "scatter", "densityplot", "plot_gauss", "plot_n_gauss", "plot_saturation_correction", "_make_iv_noiseplots", "_plot_energy_res_vs_bias", "_plot_n_noise", "_plot_sc_noise", "_plot_rload_rn_qetbias"]
+__all__ = ["hist", "scatter", "densityplot", "passageplot", "plot_gauss", "plot_n_gauss", 
+           "plot_saturation_correction", "_make_iv_noiseplots", "_plot_energy_res_vs_bias", 
+           "_plot_n_noise", "_plot_sc_noise", "_plot_rload_rn_qetbias"]
 
 
 def hist(arr, nbins='sqrt', xlims=None, cuts=None, lgcrawdata=True, 
@@ -298,6 +301,126 @@ def scatter(xvals, yvals, xlims=None, ylims=None, cuts=None, lgcrawdata=True, lg
     
     return fig, ax
 
+def passageplot(arr, cuts, basecut=None, nbins=100, lgcequaldensitybins=False, xlims=None, ylims=(0, 1),
+                lgceff=True, lgclegend=True, labeldict=None, ax=None, cmap="viridis"):
+    """
+    Function to plot histogram of RQ data with multiple cuts.
+    
+    Parameters
+    ----------
+    arr : array_like
+        Array of values to be binned and plotted
+    cuts : list, optional
+        List of masks of values to be plotted. The cuts will be applied in the order that 
+        they are listed, such that any number of cuts can be plotted.
+    basecut : NoneType, array_like, optional
+        The base cut for comparison of the first cut in `cuts`. If left as None, then the 
+        passage fraction is calculated using all of the inputted data for the first cut.
+    nbins : int, str, optional
+        This is the same as plt.hist() bins parameter. Defaults is 'sqrt'.
+    lgcequaldensitybins : bool, optional
+        If set to True, the bin widths are set such that each bin has the same number
+        of data points within it. If left as False, then a constant bin width is used.
+    xlims : list of float, optional
+        The xlimits of the passage fraction plot. 
+    ylims : list of float, optional
+        This is passed to the plot as the y limits. Set to (0, 1) by default.
+    lgceff : bool, optional
+        If True, the total cut efficiencies are printed in the legend. 
+    lgclegend : bool, optional
+        If True, the legend is plotted.
+    labeldict : dict, optional
+        Dictionary to overwrite the labels of the plot. defaults are: 
+            labels = {'title' : 'Passage Fraction Plot', 
+                      'xlabel' : 'variable', 
+                      'ylabel' : 'Passage Fraction', 
+                      'cut0' : '1st', 
+                      'cut1' : '2nd', 
+                      ...}
+        Ex: to change just the title, pass: labeldict = {'title' : 'new title'}, to hist()
+    ax : axes.Axes object, optional
+        Option to pass an existing Matplotlib Axes object to plot over, if it already exists.
+    cmap : str, optional
+        The colormap to use for plotting each cut. Default is 'viridis'.
+    
+    Returns
+    -------
+    fig : Figure
+        Matplotlib Figure object. Set to None if ax is passed as a parameter.
+    ax : axes.Axes object
+        Matplotlib Axes object
+        
+    """
+    
+    if not isinstance(cuts, list):
+        cuts = [cuts]
+    
+    labels = {'title'  : 'Passage Fraction Plot', 
+              'xlabel' : 'variable', 
+              'ylabel' : 'Passage Fraction'}
+    
+    
+    for ii in range(len(cuts)):
+        
+        num_str = str(ii+1)
+        
+        if num_str[-1]=='1':
+            num_str+="st"
+        elif num_str[-1]=='2':
+            num_str+="nd"
+        elif num_str[-1]=='3':
+            num_str+="rd"
+        else:
+            num_str+="th"
+        
+        labels[f"cut{ii}"] = num_str
+        
+    if labeldict is not None:
+        labels.update(labeldict)
+    
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(9, 6))
+    else:
+        fig = None
+        
+    ax.set_title(labels['title'])
+    ax.set_xlabel(labels['xlabel'])
+    ax.set_ylabel(labels['ylabel'])
+
+    if basecut is None:
+        basecut = np.ones(len(arr), dtype=bool)
+            
+    colors = plt.cm.get_cmap(cmap)(np.linspace(0.1, 0.9, len(cuts)))
+
+    ctemp = np.ones(len(arr), dtype=bool) & basecut
+    
+    for ii, cut in enumerate(cuts):
+        oldsum = ctemp.sum()
+        x_binned, passage_binned = rp.passage_fraction(arr, cut, basecut=ctemp, nbins=nbins,
+                                                       lgcequaldensitybins=lgcequaldensitybins)
+        ctemp = ctemp & cut
+        newsum = ctemp.sum()
+        cuteff = newsum/oldsum * 100
+        label = f"Data passing {labels[f'cut{ii}']} cut"
+        
+        if lgceff:
+            label+=f", Total Passage: {cuteff:.1f}%"
+            
+        if xlims is None:
+            xlims = (x_binned.min()*0.9, x_binned.max()*1.1)
+            
+        ax.step(x_binned, passage_binned, where='mid', color=colors[ii], label=label)
+    
+    ax.set_xlim(xlims)
+    ax.set_ylim(ylims)
+    ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
+    ax.tick_params(which="both", direction="in", right=True, top=True)
+    ax.grid(linestyle="dashed")
+    
+    if lgclegend:
+        ax.legend(loc="best")
+    
+    return fig, ax
 
 
 def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=None, 
