@@ -409,7 +409,7 @@ class OptimumFilt(object):
                         else:
                             evt_ind = evt_inds[np.argmin(filt[evt_inds])]
 
-                    if (self.lgcoverlap is False):
+                    if not self.lgcoverlap:
                         if (irange==0):
                             # save evt_ind for first event above threshold
                             # for subsequent checking for overlap
