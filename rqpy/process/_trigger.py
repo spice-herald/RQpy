@@ -188,6 +188,9 @@ class OptimumFilt(object):
     trigtypes: ndarray
         Array of boolean vectors each of length 3. The first value indicates if the trace is a random or not.
         The second value indicates if we had a pulse trigger. The third value indicates if we had a ttl trigger.
+    lgcoverlap : bool
+        If True, then all events are saved when running `eventtrigger`, such that overlapping traces will be saved.
+        If False, then `eventtrigger` will skip events that overlap, based on `tracelength`, with the previous event.
             
     """
 
@@ -209,7 +212,9 @@ class OptimumFilt(object):
             The template for the trigger channel pulse. If left as None, then the trigger channel will not
             be analyzed.
         lgcoverlap : bool, optional
-            If False, in eventtrigger skip events that overlap, based on tracelength, with the previous event.
+            If True, then all events are saved when running `eventtrigger`, such that overlapping traces will 
+            be saved. If False, then `eventtrigger` will skip events that overlap, based on `tracelength`, 
+            with the previous event.
         
         """
         
