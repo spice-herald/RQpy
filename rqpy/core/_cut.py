@@ -50,7 +50,8 @@ def baselinecut(arr, r0, i0, rload, dr=0.1e-3, cut=None):
     return cbase
 
 
-def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgcequaldensitybins=False):
+def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgcequaldensitybins=False,
+              xlwrlim=None, xuprlim=None):
     """
     Function for calculating a baseline cut over time based on a given percentile.
     
@@ -72,6 +73,12 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgce
         of `y`. If True, the larger values of `y` pass the cut based on `cut_eff`. 
         If False, the smaller values of `y` pass the cut based on `cut_eff`. Default
         is True.
+    xlwrlim : NoneType, float, optional
+        The lower limit on `x` such that the cut at this value is applied to any values of `x`
+        less than this. Default is None, where no lower limit is applied.
+    xuprlim : NoneType, float, optional
+        The upper limit on `x` such that the cut at this value is applied to any values of `x`
+        greater than this. Default is None, where no upper limit is applied.
         
     Returns
     -------
@@ -92,20 +99,28 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgce
     st = lambda var: np.partition(var, int(len(var)*cut_eff))[int(len(var)*cut_eff)]
 
     if nbins==1:
-        f = lambda var: st(x)*np.ones(len(x))
+        f = lambda var: st(y[cut])
     else:
+        bin_cut = cut
         
+        if xlwrlim is not None:
+            lwr_cut = x >= xlwrlim
+            bin_cut = bin_cut & lwr_cut
+            
+        if xuprlim is not None:
+            upr_cut = x <= xuprlim
+            bin_cut = bin_cut & upr_cut
+            
         if lgcequaldensitybins:
             histbins_equal = lambda var, nbin: np.interp(np.linspace(0, len(var), nbin + 1),
                                                          np.arange(len(var)),
                                                          np.sort(var))
-            nbins = histbins_equal(x[cut], nbins)
+            nbins = histbins_equal(x[bin_cut], nbins)
         
-        cutoffs, bin_edges, _ = stats.binned_statistic(x[cut], y[cut], bins=nbins,
+        cutoffs, bin_edges, _ = stats.binned_statistic(x[bin_cut], y[bin_cut], bins=nbins,
                                                        statistic=st)
         
-        cutoffs = np.pad(cutoffs, (1, 0), 'constant', constant_values=(cutoffs[0], 0))
-        f = interpolate.interp1d(bin_edges, cutoffs, kind='next', 
+        f = interpolate.interp1d(bin_edges[1:-1], cutoffs[1:], kind='previous', 
                                  bounds_error=False, fill_value=(cutoffs[0], cutoffs[-1]),
                                  assume_sorted=True)
 
