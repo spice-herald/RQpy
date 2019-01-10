@@ -640,10 +640,10 @@ class IVanalysis(object):
             
             if lgcplot:
                 didvobj.plot_full_trace(lgcsave=lgcsave, savepath=self.figsavepath,
-                                          savename=f'didv_{didvn.qetbias:.3e}')
+                                          savename=f'didv_{row.qetbias:.3e}')
                 didvobj.plot_re_im_didv(poles='all', plotpriors=True, lgcsave=lgcsave, 
                                         savepath=self.figsavepath,
-                                        savename=f'didv_{didvn.qetbias:.3e}')
+                                        savename=f'didv_{row.qetbias:.3e}')
 
                 
     
