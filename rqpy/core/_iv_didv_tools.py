@@ -826,7 +826,7 @@ class IVanalysis(object):
                 fig, ax = plot_noise_sim(f, psd, noise_sim, 'current')
                 fig, ax = plot_noise_sim(f, psd, noise_sim, 'power')
                 if lgcsave:
-                    plt.savefig(f'{self.figsavepath}T_noise_qetbias{noise_row.qetbias}')
+                    plt.savefig(f'{self.figsavepath}T_noise_qetbias{noise_row.qetbias}.png')
                 
             res = energy_res_estimate(freqs= f, tau_collect = tau_collect,
                                       Sp = psd/(np.abs(noise_sim.dIdP(f))**2),
