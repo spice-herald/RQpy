@@ -648,7 +648,7 @@ class IVanalysis(object):
                 
     
     def fit_normal_noise(self, fit_range=(10, 3e4), squiddc0=6e-12, squidpole0=200, squidn0=0.7,
-                        lgcplot=False, lgcsave=False):
+                        lgcplot=False, lgcsave=False, xlims = None, ylims = None):
         """
         Function to fit the noise components of the SQUID+Electronics. Fits all normal noise PSDs
         and stores the average value for squiddc, squidpole, and squidn as attributes of the class.
@@ -667,6 +667,10 @@ class IVanalysis(object):
             If True, a plot of the fit is shown
         lgcsave : bool, optional
             If True, the figure is saved
+        xlims : NoneType, tuple, optional
+            Limits to be passed to ax.set_xlim()
+        ylims : NoneType, tuple, optional
+            Limits to be passed to ax.set_ylim()
         
         Returns
         -------
@@ -715,7 +719,7 @@ class IVanalysis(object):
             squidn_list.append(fitvals['squidn'])
             
             if lgcplot:
-                _plot_n_noise(f, psd, noise_sim, noise_row.qetbias, self.figsavepath, lgcsave)
+                _plot_n_noise(f, psd, noise_sim, noise_row.qetbias, self.figsavepath, lgcsave, xlims, ylims)
                 
             
         self.squiddc = np.mean(squiddc_list)
@@ -723,7 +727,7 @@ class IVanalysis(object):
         self.squidn = np.mean(squidn_list)
                        
                        
-    def fit_sc_noise(self, fit_range=(3e3, 1e5), lgcplot=False, lgcsave=False):
+    def fit_sc_noise(self, fit_range=(3e3, 1e5), lgcplot=False, lgcsave=False, xlims = None, ylims = None):
         """
         Function to fit the components of the SC Noise. Fits all SC noise PSDs
         and stores the average value for tload as an attribute of the class.
@@ -736,6 +740,10 @@ class IVanalysis(object):
             If True, a plot of the fit is shown
         lgcsave : bool, optional
             If True, the figure is saved
+        xlims : NoneType, tuple, optional
+            Limits to be passed to ax.set_xlim()
+        ylims : NoneType, tuple, optional
+            Limits to be passed to ax.set_ylim()    
             
         Returns
         -------
@@ -782,11 +790,12 @@ class IVanalysis(object):
             tload_list.append(fitvals['tload'])
             
             if lgcplot:
-                _plot_sc_noise(f, psd, noise_sim, noise_row.qetbias, self.figsavepath, lgcsave)
+                _plot_sc_noise(f, psd, noise_sim, noise_row.qetbias, self.figsavepath, lgcsave, xlims, ylims)
             
         self.tload = np.mean(tload_list)
         
-    def model_noise(self, tau_collect=20e-6, collection_eff=1, lgcplot=False, lgcsave=False):
+    def model_noise(self, tau_collect=20e-6, collection_eff=1, lgcplot=False, lgcsave=False, 
+                    ylims_current = None, ylims_power = None):
         """
         Function to plot noise PSD with all the theoretical noise
         components (calculated from the didv fits). This function also estimates
@@ -802,6 +811,12 @@ class IVanalysis(object):
             If True, a plot of the fit is shown
         lgcsave : bool, optional
             If True, the figure is saved
+        ylims_current : NoneType, tuple, optional
+            Limits to be passed to ax.set_ylim()
+            for the current nosie plots
+        ylims_power : NoneType, tuple, optional
+            Limits to be passed to ax.set_ylim()  
+            for the power noise plots
             
         Returns
         -------
@@ -843,7 +858,7 @@ class IVanalysis(object):
         self.df.loc[self.didvinds, 'tau_eff'] =  tau_eff_arr
         
     
-    def find_optimum_bias(self, lgcplot=False, lgcsave=False):
+    def find_optimum_bias(self, lgcplot=False, lgcsave=False, xlims = None, ylims = None):
         """
         Function to find the QET bias with the lowest energy 
         resolution. 
@@ -854,6 +869,10 @@ class IVanalysis(object):
             If True, a plot of the fit is shown
         lgcsave : bool, optional
             If True, the figure is saved
+        xlims : NoneType, tuple, optional
+            Limits to be passed to ax.set_xlim()
+        ylims : NoneType, tuple, optional
+            Limits to be passed to ax.set_ylim()   
         
         Returns
         -------
@@ -901,7 +920,7 @@ class IVanalysis(object):
         optimum_e = emin_list[eminind]
         
         if lgcplot:
-            _plot_energy_res_vs_bias(r0s, energy_res, qets, optimum_r0, self.figsavepath, lgcsave)
+            _plot_energy_res_vs_bias(r0s, energy_res, qets, optimum_r0, self.figsavepath, lgcsave, xlims, ylims)
         
         return optimum_bias, optimum_r0, optimum_e
 
