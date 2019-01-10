@@ -839,7 +839,12 @@ class IVanalysis(object):
                                      noisetype='transition', lgcpriors = True)
             if lgcplot:
                 fig, ax = plot_noise_sim(f, psd, noise_sim, 'current')
+                if ylims_current is not None:
+                    ax.set_ylim(ylims_current)
                 fig, ax = plot_noise_sim(f, psd, noise_sim, 'power')
+                if ylims_power is not None:
+                    ax.set_ylim(ylims_power)
+                    
                 if lgcsave:
                     plt.savefig(f'{self.figsavepath}T_noise_qetbias{noise_row.qetbias}.png')
                 
@@ -944,7 +949,7 @@ class IVanalysis(object):
         
         _make_iv_noiseplots(self, lgcsave)
     
-    def plot_rload_rn_qetbias(self, lgcsave=False):
+    def plot_rload_rn_qetbias(self, lgcsave=False, xlims_rl=None, ylims_rl=None, xlims_rn=None, ylims_rn=None):
         """
         Helper function to plot rload and rnormal as a function of
         QETbias from the didv fits of SC and Normal data
@@ -953,6 +958,18 @@ class IVanalysis(object):
         ----------
         lgcsave : bool, optional
             If True, all the plots will be saved 
+        xlims_rl : NoneType, tuple, optional
+            Limits to be passed to ax.set_xlim()for the 
+            rload plot
+        ylims_rl : NoneType, tuple, optional
+            Limits to be passed to ax.set_ylim() for the
+            rload plot
+        xlims_rn : NoneType, tuple, optional
+            Limits to be passed to ax.set_xlim()for the 
+            rtot plot
+        ylims_rn : NoneType, tuple, optional
+            Limits to be passed to ax.set_ylim() for the
+            rtot plot
             
         Returns
         -------
@@ -960,7 +977,7 @@ class IVanalysis(object):
         
         """
         
-        _plot_rload_rn_qetbias(self, lgcsave)
+        _plot_rload_rn_qetbias(self, lgcsave, xlims_rl, ylims_rl, xlims_rn, ylims_rn)
         
         
             

@@ -770,7 +770,7 @@ def _make_iv_noiseplots(IVanalysisOBJ, lgcsave=False):
             plt.savefig(fullpath + f'{noiserow.qetbias*1e6:.2f}_didvnoise.png')
         plt.show()
             
-def _plot_rload_rn_qetbias(IVanalysisOBJ, lgcsave=False):
+def _plot_rload_rn_qetbias(IVanalysisOBJ, lgcsave, xlims_rl, ylims_rl, xlims_rn, ylims_rn):
     """
     Helper function to plot rload and rnormal as a function of
     QETbias from the didv fits of SC and Normal data for IVanalysis object.
@@ -781,6 +781,19 @@ def _plot_rload_rn_qetbias(IVanalysisOBJ, lgcsave=False):
          The IV analysis object that contains the data to use for plotting.
     lgcsave : bool, optional
         If True, all the plots will be saved 
+    xlims_rl : NoneType, tuple, optional
+        Limits to be passed to ax.set_xlim()for the 
+        rload plot
+    ylims_rl : NoneType, tuple, optional
+        Limits to be passed to ax.set_ylim() for the
+        rload plot
+    xlims_rn : NoneType, tuple, optional
+        Limits to be passed to ax.set_xlim()for the 
+        rtot plot
+    ylims_rn : NoneType, tuple, optional
+        Limits to be passed to ax.set_ylim() for the
+        rtot plot
+    
 
     Returns
     -------
@@ -790,6 +803,15 @@ def _plot_rload_rn_qetbias(IVanalysisOBJ, lgcsave=False):
 
     fig, axes = plt.subplots(1,2, figsize = (16,6))
     fig.suptitle("Rload and Rtot from dIdV Fits", fontsize = 18)
+    
+    if xlims_rl is not None:
+        axes[0].set_xlim(xlims_rl)
+    if ylims_rl is not None:
+        axes[0].set_ylim(ylims_rl)
+    if xlims_rn is not None:
+        axes[1].set_xlim(xlims_rn)
+    if ylims_rn is not None:
+        axes[1].set_ylim(ylis_rn)
 
     axes[0].errorbar(IVanalysisOBJ.vb[0,0,IVanalysisOBJ.scinds]*1e6,
                      np.array(IVanalysisOBJ.rload_list)*1e3, 
@@ -814,7 +836,8 @@ def _plot_rload_rn_qetbias(IVanalysisOBJ, lgcsave=False):
         plt.savefig(IVanalysisOBJ.figsavepath + 'rload_rtot_variation.png')
             
             
-def _plot_energy_res_vs_bias(r0s, energy_res, qets, optimum_r0, figsavepath, lgcsave):
+def _plot_energy_res_vs_bias(r0s, energy_res, qets, optimum_r0, figsavepath, lgcsave,
+                            xlims, ylims):
     """
     Helper function for the IVanalysis class to plot the expected energy resolution as 
     a function of QET bias and TES resistance.
@@ -834,6 +857,10 @@ def _plot_energy_res_vs_bias(r0s, energy_res, qets, optimum_r0, figsavepath, lgc
         Directory to save the figure
     lgcsave : bool
         If true, the figure is saved
+    xlims : NoneType, tuple, optional
+            Limits to be passed to ax.set_xlim()
+    ylims : NoneType, tuple, optional
+        Limits to be passed to ax.set_ylim()
         
     Returns
     -------
@@ -842,6 +869,11 @@ def _plot_energy_res_vs_bias(r0s, energy_res, qets, optimum_r0, figsavepath, lgc
     """
 
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(9, 6))
+    if xlims is not None:
+        ax.set_xlim(xlims)
+    if ylims is not None:
+        ax.set_ylim(ylims)
+        
     ax.plot(r0s, energy_res, linestyle = ' ', marker = '.', ms = 10, c='g')
     ax.plot(r0s, energy_res, linestyle = '-', marker = ' ', alpha = .3, c='g')
     ax.grid(True, which = 'both', linestyle = '--')
@@ -867,7 +899,7 @@ def _plot_energy_res_vs_bias(r0s, energy_res, qets, optimum_r0, figsavepath, lgc
         
         
         
-def _plot_sc_noise(f, psd, noise_sim, qetbias, figsavepath, lgcsave):
+def _plot_sc_noise(f, psd, noise_sim, qetbias, figsavepath, lgcsave, xlims, ylims):
     """
     Helper function to plot SC noise for IVanalysis class
     
@@ -885,6 +917,10 @@ def _plot_sc_noise(f, psd, noise_sim, qetbias, figsavepath, lgcsave):
         Directory to save the figure
     lgcsave : bool
         If true, the figure is saved
+    xlims : NoneType, tuple, optional
+        Limits to be passed to ax.set_xlim()
+    ylims : NoneType, tuple, optional
+        Limits to be passed to ax.set_ylim()
     
     Returns
     -------
@@ -895,6 +931,11 @@ def _plot_sc_noise(f, psd, noise_sim, qetbias, figsavepath, lgcsave):
     f = f[1:]
     psd = psd[1:]
     fig, ax = plt.subplots(1,1, figsize=(11,6))
+    if xlims is not None:
+        ax.set_xlim(xlims)
+    if ylims is not None:
+        ax.set_ylim(ylims)
+        
     ax.grid(True, linestyle = '--')
     ax.loglog(f, np.sqrt(psd), alpha = .5, label = 'Raw Data')
     ax.loglog(f, np.sqrt(noise_sim.s_isquid(f)), label = 'Squid+Electronics Noise')
@@ -909,7 +950,7 @@ def _plot_sc_noise(f, psd, noise_sim, qetbias, figsavepath, lgcsave):
         plt.savefig(f'{figsavepath}SC_noise_qetbias{qetbias}.png')
         
         
-def _plot_n_noise(f, psd, noise_sim, qetbias, figsavepath, lgcsave):
+def _plot_n_noise(f, psd, noise_sim, qetbias, figsavepath, lgcsave, xlims, ylims):
     """
     Helper function to plot normal state noise for IVanalysis class
     
@@ -927,6 +968,10 @@ def _plot_n_noise(f, psd, noise_sim, qetbias, figsavepath, lgcsave):
         Directory to save the figure
     lgcsave : bool
         If true, the figure is saved
+    xlims : NoneType, tuple, optional
+        Limits to be passed to ax.set_xlim()
+    ylims : NoneType, tuple, optional
+        Limits to be passed to ax.set_ylim()    
     
     Returns
     -------
@@ -937,6 +982,11 @@ def _plot_n_noise(f, psd, noise_sim, qetbias, figsavepath, lgcsave):
     f = f[1:]
     psd = psd[1:]
     fig, ax = plt.subplots(1,1, figsize=(11,6))
+    if xlims is not None:
+        ax.set_xlim(xlims)
+    if ylims is not None:
+        ax.set_ylim(ylims)
+        
     ax.grid(True, linestyle = '--')
     ax.loglog(f, np.sqrt(psd), alpha = .5, label = 'Raw Data')
     ax.loglog(f, np.sqrt(noise_sim.s_isquid(f)), label = 'Squid+Electronics Noise')
