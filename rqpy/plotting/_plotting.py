@@ -863,7 +863,7 @@ def _plot_energy_res_vs_bias(r0s, energy_res, qets, optimum_r0, figsavepath, lgc
     ax.legend()
 
     if lgcsave:
-        plt.savefig(f'{figsavepath}energy_res_vs_bias')
+        plt.savefig(f'{figsavepath}energy_res_vs_bias.png')
         
         
         
@@ -906,7 +906,7 @@ def _plot_sc_noise(f, psd, noise_sim, qetbias, figsavepath, lgcsave):
     ax.set_title(f'Normal State noise for QETbias: {qetbias*1e6} $\mu$A')
     
     if lgcsave:
-        plt.savefig(f'{figsavepath}SC_noise_qetbias{qetbias}')
+        plt.savefig(f'{figsavepath}SC_noise_qetbias{qetbias}.png')
         
         
 def _plot_n_noise(f, psd, noise_sim, qetbias, figsavepath, lgcsave):
@@ -949,4 +949,4 @@ def _plot_n_noise(f, psd, noise_sim, qetbias, figsavepath, lgcsave):
     ax.set_title(f'Normal State noise for QETbias: {qetbias*1e6} $\mu$A')
     
     if lgcsave:
-        plt.savefig(f'{figsavepath}Normal_noise_qetbias{qetbias}')
+        plt.savefig(f'{figsavepath}Normal_noise_qetbias{qetbias}.png')
