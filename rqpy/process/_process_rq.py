@@ -116,6 +116,9 @@ class SetupRQ(object):
         The number of indices up to which a trace should be averaged to determine the baseline.
     do_integral : bool
         Boolean flag for whether or not to calculate the baseline-subtracted integral of each trace.
+    indstop_integral : int, list of int
+        The index at which the integral should be calculated up to in order to reduce noise by 
+        truncating the rest of the trace. Default is 20000.
     do_ofamp_shifted : bool
         Boolean flag for whether or not the shifted optimum filter fit should be calculated for
         the non-trigger channels. If set to True, then self.trigger must have been set to a value.
@@ -158,10 +161,24 @@ class SetupRQ(object):
         trigger : float, NoneType, optional
             The index corresponding to which channel is the trigger channel in the list of templates
             and psds. If left as None, then no channel is assumed to be the trigger channel.
+        do_optimumfilters : bool
+            Boolean flag for whether or not any of the optimum filters will be calculated. If only
+            calculating non-OF-related RQs, then this will be False, and processing time will not
+            be spent on initializing the OF.
+        do_optimumfilters_smooth : bool
+            Boolean flag for whether or not any of the smoothed-PDS optimum filters will be calculated. 
+            If only calculating non-OF-related RQs, then this will be False, and processing time will not
+            be spent on initializing the OF.
         
         """
         
-        if len(templates) != len(psds):
+        if not isinstance(templates, list):
+            templates = [templates]
+            
+        if not isinstance(psds, list):
+            psds = [psds]
+        
+        if len(templates[0]) != len(psds[0]):
             raise ValueError("templates and psds should have the same length")
         
         self.templates = templates
@@ -216,11 +233,64 @@ class SetupRQ(object):
         self.baseline_indbasepre = [16000]*self.nchan
         
         self.do_integral = True
+        self.indstop_integral = [20000]*self.nchan
         
         self.do_ofamp_shifted = False
         self.do_ofamp_shifted_smooth = False
         self.which_fit = "constrained"
         self.t0_shifted = None
+        
+        self.do_maxmin = True
+        self.use_min = [False]*self.nchan
+        self.indstart_maxmin = [0]*self.nchan
+        self.indstop_maxmin = [len(self.templates[0])]*self.nchan
+        
+        self.do_optimumfilters = True
+        self.do_optimumfilters_smooth = False
+        
+    def _check_of(self):
+        """
+        Helper function for checking if any of the optimum filters are going to be calculated.
+        
+        """
+        
+        if self.do_ofamp_nodelay:
+            self.do_optimumfilters = True
+        elif self.do_ofamp_unconstrained:
+            self.do_optimumfilters = True
+        elif self.do_ofamp_constrained:
+            self.do_optimumfilters = True
+        elif self.do_ofamp_pileup:
+            self.do_optimumfilters = True
+        elif self.do_chi2_nopulse:
+            self.do_optimumfilters = True
+        elif self.do_chi2_lowfreq:
+            self.do_optimumfilters = True
+        elif self.do_ofamp_baseline:
+            self.do_optimumfilters = True
+        elif self.do_ofamp_shifted:
+            self.do_optimumfilters = True
+        else:
+            self.do_optimumfilters = False
+            
+        if self.do_ofamp_nodelay_smooth:
+            self.do_optimumfilters_smooth = True
+        elif self.do_ofamp_unconstrained_smooth:
+            self.do_optimumfilters_smooth = True
+        elif self.do_ofamp_constrained_smooth:
+            self.do_optimumfilters_smooth = True
+        elif self.do_ofamp_pileup_smooth:
+            self.do_optimumfilters_smooth = True
+        elif self.do_chi2_nopulse_smooth:
+            self.do_optimumfilters_smooth = True
+        elif self.do_ofamp_baseline_smooth:
+            self.do_optimumfilters_smooth = True
+        elif self.do_ofamp_shifted_smooth:
+            self.do_optimumfilters_smooth = True
+        else:
+            self.do_optimumfilters_smooth = False
+        
+        
         
     def adjust_calc(self, lgcchans=True, lgcsum=True):
         """
@@ -278,6 +348,8 @@ class SetupRQ(object):
         self.do_ofamp_nodelay_smooth = lgcrun_smooth
         self.ofamp_nodelay_lowfreqchi2 = calc_lowfreqchi2
         
+        self._check_of()
+        
     def adjust_ofamp_unconstrained(self, lgcrun=True, lgcrun_smooth=False, calc_lowfreqchi2=False):
         """
         Method for adjusting the calculation of the optimum filter fit with unconstrained 
@@ -303,6 +375,8 @@ class SetupRQ(object):
         self.do_ofamp_unconstrained = lgcrun
         self.do_ofamp_unconstrained_smooth = lgcrun_smooth
         self.ofamp_unconstrained_lowfreqchi2 = calc_lowfreqchi2
+        
+        self._check_of()
         
     def adjust_ofamp_constrained(self, lgcrun=True, lgcrun_smooth=False, calc_lowfreqchi2=True, nconstrain=80):
         """
@@ -343,6 +417,8 @@ class SetupRQ(object):
         self.ofamp_constrained_lowfreqchi2 = calc_lowfreqchi2
         self.ofamp_constrained_nconstrain = nconstrain
         
+        self._check_of()
+        
     def adjust_ofamp_baseline(self, lgcrun=True, lgcrun_smooth=False, nconstrain=80):
         """
         Method for adjusting the calculation of the optimum filter fit with fixed 
@@ -376,6 +452,8 @@ class SetupRQ(object):
         self.do_ofamp_baseline_smooth = lgcrun_smooth
         self.ofamp_baseline_nconstrain = nconstrain
         
+        self._check_of()
+        
     def adjust_ofamp_pileup(self, lgcrun=True, lgcrun_smooth=False, nconstrain=80):
         """
         Method for adjusting the calculation of the pileup optimum filter fit.
@@ -407,6 +485,8 @@ class SetupRQ(object):
         self.do_ofamp_pileup_smooth = lgcrun_smooth
         self.ofamp_pileup_nconstrain = nconstrain
         
+        self._check_of()
+        
     def adjust_chi2_nopulse(self, lgcrun=True, lgcrun_smooth=False):
         """
         Method for adjusting the calculation of the no pulse chi^2.
@@ -424,6 +504,8 @@ class SetupRQ(object):
         
         self.do_chi2_nopulse = lgcrun
         self.do_chi2_nopulse_smooth = lgcrun_smooth
+        
+        self._check_of()
         
     def adjust_chi2_lowfreq(self, lgcrun=True, fcutoff=10000):
         """
@@ -451,6 +533,8 @@ class SetupRQ(object):
         self.do_chi2_lowfreq = lgcrun
         self.chi2_lowfreq_fcutoff = fcutoff
         
+        self._check_of()
+        
     def adjust_baseline(self, lgcrun=True, indbasepre=16000):
         """
         Method for adjusting the calculation of the DC baseline.
@@ -477,7 +561,7 @@ class SetupRQ(object):
         self.do_baseline = lgcrun
         self.baseline_indbasepre = indbasepre
         
-    def adjust_integral(self, lgcrun=True):
+    def adjust_integral(self, lgcrun=True, indstop=20000):
         """
         Method for adjusting the calculation of the integral.
         
@@ -487,10 +571,69 @@ class SetupRQ(object):
             Boolean flag for whether or not the integral should be calculated. If self.do_baseline
             is True, then the baseline is subtracted from the integral. If self.do_baseline is False,
             then the baseline is not subtracted. It is recommended that the baseline should be subtracted.
+        indstop : int, list of int, optional
+            The index at which the integral should be calculated up to in order to reduce noise by 
+            truncating the rest of the trace. Default is 20000.
             
         """
         
+        if np.isscalar(indstop):
+            indstop = [indstop]*self.nchan
+        
+        if len(indstop)!=self.nchan:
+            raise ValueError("The length of indstop is not equal to the number of channels")
+        
         self.do_integral = lgcrun
+        self.indstop_integral = indstop
+        
+    def adjust_maxmin(self, lgcrun=True, use_min=False, indstart=None, indstop=None):
+        """
+        Method for adjusting the calculation of the range of a trace.
+        
+        Parameters
+        ----------
+        lgcrun : bool, optional
+            Boolean flag for whether or not the maximum (or minimum) of the trace should be calculated.
+        use_min : bool, list of bool, optional
+            Whether or not to use the maximum or the minimum when calculating maxmin. If True, then the
+            minimum is used. If False, then the maximum is used. Default is False.
+        indstart : NoneType, int, list of int, optional
+            The starting index for the range of values that maxmin should be calculated over. Default is
+            None, which sets the starting index to the beginning of the trace.
+        indstop : int, list of int, optional
+            The end index for the range of values that that maxmin should be calculated over. Default is 
+            None, which sets the end index to the end of the trace.
+            
+        """
+        
+        if indstart is None:
+            indstart = 0
+        
+        if indstop is None:
+            indstop = len(self.templates[0])
+        
+        if np.isscalar(use_min):
+            use_min = [use_min]*self.nchan
+        
+        if len(use_min)!=self.nchan:
+            raise ValueError("The length of use_min is not equal to the number of channels")
+            
+        if np.isscalar(indstart):
+            indstart = [indstart]*self.nchan
+        
+        if len(indstart)!=self.nchan:
+            raise ValueError("The length of indstart is not equal to the number of channels")
+            
+        if np.isscalar(indstop):
+            indstop = [indstop]*self.nchan
+        
+        if len(indstop)!=self.nchan:
+            raise ValueError("The length of indstop is not equal to the number of channels")
+        
+        self.do_maxmin = lgcrun
+        self.use_min = use_min
+        self.indstart_maxmin = indstart
+        self.indstop_maxmin = indstop
         
     def adjust_ofamp_shifted(self, lgcrun=True, lgcrun_smooth=False, which_fit="constrained"):
         """
@@ -548,6 +691,8 @@ class SetupRQ(object):
             
         self.shifted_fit = which_fit
         
+        self._check_of()
+        
         
 def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, chan_num, det):
     """
@@ -593,11 +738,19 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
     
     if setup.do_integral:
         if setup.do_baseline:
-            integral = np.trapz(signal - baseline[:, np.newaxis], axis=-1)/fs
+            integral = np.trapz(signal[:, :setup.indstop_integral[chan_num]] - baseline[:, np.newaxis], axis=-1)/fs
         else:
-            integral = np.trapz(signal, axis=-1)/fs
+            integral = np.trapz(signal[:, :setup.indstop_integral[chan_num]], axis=-1)/fs
         rq_dict[f'integral_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'integral_{chan}{det}'][readout_inds] = integral
+        
+    if setup.do_maxmin:
+        if setup.use_min[chan_num]:
+            maxmin = np.amin(signal[:, setup.indstart_maxmin[chan_num]:setup.indstop_maxmin[chan_num]], axis=-1)/fs
+        else:
+            maxmin = np.amax(signal[:, setup.indstart_maxmin[chan_num]:setup.indstop_maxmin[chan_num]], axis=-1)/fs
+        rq_dict[f'maxmin_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'maxmin_{chan}{det}'][readout_inds] = maxmin
     
     # initialize variables for the various OFs
     if setup.do_chi2_nopulse:
@@ -659,14 +812,18 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
             chi2low_constrain = np.zeros(len(signal))
     
     # run the OF class for each trace
-    OF = qp.OptimumFilter(signal[0], template, psd, fs)
-    psd_smooth = qp.smooth_psd(psd)
-    OF_smooth = qp.OptimumFilter(signal[0], template, psd_smooth, fs)
+    if setup.do_optimumfilters:
+        OF = qp.OptimumFilter(signal[0], template, psd, fs)
+    if setup.do_optimumfilters_smooth:
+        psd_smooth = qp.smooth_psd(psd)
+        OF_smooth = qp.OptimumFilter(signal[0], template, psd_smooth, fs)
     
     for jj, s in enumerate(signal):
         if jj!=0:
-            OF.update_signal(s)
-            OF_smooth.update_signal(s)
+            if setup.do_optimumfilters:
+                OF.update_signal(s)
+            if setup.do_optimumfilters_smooth:
+                OF_smooth.update_signal(s)
         
         if setup.do_chi2_nopulse:
             chi0[jj] = OF.chi2_nopulse()
