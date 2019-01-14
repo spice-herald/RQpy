@@ -137,6 +137,14 @@ class SetupRQ(object):
     t0_shifted : ndarray
         Attribute used to save the times to shift the non-trigger channels. Only used if `do_ofamp_shifted`
         is True.
+    do_optimumfilters : bool
+        Boolean flag for whether or not any of the optimum filters will be calculated. If only
+        calculating non-OF-related RQs, then this will be False, and processing time will not
+        be spent on initializing the OF.
+    do_optimumfilters_smooth : bool
+        Boolean flag for whether or not any of the smoothed-PDS optimum filters will be calculated. 
+        If only calculating non-OF-related RQs, then this will be False, and processing time will not
+        be spent on initializing the OF.
     
     """
     
@@ -164,14 +172,6 @@ class SetupRQ(object):
         trigger : float, NoneType, optional
             The index corresponding to which channel is the trigger channel in the list of templates
             and psds. If left as None, then no channel is assumed to be the trigger channel.
-        do_optimumfilters : bool
-            Boolean flag for whether or not any of the optimum filters will be calculated. If only
-            calculating non-OF-related RQs, then this will be False, and processing time will not
-            be spent on initializing the OF.
-        do_optimumfilters_smooth : bool
-            Boolean flag for whether or not any of the smoothed-PDS optimum filters will be calculated. 
-            If only calculating non-OF-related RQs, then this will be False, and processing time will not
-            be spent on initializing the OF.
         
         """
         
