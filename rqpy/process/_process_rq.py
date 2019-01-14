@@ -116,6 +116,9 @@ class SetupRQ(object):
         The number of indices up to which a trace should be averaged to determine the baseline.
     do_integral : bool
         Boolean flag for whether or not to calculate the baseline-subtracted integral of each trace.
+    indstart_integral : int, list of int
+        The index at which the integral should start being calculated from in order to reduce noise by 
+        truncating the beginning of the trace. Default is 16000.
     indstop_integral : int, list of int
         The index at which the integral should be calculated up to in order to reduce noise by 
         truncating the rest of the trace. Default is 20000.
@@ -233,6 +236,7 @@ class SetupRQ(object):
         self.baseline_indbasepre = [16000]*self.nchan
         
         self.do_integral = True
+        self.indstart_integral = [16000]*self.nchan
         self.indstop_integral = [20000]*self.nchan
         
         self.do_ofamp_shifted = False
@@ -561,7 +565,7 @@ class SetupRQ(object):
         self.do_baseline = lgcrun
         self.baseline_indbasepre = indbasepre
         
-    def adjust_integral(self, lgcrun=True, indstop=20000):
+    def adjust_integral(self, lgcrun=True, indstart=16000, indstop=20000):
         """
         Method for adjusting the calculation of the integral.
         
@@ -571,11 +575,20 @@ class SetupRQ(object):
             Boolean flag for whether or not the integral should be calculated. If self.do_baseline
             is True, then the baseline is subtracted from the integral. If self.do_baseline is False,
             then the baseline is not subtracted. It is recommended that the baseline should be subtracted.
+        indstart : int, list of int, optional
+            The index at which the integral should start being calculated from in order to reduce noise by 
+            truncating the beginning of the trace. Default is 16000.
         indstop : int, list of int, optional
             The index at which the integral should be calculated up to in order to reduce noise by 
             truncating the rest of the trace. Default is 20000.
             
         """
+        
+        if np.isscalar(indstart):
+            indstart = [indstart]*self.nchan
+        
+        if len(indstart)!=self.nchan:
+            raise ValueError("The length of indstart is not equal to the number of channels")
         
         if np.isscalar(indstop):
             indstop = [indstop]*self.nchan
@@ -584,6 +597,7 @@ class SetupRQ(object):
             raise ValueError("The length of indstop is not equal to the number of channels")
         
         self.do_integral = lgcrun
+        self.indstart_integral = indstart
         self.indstop_integral = indstop
         
     def adjust_maxmin(self, lgcrun=True, use_min=False, indstart=None, indstop=None):
@@ -738,17 +752,18 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
     
     if setup.do_integral:
         if setup.do_baseline:
-            integral = np.trapz(signal[:, :setup.indstop_integral[chan_num]] - baseline[:, np.newaxis], axis=-1)/fs
+            integral = np.trapz(signal[:, setup.indstart_integral[chan_num]:setup.indstop_integral[chan_num]]\
+                                - baseline[:, np.newaxis], axis=-1)/fs
         else:
-            integral = np.trapz(signal[:, :setup.indstop_integral[chan_num]], axis=-1)/fs
+            integral = np.trapz(signal[:, setup.indstart_integral[chan_num]:setup.indstop_integral[chan_num]], axis=-1)/fs
         rq_dict[f'integral_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'integral_{chan}{det}'][readout_inds] = integral
         
     if setup.do_maxmin:
         if setup.use_min[chan_num]:
-            maxmin = np.amin(signal[:, setup.indstart_maxmin[chan_num]:setup.indstop_maxmin[chan_num]], axis=-1)/fs
+            maxmin = np.amin(signal[:, setup.indstart_maxmin[chan_num]:setup.indstop_maxmin[chan_num]], axis=-1)
         else:
-            maxmin = np.amax(signal[:, setup.indstart_maxmin[chan_num]:setup.indstop_maxmin[chan_num]], axis=-1)/fs
+            maxmin = np.amax(signal[:, setup.indstart_maxmin[chan_num]:setup.indstop_maxmin[chan_num]], axis=-1)
         rq_dict[f'maxmin_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'maxmin_{chan}{det}'][readout_inds] = maxmin
     
