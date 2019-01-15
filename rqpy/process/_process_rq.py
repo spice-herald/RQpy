@@ -44,6 +44,10 @@ class SetupRQ(object):
         Boolean flag for whether or not calculate the RQs for the sum of the channels.
         Requires summed_template and summed_psd to be set when initializing the SetupRQ
         object.
+    indstart : int, NoneType
+        The index at we should truncate the beginning of the traces up to when calculating RQs.
+    indstop : int, NoneType
+        The index at we should truncate the end of the traces up to when calculating RQs.
     nchan : int
         The number of channels to be processed.
     do_ofamp_nodelay : bool
@@ -68,6 +72,11 @@ class SetupRQ(object):
     ofamp_unconstrained_lowfreqchi2 : bool
         Boolean flag for whether or not to calculate the low frequency chi-squared for 
         the optimum filter fit with unconstrained time shifting.
+    ofamp_unconstrained_pulse_constraint : int, list of int
+        Sets a constraint on the direction of the fitted pulse. If 0, then no constraint on the 
+        pulse direction is set. If 1, then a positive pulse constraint is set for all fits. 
+        If -1, then a negative pulse constraint is set for all fits. If any other value, then
+        an ValueError will be raised.
     do_ofamp_constrained : bool
         Boolean flag for whether or not to do the optimum filter fit with constrained time
         shifting.
@@ -82,6 +91,11 @@ class SetupRQ(object):
     ofamp_constrained_nconstrain : list
         The length of the window (in bins), centered on the middle of the trace, to constrain 
         the possible time shift values to when doing the optimum filter fit with constrained time shifting.
+    ofamp_constrained_pulse_constraint : int, list of int
+        Sets a constraint on the direction of the fitted pulse. If 0, then no constraint on the 
+        pulse direction is set. If 1, then a positive pulse constraint is set for all fits. 
+        If -1, then a negative pulse constraint is set for all fits. If any other value, then
+        an ValueError will be raised.
     do_ofamp_pileup : bool
         Boolean flag for whether or not to do the pileup optimum filter fit.
     do_ofamp_pileup_smooth : bool
@@ -91,6 +105,11 @@ class SetupRQ(object):
     ofamp_pileup_nconstrain : list
         The length of the window (in bins), centered on the middle of the trace, outside of which to 
         constrain the possible time shift values to when searching for a pileup pulse using ofamp_pileup.
+    ofamp_pileup_pulse_constraint : int, list of int
+        Sets a constraint on the direction of the fitted pulse. If 0, then no constraint on the 
+        pulse direction is set. If 1, then a positive pulse constraint is set for all fits. 
+        If -1, then a negative pulse constraint is set for all fits. If any other value, then
+        an ValueError will be raised.
     do_chi2_nopulse : bool
         Boolean flag for whether or not to calculate the chi^2 for no pulse.
     do_chi2_nopulse_smooth : bool
@@ -110,6 +129,11 @@ class SetupRQ(object):
     ofamp_baseline_nconstrain : list
         The length of the window (in bins), centered on the middle of the trace, to constrain 
         the possible time shift values to when doing the optimum filter fit with fixed baseline.
+    ofamp_baseline_pulse_constraint : int, list of int
+        Sets a constraint on the direction of the fitted pulse. If 0, then no constraint on the 
+        pulse direction is set. If 1, then a positive pulse constraint is set for all fits. 
+        If -1, then a negative pulse constraint is set for all fits. If any other value, then
+        an ValueError will be raised.
     do_baseline : bool
         Boolean flag for whether or not to calculate the DC baseline for each trace.
     baseline_indbasepre : int
@@ -145,10 +169,6 @@ class SetupRQ(object):
         Boolean flag for whether or not any of the smoothed-PDS optimum filters will be calculated. 
         If only calculating non-OF-related RQs, then this will be False, and processing time will not
         be spent on initializing the OF.
-    indstart : int, NoneType
-        The index at we should truncate the beginning of the traces up to when calculating RQs.
-    indstop : int, NoneType
-        The index at we should truncate the end of the traces up to when calculating RQs.
     
     """
     
@@ -232,15 +252,18 @@ class SetupRQ(object):
         self.do_ofamp_unconstrained = True
         self.do_ofamp_unconstrained_smooth = False
         self.ofamp_unconstrained_lowfreqchi2 = False
+        self.ofamp_unconstrained_pulse_constraint = [0]*self.nchan
         
         self.do_ofamp_constrained = True
         self.do_ofamp_constrained_smooth = False
         self.ofamp_constrained_lowfreqchi2 = True
         self.ofamp_constrained_nconstrain = [80]*self.nchan
+        self.ofamp_constrained_pulse_constraint = [0]*self.nchan
         
         self.do_ofamp_pileup = True
         self.do_ofamp_pileup_smooth = False
         self.ofamp_pileup_nconstrain = [80]*self.nchan
+        self.ofamp_pileup_pulse_constraint = [0]*self.nchan
         
         self.do_chi2_nopulse = True
         self.do_chi2_nopulse_smooth = False
@@ -251,6 +274,7 @@ class SetupRQ(object):
         self.do_ofamp_baseline = False
         self.do_ofamp_baseline_smooth = False
         self.ofamp_baseline_nconstrain = [80]*self.nchan
+        self.ofamp_baseline_pulse_constraint = [0]*self.nchan
         
         self.do_baseline = True
         self.baseline_indbasepre = [16000]*self.nchan
@@ -314,8 +338,40 @@ class SetupRQ(object):
         else:
             self.do_optimumfilters_smooth = False
         
+    def _check_arg_length(self, **kwargs):
+        """
+        Helper function for checking if the inputted `kwargs` are list type and if they have same
+        length as the number of channels.
         
+        Returns
+        -------
+        kwargs.values() : dict_values
+            A dict_values object that contains the list of values for each inputted kwarg, in the
+            order that they were inputted.
+            
+        Raises
+        ------
+        ValueError
+            A ValueError is raised if the length of one of the `kwargs` is not equal
+            to `self.chan`.
+        ValueError
+            A ValueError is raised if the `kwarg` pulse_direction_constraint is inputted and 
+            one of the values is not set to 1, 0, or -1.
         
+        """
+    
+        for key, value in kwargs.items():
+            if np.isscalar(value):
+                kwargs[key] = [value]*self.nchan
+                
+            if key == "pulse_direction_constraint" and not all(x in [-1, 0, 1] for x in kwargs[key]):
+                    raise ValueError(f"{key} should be set to 0, 1, or -1")
+
+            if len(kwargs[key])!=self.nchan:
+                raise ValueError(f"The length of {key} is not equal to the number of channels")
+
+        return kwargs.values()
+
     def adjust_calc(self, lgcchans=True, lgcsum=True):
         """
         Method for adjusting the calculation of RQs for each individual channel and the sum
@@ -374,7 +430,8 @@ class SetupRQ(object):
         
         self._check_of()
         
-    def adjust_ofamp_unconstrained(self, lgcrun=True, lgcrun_smooth=False, calc_lowfreqchi2=False):
+    def adjust_ofamp_unconstrained(self, lgcrun=True, lgcrun_smooth=False, calc_lowfreqchi2=False, 
+                                   pulse_direction_constraint=0):
         """
         Method for adjusting the calculation of the optimum filter fit with unconstrained 
         time shifting.
@@ -393,16 +450,26 @@ class SetupRQ(object):
             Boolean flag for whether or not the low frequency chi^2 of this fit 
             should be calculated. The low frequency chi^2 calculation should be adjusted
             using the adjust_chi2_lowfreq method. Default is False.
+        pulse_direction_constraint : int, optional
+            Sets a constraint on the direction of the fitted pulse. If 0, then no constraint on the 
+            pulse direction is set. If 1, then a positive pulse constraint is set for all fits. 
+            If -1, then a negative pulse constraint is set for all fits. If any other value, then
+            an ValueError will be raised.
         
         """
+        
+        pulse_direction_constraint = self._check_arg_length(pulse_direction_constraint=pulse_direction_constraint)
         
         self.do_ofamp_unconstrained = lgcrun
         self.do_ofamp_unconstrained_smooth = lgcrun_smooth
         self.ofamp_unconstrained_lowfreqchi2 = calc_lowfreqchi2
         
+        self.ofamp_unconstrained_pulse_constraint = pulse_direction_constraint
+        
         self._check_of()
         
-    def adjust_ofamp_constrained(self, lgcrun=True, lgcrun_smooth=False, calc_lowfreqchi2=True, nconstrain=80):
+    def adjust_ofamp_constrained(self, lgcrun=True, lgcrun_smooth=False, calc_lowfreqchi2=True, 
+                                 nconstrain=80, pulse_direction_constraint=0):
         """
         Method for adjusting the calculation of the optimum filter fit with constrained 
         time shifting.
@@ -427,23 +494,28 @@ class SetupRQ(object):
             fit with constrained time shifting. Can be set to a list of values, if the 
             constrain window should be different for each channel. The length of the list should
             be the same length as the number of channels.
+        pulse_direction_constraint : int, optional
+            Sets a constraint on the direction of the fitted pulse. If 0, then no constraint on the 
+            pulse direction is set. If 1, then a positive pulse constraint is set for all fits. 
+            If -1, then a negative pulse constraint is set for all fits. If any other value, then
+            an ValueError will be raised.
         
         """
         
-        if np.isscalar(nconstrain):
-            nconstrain = [nconstrain]*self.nchan
-        
-        if len(nconstrain)!=self.nchan:
-            raise ValueError("The length of nconstrain is not equal to the number of channels")
+        nconstrain, pulse_direction_constraint = self._check_arg_length(nconstrain=nconstrain, 
+                                                                        pulse_direction_constraint=pulse_direction_constraint)
         
         self.do_ofamp_constrained = lgcrun
         self.do_ofamp_constrained_smooth = lgcrun_smooth
         self.ofamp_constrained_lowfreqchi2 = calc_lowfreqchi2
         self.ofamp_constrained_nconstrain = nconstrain
         
+        self.ofamp_constrained_pulse_constraint = pulse_direction_constraint
+        
         self._check_of()
         
-    def adjust_ofamp_baseline(self, lgcrun=True, lgcrun_smooth=False, nconstrain=80):
+    def adjust_ofamp_baseline(self, lgcrun=True, lgcrun_smooth=False, 
+                              nconstrain=80, pulse_direction_constraint=0):
         """
         Method for adjusting the calculation of the optimum filter fit with fixed 
         baseline.
@@ -463,22 +535,27 @@ class SetupRQ(object):
             fit with fixed baseline. Can be set to a list of values, if the 
             constrain window should be different for each channel. The length of the list should
             be the same length as the number of channels.
+        pulse_direction_constraint : int, optional
+            Sets a constraint on the direction of the fitted pulse. If 0, then no constraint on the 
+            pulse direction is set. If 1, then a positive pulse constraint is set for all fits. 
+            If -1, then a negative pulse constraint is set for all fits. If any other value, then
+            an ValueError will be raised.
         
         """
         
-        if np.isscalar(nconstrain):
-            nconstrain = [nconstrain]*self.nchan
-        
-        if len(nconstrain)!=self.nchan:
-            raise ValueError("The length of nconstrain is not equal to the number of channels")
+        nconstrain, pulse_direction_constraint = self._check_arg_length(nconstrain=nconstrain, 
+                                                                        pulse_direction_constraint=pulse_direction_constraint)
         
         self.do_ofamp_baseline = lgcrun
         self.do_ofamp_baseline_smooth = lgcrun_smooth
         self.ofamp_baseline_nconstrain = nconstrain
         
+        self.ofamp_baseline_pulse_constraint = pulse_direction_constraint
+        
         self._check_of()
         
-    def adjust_ofamp_pileup(self, lgcrun=True, lgcrun_smooth=False, nconstrain=80):
+    def adjust_ofamp_pileup(self, lgcrun=True, lgcrun_smooth=False, 
+                            nconstrain=80, pulse_direction_constraint=0):
         """
         Method for adjusting the calculation of the pileup optimum filter fit.
         
@@ -496,18 +573,22 @@ class SetupRQ(object):
             pileup pulse using ofamp_pileup. Can be set to a list of values, if the constrain 
             window should be different for each channel. The length of the list should
             be the same length as the number of channels.
+        pulse_direction_constraint : int, optional
+            Sets a constraint on the direction of the fitted pulse. If 0, then no constraint on the 
+            pulse direction is set. If 1, then a positive pulse constraint is set for all fits. 
+            If -1, then a negative pulse constraint is set for all fits. If any other value, then
+            an ValueError will be raised.
         
         """
         
-        if np.isscalar(nconstrain):
-            nconstrain = [nconstrain]*self.nchan
-        
-        if len(nconstrain)!=self.nchan:
-            raise ValueError("The length of nconstrain is not equal to the number of channels")
+        nconstrain, pulse_direction_constraint = self._check_arg_length(nconstrain=nconstrain, 
+                                                                        pulse_direction_constraint=pulse_direction_constraint)
         
         self.do_ofamp_pileup = lgcrun
         self.do_ofamp_pileup_smooth = lgcrun_smooth
         self.ofamp_pileup_nconstrain = nconstrain
+        
+        self.ofamp_pileup_pulse_constraint = pulse_direction_constraint
         
         self._check_of()
         
@@ -548,11 +629,7 @@ class SetupRQ(object):
             
         """
         
-        if np.isscalar(fcutoff):
-            fcutoff = [fcutoff]*self.nchan
-        
-        if len(fcutoff)!=self.nchan:
-            raise ValueError("The length of fcutoff is not equal to the number of channels")
+        fcutoff = self._check_arg_length(fcutoff=fcutoff)
             
         self.do_chi2_lowfreq = lgcrun
         self.chi2_lowfreq_fcutoff = fcutoff
@@ -576,11 +653,7 @@ class SetupRQ(object):
             
         """
         
-        if np.isscalar(indbasepre):
-            indbasepre = [indbasepre]*self.nchan
-        
-        if len(indbasepre)!=self.nchan:
-            raise ValueError("The length of indbasepre is not equal to the number of channels")
+        indbasepre = self._check_arg_length(indbasepre=indbasepre)
             
         self.do_baseline = lgcrun
         self.baseline_indbasepre = indbasepre
@@ -604,17 +677,7 @@ class SetupRQ(object):
             
         """
         
-        if np.isscalar(indstart):
-            indstart = [indstart]*self.nchan
-        
-        if len(indstart)!=self.nchan:
-            raise ValueError("The length of indstart is not equal to the number of channels")
-        
-        if np.isscalar(indstop):
-            indstop = [indstop]*self.nchan
-        
-        if len(indstop)!=self.nchan:
-            raise ValueError("The length of indstop is not equal to the number of channels")
+        indstart, indstop = self._check_arg_length(indstart=indstart, indstop=indstop)
         
         self.do_integral = lgcrun
         self.indstart_integral = indstart
@@ -645,24 +708,8 @@ class SetupRQ(object):
         
         if indstop is None:
             indstop = len(self.templates[0])
-        
-        if np.isscalar(use_min):
-            use_min = [use_min]*self.nchan
-        
-        if len(use_min)!=self.nchan:
-            raise ValueError("The length of use_min is not equal to the number of channels")
             
-        if np.isscalar(indstart):
-            indstart = [indstart]*self.nchan
-        
-        if len(indstart)!=self.nchan:
-            raise ValueError("The length of indstart is not equal to the number of channels")
-            
-        if np.isscalar(indstop):
-            indstop = [indstop]*self.nchan
-        
-        if len(indstop)!=self.nchan:
-            raise ValueError("The length of indstop is not equal to the number of channels")
+        use_min, indstart, indstop = self._check_arg_length(use_min=use_min, indstart=indstart, indstop=indstop)
         
         self.do_maxmin = lgcrun
         self.use_min = use_min
@@ -804,6 +851,10 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         amp_noconstrain = np.zeros(len(signal))
         t0_noconstrain = np.zeros(len(signal))
         chi2_noconstrain = np.zeros(len(signal))
+        if setup.ofamp_unconstrained_pulse_constraint[chan_num]!=0:
+            amp_noconstrain_pcon = np.zeros(len(signal))
+            t0_noconstrain_pcon  = np.zeros(len(signal))
+            chi2_noconstrain_pcon  = np.zeros(len(signal))
     if setup.do_ofamp_unconstrained_smooth:
         amp_noconstrain_smooth = np.zeros(len(signal))
         t0_noconstrain_smooth = np.zeros(len(signal))
@@ -813,6 +864,10 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         amp_constrain = np.zeros(len(signal))
         t0_constrain = np.zeros(len(signal))
         chi2_constrain = np.zeros(len(signal))
+        if setup.ofamp_constrained_pulse_constraint[chan_num]!=0:
+            amp_constrain_pcon = np.zeros(len(signal))
+            t0_constrain_pcon = np.zeros(len(signal))
+            chi2_constrain_pcon = np.zeros(len(signal))
     if setup.do_ofamp_constrained_smooth:
         amp_constrain_smooth = np.zeros(len(signal))
         t0_constrain_smooth = np.zeros(len(signal))
@@ -822,6 +877,10 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         amp_pileup = np.zeros(len(signal))
         t0_pileup = np.zeros(len(signal))
         chi2_pileup = np.zeros(len(signal))
+        if setup.ofamp_pileup_pulse_constraint[chan_num]!=0:
+            amp_pileup_pcon = np.zeros(len(signal))
+            t0_pileup_pcon = np.zeros(len(signal))
+            chi2_pileup_pcon = np.zeros(len(signal))
     if setup.do_ofamp_pileup_smooth:
         amp_pileup_smooth = np.zeros(len(signal))
         t0_pileup_smooth = np.zeros(len(signal))
@@ -831,6 +890,10 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         amp_baseline = np.zeros(len(signal))
         t0_baseline = np.zeros(len(signal))
         chi2_baseline = np.zeros(len(signal))
+        if setup.ofamp_baseline_pulse_constraint[chan_num]!=0:
+            amp_baseline_pcon = np.zeros(len(signal))
+            t0_baseline_pcon = np.zeros(len(signal))
+            chi2_baseline_pcon = np.zeros(len(signal))
     if setup.do_ofamp_baseline_smooth:
         amp_baseline_smooth = np.zeros(len(signal))
         t0_baseline_smooth = np.zeros(len(signal))
@@ -839,10 +902,8 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
     if setup.do_chi2_lowfreq:
         if setup.ofamp_nodelay_lowfreqchi2:
             chi2low_nodelay = np.zeros(len(signal))
-        
         if setup.ofamp_unconstrained_lowfreqchi2:
             chi2low_unconstrain = np.zeros(len(signal))
-            
         if setup.ofamp_constrained_lowfreqchi2:
             chi2low_constrain = np.zeros(len(signal))
     
@@ -878,6 +939,9 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         
         if setup.do_ofamp_unconstrained:
             amp_noconstrain[jj], t0_noconstrain[jj], chi2_noconstrain[jj] = OF.ofamp_withdelay()
+            if setup.ofamp_unconstrained_pulse_constraint[chan_num]!=0:
+                amp_noconstrain_pcon[jj], t0_noconstrain_pcon[jj], chi2_noconstrain_pcon[jj] = OF.ofamp_withdelay(
+                                        pulse_direction_constraint=setup.ofamp_unconstrained_pulse_constraint[chan_num])
             
         if setup.do_ofamp_unconstrained_smooth:
             amp_noconstrain_smooth[jj], t0_noconstrain_smooth[jj], chi2_noconstrain_smooth[jj] = OF_smooth.ofamp_withdelay()
@@ -889,6 +953,10 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         if setup.do_ofamp_constrained:
             amp_constrain[jj], t0_constrain[jj], chi2_constrain[jj] = OF.ofamp_withdelay(
                                                                       nconstrain=setup.ofamp_constrained_nconstrain[chan_num])
+            if setup.ofamp_constrained_pulse_constraint[chan_num]!=0:
+                amp_constrain_pcon[jj], t0_constrain_pcon[jj], chi2_constrain_pcon[jj] = OF.ofamp_withdelay(
+                                                             nconstrain=setup.ofamp_constrained_nconstrain[chan_num],
+                                        pulse_direction_constraint=setup.ofamp_constrained_pulse_constraint[chan_num])
             
         if setup.do_ofamp_constrained_smooth:
             amp_constrain_smooth[jj], t0_constrain_smooth[jj], chi2_constrain_smooth[jj] = OF_smooth.ofamp_withdelay(
@@ -901,6 +969,11 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         if setup.do_ofamp_pileup:
             amp_pileup[jj], t0_pileup[jj], chi2_pileup[jj] = OF.ofamp_pileup_iterative(amp_constrain[jj], t0_constrain[jj],
                                                                nconstrain=setup.ofamp_pileup_nconstrain[chan_num])
+            if setup.ofamp_pileup_pulse_constraint[chan_num]!=0:
+                amp_pileup_pcon[jj], t0_pileup_pcon[jj], chi2_pileup_pcon[jj] = OF.ofamp_pileup_iterative(amp_constrain[jj], 
+                                                             t0_constrain[jj],
+                                                             nconstrain=setup.ofamp_pileup_nconstrain[chan_num],
+                                        pulse_direction_constraint=setup.ofamp_pileup_pulse_constraint[chan_num])
             
         if setup.do_ofamp_pileup_smooth:
             amp_pileup_smooth[jj], t0_pileup_smooth[jj], chi2_pileup_smooth[jj] = OF_smooth.ofamp_pileup_iterative(
@@ -910,6 +983,10 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         if setup.do_ofamp_baseline:
             amp_baseline[jj], t0_baseline[jj], chi2_baseline[jj] = OF.ofamp_baseline(
                                                                    nconstrain=setup.ofamp_baseline_nconstrain[chan_num])
+            if setup.ofamp_baseline_pulse_constraint[chan_num]!=0:
+                amp_baseline_pcon[jj], t0_baseline_pcon[jj], chi2_baseline_pcon[jj] = OF.ofamp_baseline(
+                                                             nconstrain=setup.ofamp_baseline_nconstrain[chan_num],
+                                        pulse_direction_constraint=setup.ofamp_baseline_pulse_constraint[chan_num])
             
         if setup.do_ofamp_baseline_smooth:
             amp_baseline_smooth[jj], t0_baseline_smooth[jj], chi2_baseline_smooth[jj] = OF_smooth.ofamp_baseline(
@@ -941,6 +1018,13 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         rq_dict[f't0_unconstrain_{chan}{det}'][readout_inds] = t0_noconstrain
         rq_dict[f'chi2_unconstrain_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'chi2_unconstrain_{chan}{det}'][readout_inds] = chi2_noconstrain
+        if setup.ofamp_unconstrained_pulse_constraint[chan_num]!=0:
+            rq_dict[f'ofamp_unconstrain_pcon_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f'ofamp_unconstrain_pcon_{chan}{det}'][readout_inds] = amp_noconstrain_pcon
+            rq_dict[f't0_unconstrain_pcon_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f't0_unconstrain_pcon_{chan}{det}'][readout_inds] = t0_noconstrain_pcon
+            rq_dict[f'chi2_unconstrain_pcon_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f'chi2_unconstrain_pcon_{chan}{det}'][readout_inds] = chi2_noconstrain_pcon
     if setup.do_ofamp_unconstrained_smooth:
         rq_dict[f'ofamp_unconstrain_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'ofamp_unconstrain_smooth_{chan}{det}'][readout_inds] = amp_noconstrain_smooth
@@ -956,6 +1040,13 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         rq_dict[f't0_constrain_{chan}{det}'][readout_inds] = t0_constrain
         rq_dict[f'chi2_constrain_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'chi2_constrain_{chan}{det}'][readout_inds] = chi2_constrain
+        if setup.ofamp_constrained_pulse_constraint[chan_num]!=0:
+            rq_dict[f'ofamp_constrain_pcon_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f'ofamp_constrain_pcon_{chan}{det}'][readout_inds] = amp_constrain_pcon
+            rq_dict[f't0_constrain_pcon_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f't0_constrain_pcon_{chan}{det}'][readout_inds] = t0_constrain_pcon
+            rq_dict[f'chi2_constrain_pcon_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f'chi2_constrain_pcon_{chan}{det}'][readout_inds] = chi2_constrain_pcon
     if setup.do_ofamp_constrained_smooth:
         rq_dict[f'ofamp_constrain_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'ofamp_constrain_smooth_{chan}{det}'][readout_inds] = amp_constrain_smooth
@@ -984,6 +1075,13 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         rq_dict[f't0_pileup_{chan}{det}'][readout_inds] = t0_pileup
         rq_dict[f'chi2_pileup_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'chi2_pileup_{chan}{det}'][readout_inds] = chi2_pileup
+        if setup.ofamp_pileup_pulse_constraint[chan_num]!=0:
+            rq_dict[f'ofamp_pileup_pcon_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f'ofamp_pileup_pcon_{chan}{det}'][readout_inds] = amp_pileup_pcon
+            rq_dict[f't0_pileup_pcon_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f't0_pileup_pcon_{chan}{det}'][readout_inds] = t0_pileup_pcon
+            rq_dict[f'chi2_pileup_pcon_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f'chi2_pileup_pcon_{chan}{det}'][readout_inds] = chi2_pileup_pcon
     if setup.do_ofamp_pileup_smooth:
         rq_dict[f'ofamp_pileup_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'ofamp_pileup_smooth_{chan}{det}'][readout_inds] = amp_pileup_smooth
@@ -999,6 +1097,13 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         rq_dict[f't0_baseline_{chan}{det}'][readout_inds] = t0_baseline
         rq_dict[f'chi2_baseline_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'chi2_baseline_{chan}{det}'][readout_inds] = chi2_baseline
+        if setup.ofamp_baseline_pulse_constraint[chan_num]!=0:
+            rq_dict[f'ofamp_baseline_pcon_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f'ofamp_baseline_pcon_{chan}{det}'][readout_inds] = amp_baseline_pcon
+            rq_dict[f't0_baseline_pcon_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f't0_baseline_pcon_{chan}{det}'][readout_inds] = t0_baseline_pcon
+            rq_dict[f'chi2_baseline_pcon_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f'chi2_baseline_pcon_{chan}{det}'][readout_inds] = chi2_baseline_pcon
     if setup.do_ofamp_baseline_smooth:
         rq_dict[f'ofamp_baseline_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'ofamp_baseline_smooth_{chan}{det}'][readout_inds] = amp_baseline_smooth
