@@ -340,8 +340,13 @@ class SetupRQ(object):
         
     def _check_arg_length(self, **kwargs):
         """
-        Helper function for checking if the inputted `kwargs` are list type and if they have same
+        Helper function for checking if the inputted `**kwargs` are list type and if they have same
         length as the number of channels.
+        
+        Parameters
+        ----------
+        **kwargs : Arbitrary keyword arguments
+            The inputted keyword arguments to check list type and length.
         
         Returns
         -------
@@ -352,10 +357,10 @@ class SetupRQ(object):
         Raises
         ------
         ValueError
-            A ValueError is raised if the length of one of the `kwargs` is not equal
+            A ValueError is raised if the length of one of the `**kwargs` is not equal
             to `self.chan`.
         ValueError
-            A ValueError is raised if the `kwarg` pulse_direction_constraint is inputted and 
+            A ValueError is raised if the `**kwargs` pulse_direction_constraint is inputted and 
             one of the values is not set to 1, 0, or -1.
         
         """
