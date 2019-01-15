@@ -370,7 +370,7 @@ class SetupRQ(object):
                 kwargs[key] = [value]*self.nchan
                 
             if key == "pulse_direction_constraint" and not all(x in [-1, 0, 1] for x in kwargs[key]):
-                    raise ValueError(f"{key} should be set to 0, 1, or -1")
+                raise ValueError(f"{key} should be set to 0, 1, or -1")
 
             if len(kwargs[key])!=self.nchan:
                 raise ValueError(f"The length of {key} is not equal to the number of channels")
@@ -646,7 +646,7 @@ class SetupRQ(object):
         
         self._check_of()
         
-    def adjust_baseline(self, lgcrun=True, indbasepre=16000):
+    def adjust_baseline(self, lgcrun=True, indbasepre=None):
         """
         Method for adjusting the calculation of the DC baseline.
         
@@ -663,12 +663,15 @@ class SetupRQ(object):
             
         """
         
+        if indbasepre is None:
+            indbasepre = len(templates[0])//3
+        
         indbasepre = self._check_arg_length(indbasepre=indbasepre)
             
         self.do_baseline = lgcrun
         self.baseline_indbasepre = indbasepre
         
-    def adjust_integral(self, lgcrun=True, indstart=16000, indstop=20000):
+    def adjust_integral(self, lgcrun=True, indstart=None, indstop=None):
         """
         Method for adjusting the calculation of the integral.
         
@@ -686,6 +689,12 @@ class SetupRQ(object):
             truncating the rest of the trace. Default is 20000.
             
         """
+        
+        if indstart is None:
+            indstart = len(templates[0])//3
+            
+        if indstop is None:
+            indstop = 2*len(templates[0])//3
         
         indstart, indstop = self._check_arg_length(indstart=indstart, indstop=indstop)
         
