@@ -225,7 +225,7 @@ class SetupRQ(object):
         
         if self.indstop - self.indstart != len(self.templates[0]):
             raise ValueError("The indices specified indstart and indstop will result in each"+\
-                             "truncated trace having a different length than their corresponding"+\ 
+                             "truncated trace having a different length than their corresponding"+\
                              "psd and template. Make sure indstart-indstop = the length of the"+\
                              "template/psd")
         
@@ -345,8 +345,8 @@ class SetupRQ(object):
         
         Returns
         -------
-        kwargs.values() : dict_values
-            A dict_values object that contains the list of values for each inputted kwarg, in the
+        out : list
+            The list of values for each inputted kwarg, in the
             order that they were inputted.
             
         Raises
@@ -369,8 +369,13 @@ class SetupRQ(object):
 
             if len(kwargs[key])!=self.nchan:
                 raise ValueError(f"The length of {key} is not equal to the number of channels")
-
-        return kwargs.values()
+        
+        out = list(kwargs.values())
+        
+        if len(out)==1:
+            out = out[0]
+        
+        return out
 
     def adjust_calc(self, lgcchans=True, lgcsum=True):
         """
