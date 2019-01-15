@@ -145,10 +145,15 @@ class SetupRQ(object):
         Boolean flag for whether or not any of the smoothed-PDS optimum filters will be calculated. 
         If only calculating non-OF-related RQs, then this will be False, and processing time will not
         be spent on initializing the OF.
+    indstart : int, NoneType
+        The index at we should truncate the beginning of the traces up to when calculating RQs.
+    indstop : int, NoneType
+        The index at we should truncate the end of the traces up to when calculating RQs.
     
     """
     
-    def __init__(self, templates, psds, fs, summed_template=None, summed_psd=None, trigger=None):
+    def __init__(self, templates, psds, fs, summed_template=None, summed_psd=None, trigger=None,
+                 indstart=None, indstop=None):
         """
         Initialization of the SetupRQ class.
         
@@ -172,6 +177,12 @@ class SetupRQ(object):
         trigger : float, NoneType, optional
             The index corresponding to which channel is the trigger channel in the list of templates
             and psds. If left as None, then no channel is assumed to be the trigger channel.
+        indstart : int, NoneType, optional
+            The index at we should truncate the beginning of the traces up to when calculating RQs.
+            If left as None, then we do not truncate the beginning of the trace. See `indstop`.
+        indstop : int, NoneType, optional
+            The index at we should truncate the end of the traces up to when calculating RQs. If left as 
+            None, then we do not truncate the end of the trace. See `indstart`.
         
         """
         
@@ -188,6 +199,15 @@ class SetupRQ(object):
         self.psds = psds
         self.fs = fs
         self.nchan = len(templates)
+        
+        self.indstart = 0
+        self.indstop = len(self.templates[0])
+        
+        if self.indstop - self.indstart != len(self.templates[0]):
+            raise ValueError("The indices specified indstart and indstop will result in each"+\
+                             "truncated trace having a different length than their corresponding"+\ 
+                             "psd and template. Make sure indstart-indstop = the length of the"+\
+                             "template/psd")
         
         self.summed_template = summed_template
         self.summed_psd = summed_psd
@@ -1079,7 +1099,7 @@ def _calc_rq(traces, channels, det, setup, readout_inds=None):
             vals[setup.trigger], vals[0] = vals[0], vals[setup.trigger]
         
         for ii, (chan, d) in vals:
-            signal = traces[readout_inds, ii]
+            signal = traces[readout_inds, ii, setup.indstart:setup.indstop]
             template = setup.templates[ii]
             psd = setup.psds[ii]
 
@@ -1088,7 +1108,7 @@ def _calc_rq(traces, channels, det, setup, readout_inds=None):
             rq_dict.update(chan_dict)
             
     if setup.calcsum:
-        signal = traces[readout_inds].sum(axis=1)
+        signal = traces[readout_inds, :, setup.indstart:setup.indstop].sum(axis=1)
         template = setup.summed_template
         psd = setup.summed_psd
         chan = "sum"
