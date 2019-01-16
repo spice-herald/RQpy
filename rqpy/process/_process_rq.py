@@ -241,13 +241,13 @@ class SetupRQ(object):
         self.fs = fs
         self.nchan = len(templates)
         
-        self.indstart = 0
-        self.indstop = len(self.templates[0])
+        self.indstart = indstart
+        self.indstop = indstop
         
-        if self.indstop - self.indstart != len(self.templates[0]):
-            raise ValueError("The indices specified indstart and indstop will result in each"+\
-                             "truncated trace having a different length than their corresponding"+\
-                             "psd and template. Make sure indstart-indstop = the length of the"+\
+        if self.indstart is not None and self.indstop is not None and (self.indstop - self.indstart != len(self.templates[0])):
+            raise ValueError("The indices specified indstart and indstop will result in each "+\
+                             "truncated trace having a different length than their corresponding "+\
+                             "psd and template. Make sure indstart-indstop = the length of the "+\
                              "template/psd")
         
         self.summed_template = summed_template
