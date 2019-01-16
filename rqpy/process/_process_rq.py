@@ -1141,7 +1141,7 @@ def _rq(file, channels, det, setup, convtoamps, savepath, lgcsavedumps, filetype
         dump = file.split('/')[-1].split('_')[-1].split('.')[0]
     elif filetype == "npz":
         seriesnum = file.split('/')[-1].split('.')[0]
-        dump = int(seriesnum.split('_')[-1])
+        dump = f"{int(seriesnum.split('_')[-1]):04d}"
         
     print(f"On Series: {seriesnum},  dump: {dump}")
     
