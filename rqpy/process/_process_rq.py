@@ -83,7 +83,7 @@ class SetupRQ(object):
     
     """
     
-    def __init__(self, templates, psds, fs, summed_template=None, summed_psd=None, background_templates=None):
+    def __init__(self, templates, psds, fs, summed_template=None, summed_psd=None, background_templates=None, background_templates_shifts=None):
         """
         Initialization of the SetupRQ class.
         
@@ -107,6 +107,8 @@ class SetupRQ(object):
         background_templates : ndarray, optional
             The m background templates for the nSmB optimal filter. All should be normalized to max(temp)=1)
             Dimensions: (time bins) X (m)
+        background_templates_shifts : ndarray, optional
+            The bin offsets/shifts between the background templates
            
         
         """
@@ -123,6 +125,7 @@ class SetupRQ(object):
         self.summed_psd = summed_psd
 
         self.background_templates = background_templates
+        self.background_templates_shifts = background_templates_shifts
         
         self.calcchans=True
         if summed_template is None or summed_psd is None:
@@ -367,7 +370,8 @@ class SetupRQ(object):
         
         self.do_integral = lgcrun
         
-def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, chan_num, det, background_templates=None):
+def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, chan_num, det, background_templates=None,
+                            background_templates_shifts=None):
     """
     Helper function for calculating RQs for an array of traces corresponding to a single channel.
     
@@ -512,25 +516,63 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         
 
     if setup.do_ofamp_nSmB:
-        psddnu,OFfiltf,sbTemplatef,sbTemplatet,iWt,iBB,nS,nB  =  qp.of_nSmB_setup(template,background_templates,psd, fs)
+        psddnu,OFfiltf,Wf, Wf_summed, Wt, sbTemplatef,sbTemplatet,iWt,iBB,nS,nB,bitComb  =  qp.of_nSmB_setup(template,background_templates,psd, fs)
         amp_s_nsmb = np.zeros(len(signal))
         t0_s_nsmb = np.zeros(len(signal))
         amps_nsmb = np.zeros((len(signal),(nS+nB)))        
         chi2_nsmb = np.zeros(len(signal))
         chi2BOnly_nsmb = np.zeros(len(signal))
+        
+        
         # allow signal template to move anywhere along trace
         indwindow = np.arange(0,len(template))
-        # make indwinow dimensions 1 X (time bins)
+        # make indwindow dimensions 1 X (time bins)
+        indwindow = indwindow[:,None].T
+        
+        # find all indices within -lowInd and +highInd bins of background_template_shifts
+        # manually do the first range
+        #lowInd = 13
+        lowInd = 1
+        #highInd = 14
+        highInd = 1
+        restrictInd = np.arange(-lowInd,highInd+1);
+        for ii in range(1,nB-1):
+            # start with the second index
+            restrictInd = np.concatenate((restrictInd,
+                                         np.arange(int(background_templates_shifts[ii]-lowInd),
+                                                   int(background_templates_shifts[ii]+highInd+1))))
+        
+        # if values of restrictInd are negative
+        # wrap them around to the end of the window
+        lgcneg = restrictInd<0
+        restrictInd[lgcneg] = len(template)+restrictInd[lgcneg]
+        
+        # make restictInd 1 X (time bins)
+        restrictInd = restrictInd[:,None].T
+        
+        # delete the restrictedInd from indwindow
+        indwindow = np.delete(indwindow,restrictInd)
+        
+        # make indwindow dimensions 1 X (time bins)
         indwindow = indwindow[:,None].T
 
+        #lgcplotnsmb=True
         lgcplotnsmb=False
         for jj, s in enumerate(signal):
+        #for jj  in range(len(signal)):
+            #s = signal[25,:]
+            #print(f'jj={jj}')
+            if lgcplotnsmb==True:
+                figNum = jj
+            else:
+                figNum=False
             amps_nsmb[jj,:],t0_s_nsmb[jj],chi2_nsmb[jj],_,_,_,chi2BOnly_nsmb[jj] = qp.of_nSmB_inside(
-                s, OFfiltf, sbTemplatef.T, sbTemplatet, iWt, iBB,
-                psddnu.T, fs, indwindow, nS,nB, lgc_interp=False,lgcplot=lgcplotnsmb)
+                s, OFfiltf, Wf, Wf_summed, Wt, sbTemplatef.T, sbTemplatet, iWt, iBB,
+                psddnu.T, fs, indwindow, nS,nB, bitComb,background_templates_shifts = background_templates_shifts,
+                lgc_interp=False,lgcplot=lgcplotnsmb,lgcsaveplots=figNum)
             if (lgcplotnsmb==True):
-                nPlots = 10
-                if(jj==nPlots):
+                nPlots = 30
+                if(jj==(nPlots-1)):
                     print('Warning: stopping at', nPlots, 'events to head off any memory problems')
                     break
         
@@ -588,8 +630,10 @@ def _calc_rq(traces, channels, det, setup, readout_inds=None):
             template = setup.templates[ii]
             psd = setup.psds[ii]
             background_templates = setup.background_templates
-
-            chan_dict = _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ii, background_templates)
+            background_templates_shifts = setup.background_templates_shifts
+    
+            chan_dict = _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ii, background_templates,
+                                               background_templates_shifts)
 
             rq_dict.update(chan_dict)
             
@@ -598,10 +642,12 @@ def _calc_rq(traces, channels, det, setup, readout_inds=None):
         template = setup.summed_template
         psd = setup.summed_psd
         background_templates = setup.background_templates
+        background_templates_shifts = setup.background_templates_shifts
 
         chan = "sum"
 
-        sum_dict = _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, 0, "", background_templates)
+        sum_dict = _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, 0, "", background_templates,
+                                          background_templates_shifts)
 
         rq_dict.update(sum_dict)
     
