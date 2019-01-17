@@ -963,8 +963,12 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
             chi2low_nodelay = np.zeros(len(signal))
         if setup.ofamp_unconstrained_lowfreqchi2:
             chi2low_unconstrain = np.zeros(len(signal))
+            if setup.ofamp_unconstrained_pulse_constraint[chan_num]!=0:
+                chi2low_unconstrain_pcon = np.zeros(len(signal))
         if setup.ofamp_constrained_lowfreqchi2:
             chi2low_constrain = np.zeros(len(signal))
+            if setup.ofamp_constrained_pulse_constraint[chan_num]!=0:
+                chi2low_constrain_pcon = np.zeros(len(signal))
     
     # run the OF class for each trace
     if setup.do_optimumfilters[chan_num]:
@@ -1008,6 +1012,9 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         if setup.ofamp_unconstrained_lowfreqchi2 and setup.do_chi2_lowfreq[chan_num]:
             chi2low_unconstrain[jj] = OF.chi2_lowfreq(amp_noconstrain[jj], t0_noconstrain[jj], 
                                                       fcutoff=setup.chi2_lowfreq_fcutoff[chan_num])
+            if setup.ofamp_unconstrained_pulse_constraint[chan_num]!=0:
+                chi2low_unconstrain_pcon[jj] = OF.chi2_lowfreq(amp_noconstrain_pcon[jj], t0_noconstrain_pcon[jj], 
+                                                               fcutoff=setup.chi2_lowfreq_fcutoff[chan_num])
 
         if setup.do_ofamp_constrained[chan_num]:
             amp_constrain[jj], t0_constrain[jj], chi2_constrain[jj] = OF.ofamp_withdelay(
@@ -1024,6 +1031,9 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         if setup.ofamp_constrained_lowfreqchi2 and setup.do_chi2_lowfreq[chan_num]:
             chi2low_constrain[jj] = OF.chi2_lowfreq(amp_constrain[jj], t0_constrain[jj], 
                                                     fcutoff=setup.chi2_lowfreq_fcutoff[chan_num])
+            if setup.ofamp_constrained_pulse_constraint[chan_num]!=0:
+                chi2low_constrain_pcon[jj] = OF.chi2_lowfreq(amp_constrain_pcon[jj], t0_constrain_pcon[jj], 
+                                                            fcutoff=setup.chi2_lowfreq_fcutoff[chan_num])
         
         if setup.do_ofamp_pileup[chan_num]:
             amp_pileup[jj], t0_pileup[jj], chi2_pileup[jj] = OF.ofamp_pileup_iterative(amp_constrain[jj], t0_constrain[jj],
@@ -1122,10 +1132,16 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         if setup.ofamp_unconstrained_lowfreqchi2:
             rq_dict[f'chi2lowfreq_unconstrain_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
             rq_dict[f'chi2lowfreq_unconstrain_{chan}{det}'][readout_inds] = chi2low_unconstrain
-            
+            if setup.ofamp_unconstrained_pulse_constraint[chan_num]!=0:
+                rq_dict[f'chi2lowfreq_unconstrain_pcon_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+                rq_dict[f'chi2lowfreq_unconstrain_pcon_{chan}{det}'][readout_inds] = chi2low_unconstrain_pcon
+        
         if setup.ofamp_constrained_lowfreqchi2:
             rq_dict[f'chi2lowfreq_constrain_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
             rq_dict[f'chi2lowfreq_constrain_{chan}{det}'][readout_inds] = chi2low_constrain
+            if setup.ofamp_constrained_pulse_constraint[chan_num]!=0:
+                rq_dict[f'chi2lowfreq_constrain_pcon_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+                rq_dict[f'chi2lowfreq_constrain_pcon_{chan}{det}'][readout_inds] = chi2low_constrain_pcon
     
     if setup.do_ofamp_pileup[chan_num]:
         rq_dict[f'ofamp_pileup_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
