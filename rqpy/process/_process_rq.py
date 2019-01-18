@@ -976,7 +976,10 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         energy_absorbed = qp.utils.integrate_powertrace_simple(signal, np.arange(signal.shape[-1])/fs,
                                                                setup.indstart_energy_absorbed[chan_num], 
                                                                setup.indstop_energy_absorbed[chan_num], 
-                                                               setup.ioffset, setup.qetbias, setup.rload, setup.rsh)
+                                                               setup.ioffset[chan_num], 
+                                                               setup.qetbias[chan_num], 
+                                                               setup.rload[chan_num], 
+                                                               setup.rsh[chan_num])
         rq_dict[f'energy_absorbed_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'energy_absorbed_{chan}{det}'][readout_inds] = energy_absorbed
         
