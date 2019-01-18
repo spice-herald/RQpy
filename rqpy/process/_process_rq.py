@@ -973,13 +973,23 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         rq_dict[f'integral_{chan}{det}'][readout_inds] = integral
         
     if setup.do_energy_absorbed[chan_num]:
-        energy_absorbed = qp.utils.integrate_powertrace_simple(signal, np.arange(signal.shape[-1])/fs,
-                                                               setup.indstart_energy_absorbed[chan_num], 
-                                                               setup.indstop_energy_absorbed[chan_num], 
-                                                               setup.ioffset[chan_num], 
-                                                               setup.qetbias[chan_num], 
-                                                               setup.rload[chan_num], 
-                                                               setup.rsh[chan_num])
+        if setup.do_baseline[chan_num]:
+            energy_absorbed = qp.utils.energy_absorbed(
+                              signal[:, setup.indstart_energy_absorbed[chan_num]:setup.indstop_energy_absorbed[chan_num]],
+                                                       setup.ioffset[chan_num], 
+                                                       setup.qetbias[chan_num], 
+                                                       setup.rload[chan_num], 
+                                                       setup.rsh[chan_num],
+                                                       fs=fs,
+                                                       baseline=baseline[:, np.newaxis])
+        else:
+            energy_absorbed = qp.utils.energy_absorbed(signal[:, :setup.indstop_energy_absorbed[chan_num]],
+                                                       setup.ioffset[chan_num], 
+                                                       setup.qetbias[chan_num], 
+                                                       setup.rload[chan_num], 
+                                                       setup.rsh[chan_num],
+                                                       indbasepre=setup.indstart_energy_absorbed[chan_num],
+                                                       fs=fs)
         rq_dict[f'energy_absorbed_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'energy_absorbed_{chan}{det}'][readout_inds] = energy_absorbed
         
