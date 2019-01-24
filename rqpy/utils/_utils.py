@@ -255,36 +255,6 @@ def prop_sat_err(x, params,cov):
     
     return errors
 
-def prop_invert_sat_err(x, params,cov):
-    """
-    Helper function to propagate errors for invert_saturation_func()
-    
-    Parameters
-    ----------
-    x : ndarray
-        Array of x-data
-    params : ndarray
-        Best fit parameters for saturation_func()
-    cov : ndarray
-        Covariance matrix for parameters
-        
-    Returns
-    -------
-    errors : ndarray
-        Array of 1 sigma errors as a function of x
-        
-    """
-    
-    a, b = params
-    deriv = np.array([-b*y/(a**2-a*y), -np.log(1-x/a)]) 
-    sig_func = []
-    for ii in range(len(deriv)):
-        for jj in range(len(deriv)):
-            sig_func.append(deriv[ii]*cov[ii][jj]*deriv[jj])
-    sig_func = np.array(sig_func)
-    errors = sig_func.sum(axis=0) 
-    
-    return errors
 
 
 def prop_sat_err_lin(x, params, cov):
@@ -318,4 +288,36 @@ def prop_sat_err_lin(x, params, cov):
     errors = sig_func.sum(axis=0)
     
     return errors
+
+def prop_invert_sat_err(x, params,cov):
+    """
+    Helper function to propagate errors for invert_saturation_func()
+    
+    Parameters
+    ----------
+    x : ndarray
+        Array of x-data
+    params : ndarray
+        Best fit parameters for saturation_func()
+    cov : ndarray
+        Covariance matrix for parameters
+        
+    Returns
+    -------
+    errors : ndarray
+        Array of 1 sigma errors as a function of x
+        
+    """
+    
+    a, b = params
+    deriv = np.array([-b*x/(a**2-a*x), -np.log(1-x/a)]) 
+    sig_func = []
+    for ii in range(len(deriv)):
+        for jj in range(len(deriv)):
+            sig_func.append(deriv[ii]*cov[ii][jj]*deriv[jj])
+    sig_func = np.array(sig_func)
+    errors = sig_func.sum(axis=0) 
+    
+    return errors
+
 
