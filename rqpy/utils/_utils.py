@@ -251,7 +251,7 @@ def prop_sat_err(x, params,cov):
         for jj in range(len(deriv)):
             sig_func.append(deriv[ii]*cov[ii][jj]*deriv[jj])
     sig_func = np.array(sig_func)
-    errors = sig_func.sum(axis=0) 
+    errors = np.sqrt(sig_func.sum(axis=0)) 
     
     return errors
 
@@ -285,7 +285,7 @@ def prop_sat_err_lin(x, params, cov):
         for jj in range(len(deriv)):
             sig_func.append(deriv[ii]*cov[ii][jj]*deriv[jj])
     sig_func = np.array(sig_func)
-    errors = sig_func.sum(axis=0)
+    errors = np.sqrt(sig_func.sum(axis=0))
     
     return errors
 
@@ -316,7 +316,7 @@ def prop_invert_sat_err(x, params,cov):
         for jj in range(len(deriv)):
             sig_func.append(deriv[ii]*cov[ii][jj]*deriv[jj])
     sig_func = np.array(sig_func)
-    errors = sig_func.sum(axis=0) 
+    errors = np.sqrt(sig_func.sum(axis=0)) 
     
     return errors
 

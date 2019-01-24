@@ -40,9 +40,11 @@ def fit_saturation(x, y, yerr, guess, labeldict=None, lgcplot=True, ax=None):
         Array of best fit paramters
     pcov : ndarray
         Covariance matrix from fit
-    slope_linear : float
+    linear_approx : float
         The slope of the Taylor expansion of the saturation function 
         evaluated at the best fit parameters
+    slope_error : float
+        The error in the linear slope
         
     Notes
     -----
@@ -58,48 +60,90 @@ def fit_saturation(x, y, yerr, guess, labeldict=None, lgcplot=True, ax=None):
     if lgcplot:
         plotting.plot_saturation_correction(x, y, yerr, popt, pcov, labeldict, ax)
         
-    slope_linear = utils.sat_func_expansion(1, *popt)
+    linear_approx = utils.sat_func_expansion(1, *popt)
+    slope_error = utils.prop_sat_err_lin(1, popt, pcov)
     
-    return popt, pcov, slope_linear
     
-def fit_integral_ofamp(xarr, yarr, clinearx, clineary, guess = (2e-6, 2e-10), yerr=None, nsigma=2):
+    return popt, pcov, linear_approx, slope_error
+    
+def fit_integral_ofamp(xarr, yarr, clinearx, clineary, guess = (2e-6, 2e-10),
+                       yerr=None, labeldict=None, lgcplot=True, ax=None):
+    """
+    Function to fit the saturation of the Optimum Filter metric to an Integral 
+    type metric for Low Energy Events. 
+    
+    Parameters
+    ----------
+    xarr : array_like
+        Array of OF amplitudes
+    yarr : array_like
+        Array of Integrals (or Integral like measurement)
+    clinearx : float
+        The cut-off in x to include in the fit
+    clineary : float
+        The cut-off in y to include in the fit
+    guess : tuple, optional
+        Intial guess for the fit. Note, can be very sensitive to guess,
+        may take multiple tries to get good fit
+    yerr : float, array, or NoneType, optional
+        The errors in the integral metric. Can be a single float applied
+        to all events, or an array of values of the same shape as xarr. 
+        Can also be left as None. In this case, all data point will be 
+        weighted equally, Note that the error returned from the fit is meaningless 
+        in this case.
+    labeldict : dict, optional
+        Dictionary to overwrite the labels of the plot. defaults are : 
+            labels = {'title' : 'Energy Saturation Correction', 
+                      'xlabel' : 'True Energy [eV]',
+                      'ylabel' : 'Measured Energy [eV]',
+                      'nsigma' : 2} # Note, nsigma is the number of sigma error bars 
+                                      to plot 
+        Ex: to change just the title, pass: labeldict = {'title' : 'new title'}
+    lgcplot : bool, optional
+            If True, the fit and spectrum will be plotted    
+    ax : axes.Axes object, optional
+        Option to pass an existing Matplotlib Axes object to plot over, if it already exists.
+        
+    Returns
+    -------
+    popt : ndarray
+        Array of best fit paramters
+    pcov : ndarray
+        Covariance matrix from fit
+    linear_approx : float
+        The slope of the Taylor expansion of the inverted saturation function 
+        evaluated at the best fit parameters
+    slope_error : float
+        The error in the linear slope
+    """
+    
+    
+    
+    
+    cut = (xarr < clinearx) & (yarr < clineary)
+    x = xarr[cut]
+    y = yarr[cut]
 
-
-    x = xarr[(xarr < clinearx) & (yarr < clineary)]
-    y = yarr[(xarr < clinearx) & (yarr < clineary)]
     x_fit = np.linspace(0, max(x), 50)
     if yerr is None:
-        err = np.ones_like(y)
+        err = np.ones(y.shape)
     elif (isinstance(yerr, float) or isinstance(yerr, int)):
-        err = np.ones_like(y)*yerr
+        err = np.ones(y.shape)*yerr
     else:
         err = yerr
         
     popt, pcov = curve_fit(utils.invert_saturation_func, xdata = x, ydata = y,
-                                   sigma = err ,p0 = guess, maxfev=100000, absolute_sigma = True)
-
-    sat_errors = utils.prop_invert_sat_err(x_fit, popt, pcov)
+                                   sigma = err, p0 = guess, maxfev=100000, absolute_sigma = True)
     y_fit = utils.invert_saturation_func(x_fit, *popt)
+    sat_errors = utils.prop_invert_sat_err(x_fit, popt, pcov)
+    
     linear_approx = popt[1]/popt[0]
+    linear_approx_errs = utils.prop_sat_err_lin(x_fit, popt[::-1], pcov[::-1,::-1])
+    slope_error = utils.prop_sat_err_lin(1, popt[::-1], pcov[::-1,::-1])
+
+    if lgcplot:
+        plotting._plot_fit_integral_ofamp(x=x, y=y, err=err, y_fit=y_fit, sat_errors=sat_errors,
+                                          linear_approx=linear_approx, linear_approx_errs=linear_approx_errs,
+                                          labeldict=labeldict, ax=ax)
     
-    #dfda = popt_sat[1]/popt_sat[0]**2
-    #dfdb = -1/popt_sat[0]
-   
-
-
-
-    #linear_approx_error = np.sqrt(dfda**2*pcov_sat[0,0] + dfdb**2*pcov_sat[1,1] + dfda*pcov_sat[0,1]*dfdb + dfdb*pcov_sat[1,0]*dfda)
-
-    plt.figure(figsize=(9,6))
-
-    plt.errorbar(x,y, marker = '.', linestyle = ' ', yerr = err, label = 'Data used for Fit',
-                 elinewidth=0.3, alpha =.5, ms = 5,zorder = 50)
-
-    plt.grid(True, linestyle = '--')
-    plt.plot(x_fit, y_fit, color = 'k',  label = r'$y = -b*ln(1-y/a)$')
-    plt.fill_between(x_fit, y_fit+nsigma*sat_errors, y_fit-nsigma*sat_errors, color = 'k' , alpha= .5)
-    
-    plt.plot(x_fit, linear_approx*x_fit,zorder = 200, c = 'r', linestyle = '--', label = 'linear approximation (2σ bounds) ')
-
-    plt.legend()
-    return linear_approx#, linear_approx_error
+    return popt, pcov, linear_approx, slope_error
