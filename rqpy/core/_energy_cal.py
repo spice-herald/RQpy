@@ -4,7 +4,7 @@ from rqpy import plotting, utils
 import matplotlib.pyplot as plt 
 
 
-__all__ = ["fit_integral_ofamp", "fit_saturation"]
+__all__ = ["fit_integral_ofamp", "fit_saturation", "scale_integral", "scale_of_to_integral"]
 
 def fit_saturation(x, y, yerr, guess, labeldict=None, lgcplot=True, ax=None):
     """
@@ -147,3 +147,96 @@ def fit_integral_ofamp(xarr, yarr, clinearx, clineary, guess = (2e-6, 2e-10),
                                           labeldict=labeldict, ax=ax)
     
     return popt, pcov, linear_approx, slope_error
+
+
+
+def scale_integral(vals, lgcsaturated=False, linparams=None, satparams=None):
+    """
+    Function to convert saturated measured energy into 
+    true energy
+    
+    Parameters
+    ----------
+    vals : ndarray
+        Array of measured energies to be converted to true energies
+    lgcsaturated : bool, Defaults to False
+        If True, the saturated correction is done. Note, the user must 
+        provide the fit parameters from the saturated energy fit.
+        If False, the linear scaling is done. The user must suply the
+        slope in this case
+    linparams : list, optional
+        List containing the slope for the linear approximation, and 
+        the error in the slope. If the error in the slope is not known, 
+        then just put 0 for linparams[0]. 
+        linparams must be in units of [(units of vals)/(eV)]
+    satparams : list, optional
+        List containing the best fit parameters from the fit_saturation() 
+        fuction. fitparams[0] should correspond to the optimum parameters
+        and fitparams[1] should be the covariance matrix from the fit
+        
+    Returns
+    -------
+    energy_true : ndarray
+        Array of saturation corrected energies
+    errors : ndarray
+        Array of uncertainties for each value in energy_true
+        
+    """
+    
+    if not lgcsaturated:
+        if linparams is None:
+            raise ValueError('Must provide linparamsto do the linear scaling')
+        else:
+            energy_true = vals/linparams[0]
+            errors = vals/linparams[0]**2*linparams[1]
+            
+    else:
+        if satparams is None:
+            raise ValueError('Must provide satparamsto do the saturation correction')
+        else:
+            params = satparams[0]
+            cov = satparams[1]
+
+            energy_true = utils.invert_saturation_func(vals, *params)
+            errors = utils.prop_invert_sat_err(vals, params, cov)
+    
+    return energy_true, errors
+
+
+
+
+
+def scale_of_to_integral(vals, satparams):
+    """
+    Function to calibrate the OF amplitude to an integral type metric
+    
+    Parameters
+    ----------
+    vals : ndarray
+        Array of OF amplitudes to be calibrated
+    satparams : list
+        List containing the best fit parameters from the fit_saturation() 
+        fuction. fitparams[0] should correspond to the optimum parameters
+        and fitparams[1] should be the covariance matrix from the fit
+        
+    Returns
+    -------
+    energy_true : ndarray
+        Array of saturation corrected energies
+    errors : ndarray
+        Array of uncertainties for each value in energy_true
+        
+    """
+           
+    
+    params = satparams[0]
+    cov = satparams[1]
+
+    energy_true = utils.invert_saturation_func(vals, *params)
+    errors = utils.prop_invert_sat_err(vals, params, cov)
+
+    return energy_true, errors
+
+
+
+
