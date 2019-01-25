@@ -120,7 +120,7 @@ def fit_integral_ofamp(xarr, yarr, clinearx, clineary, guess = (2e-6, 2e-10),
     
     
     
-    cut = (xarr < clinearx) & (yarr < clineary)
+    cut = (xarr < clinearx) & (yarr < clineary) & (yarr > 0) & (xarr > 0)
     x = xarr[cut]
     y = yarr[cut]
 
@@ -130,7 +130,7 @@ def fit_integral_ofamp(xarr, yarr, clinearx, clineary, guess = (2e-6, 2e-10),
     elif (isinstance(yerr, float) or isinstance(yerr, int)):
         err = np.ones(y.shape)*yerr
     else:
-        err = yerr
+        err = yerr[cut]
         
     popt, pcov = curve_fit(utils.invert_saturation_func, xdata = x, ydata = y,
                                    sigma = err, p0 = guess, maxfev=100000, absolute_sigma = True)
@@ -188,7 +188,7 @@ def scale_integral(vals, lgcsaturated=False, linparams=None, satparams=None):
             raise ValueError('Must provide linparamsto do the linear scaling')
         else:
             energy_true = vals/linparams[0]
-            errors = vals/linparams[0]**2*linparams[1]
+            errors = np.sqrt(abs(-vals/linparams[0])**2*linparams[1])
             
     else:
         if satparams is None:
@@ -233,8 +233,11 @@ def scale_of_to_integral(vals, satparams):
     cov = satparams[1]
 
     energy_true = utils.invert_saturation_func(vals, *params)
-    errors = utils.prop_invert_sat_err(vals, params, cov)
-
+    try:
+        errors = utils.prop_invert_sat_err(vals, params, cov)
+    except:
+        print('Problem calculating errors')
+        errors = np.ones(vals.shape)
     return energy_true, errors
 
 
