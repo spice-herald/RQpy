@@ -8,7 +8,7 @@ from rqpy import utils
 
 __all__ = ["hist", "scatter", "densityplot", "passageplot", "plot_gauss", "plot_n_gauss", 
            "plot_saturation_correction", "_make_iv_noiseplots", "_plot_energy_res_vs_bias", 
-           "_plot_n_noise", "_plot_sc_noise", "_plot_rload_rn_qetbias"]
+           "_plot_n_noise", "_plot_sc_noise", "_plot_rload_rn_qetbias", "_plot_fit_integral_ofamp"]
 
 
 def hist(arr, nbins='sqrt', xlims=None, cuts=None, lgcrawdata=True, 
@@ -713,6 +713,84 @@ def plot_saturation_correction(x, y, yerr, popt, pcov, labeldict, ax = None):
     
     return fig, ax
 
+
+def _plot_fit_integral_ofamp(x, y, err, y_fit, sat_errors, linear_approx, linear_approx_errs, labeldict, ax):
+     
+    """
+    Helper function to plot the fit for fit_integral_ofamp()
+    
+    Parameters
+    ----------
+    x : array
+        Array of x data
+    y : array
+        Array of y data
+    err : array-like
+        The errors in the measured energy of the spectral peaks
+    y_fit : array
+        Array of y data from fit
+    sat_errors : array
+        Array of errors for the fit
+    linear_approx : float
+        The slope of the linear approximation of the saturated function
+    linear_approx_errs : array
+        Array of errors for the approximation of the fit
+    labeldict : dict, optional
+        Dictionary to overwrite the labels of the plot. defaults are : 
+            labels = {'title' : 'Energy Saturation Correction', 
+                      'xlabel' : 'True Energy [eV]',
+                      'ylabel' : 'Measured Energy [eV]'}
+        Ex: to change just the title, pass: labeldict = {'title' : 'new title'}
+    ax : axes.Axes object, optional
+        Option to pass an existing Matplotlib Axes object to plot over, if it already exists.
+        
+    Returns
+    -------
+    fig : matrplotlib figure object
+    
+    ax : matplotlib axes object
+    
+    """
+    
+    labels = {'title'  : 'OF Amplitude vs Integral Saturation Correction',
+              'xlabel' : 'OF Amplitude [A]', 
+              'ylabel' : 'Integrated Charge [C]',
+              'nsigma' : 2} 
+
+    if labeldict is not None:
+        for key in labeldict:
+            labels[key] = labeldict[key]
+    nsigma = labels['nsigma'] 
+    
+    x_fit = np.linspace(0, max(x), 50)
+    
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(12, 8))
+    else:
+        fig = None
+    ax.set_title(labels['title'], fontsize = 16)
+    ax.set_xlabel(labels['xlabel'], fontsize = 14)
+    ax.set_ylabel(labels['ylabel'], fontsize = 14)
+    ax.grid(True, linestyle = 'dashed')
+    
+    ax.grid(True, linestyle = '--')
+    ax.set_xlim(0, max(x)*1.05)
+    ax.set_ylim(0, max(y)*1.05)
+
+    ax.errorbar(x,y, marker = '.', linestyle = ' ', yerr = err, label = 'Data used for Fit',
+                 elinewidth=0.3, alpha =.5, ms = 5,zorder = 50)
+
+    ax.plot(x_fit, y_fit, color = 'k',  label = f'Fit : $y = -b*ln(1-y/a)$ ({nsigma}σ bounds)')
+    ax.fill_between(x_fit, y_fit+nsigma*sat_errors, y_fit-nsigma*sat_errors, color = 'k' , alpha= .5)
+    
+    ax.plot(x_fit, linear_approx*x_fit,zorder = 200, c = 'r', linestyle = '--', 
+            label = f'Linear approximation ({nsigma}σ bounds) ')
+    ax.fill_between(x_fit, linear_approx*x_fit+nsigma*linear_approx_errs,
+                    linear_approx*x_fit-nsigma*linear_approx_errs, color = 'r' , alpha= .5)
+    ax.legend()    
+
+    
+    
     
     
 def _make_iv_noiseplots(IVanalysisOBJ, lgcsave=False):
