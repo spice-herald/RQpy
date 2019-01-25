@@ -1,7 +1,10 @@
+import warnings
 import numpy as np
 import pandas as pd
+from scipy import stats, interpolate, optimize
+from skimage import measure
+
 from qetpy.cut import removeoutliers
-from scipy import stats, interpolate
 
 __all__ = ["binnedcut", "baselinecut", "inrange", "passage_fraction"]
 
@@ -49,11 +52,82 @@ def baselinecut(arr, r0, i0, rload, dr=0.1e-3, cut=None):
     
     return cbase
 
+class GenericModel(object):
+    """
+    A generic model class to be used with `skimage.measure.ransac` to allow the user to 
+    create their own model for the data.
+    
+    Attributes
+    ----------
+    params : NoneType, ndarray
+        The parameters that are returned by the fit.
+    model : function
+        A user-defined function to use as the model for the data.
+    guess : tuple
+        A guess for the best-fit parameters of the model.
+    
+    """
+    
+    def __init__(self, model, guess):
+        """
+        Initialization of the `GenericModel` object
+        
+        Parameters
+        ----------
+        model : function
+            A user-defined function to use as the model for the data.
+        guess : tuple
+            A guess for the best-fit parameters of the model.
+        
+        """
+        
+        self.params = None
+        self.model = model
+        self.guess = guess
+        
+    def estimate(self, data):
+        """
+        Estimate the generic model from data using `scipy.optimize.curve_fit`.
+        
+        Parameters
+        ----------
+        data : (N, 2) ndarray
+            The x and y values of the data to be used to estimate the model.
+        
+        Returns
+        -------
+        success : bool
+            True, if model estimation succeeds.
+        
+        """
+        
+        self.params, _ = optimize.curve_fit(self.model, data[:, 0], data[:, 1], p0=self.guess)
+        
+        return True
+        
+    def residuals(self, data):
+        """
+        Determine the residuals of data to the generic model.
+        
+        Parameters
+        ----------
+        data : (N, 2) ndarray
+            The x and y values of the data to be used to estimate the model.
+        
+        Returns
+        -------
+        residuals : (N, ) ndarray
+            The residuals for each data point.
+        
+        """
+        
+        return self.model(data[:, 0], *self.params) - data[:, 1]
+    
 
 def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgcequaldensitybins=False,
-              xlwrlim=None, xuprlim=None):
+              xlwrlim=None, xuprlim=None, model=None, guess=None, residual_threshold=2, **kwargs):
     """
-    Function for calculating a baseline cut over time based on a given percentile.
+    Function for calculating a cut given a desired passage fraction, based on binning the data.
     
     Parameters
     ----------
@@ -63,11 +137,12 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgce
         Array of y-values to cut.
     cut : array_like, optional
         Boolean mask of values to keep for determination of the binned cut. Useful if 
-        doing cut in a certain order. The binned cut will be added to this cut.
+        doing cut in a certain order. The binned cut will be added to this cut. Default is None.
     nbins : float, optional
-        The number of bins to use in the cut
+        The number of bins to use in the cut. Default is 100.
     cut_eff : float, optional
-        The desired cut efficiency, should be a value between 0 and 1.
+        The desired efficiency/passage fraction of the cut, should be a value between 0 and 1.
+        Default is 0.9.
     keep_large_vals : bool, optional
         Whether or not the cut should keep the smaller values or the larger values
         of `y`. If True, the larger values of `y` pass the cut based on `cut_eff`. 
@@ -75,18 +150,40 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgce
         is True.
     lgcequaldensitybins : bool, optional
         If set to True, the bin widths are set such that each bin has the same number
-        of data points within it. If left as False, then a constant bin width is used.
+        of data points within it. If set to False, then a constant bin width is used. Default
+        is False.
     xlwrlim : NoneType, float, optional
         The lower limit on `x` such that the cut at this value is applied to any values of `x`
         less than this. Default is None, where no lower limit is applied.
     xuprlim : NoneType, float, optional
         The upper limit on `x` such that the cut at this value is applied to any values of `x`
         greater than this. Default is None, where no upper limit is applied.
+    model : NoneType, str, function, optional
+        The model to use for determining the functional form of the cut. If set to None, the 
+        bins are used as the bounds for this cut. If set to "linear", then
+        `skimage.measure.LineModelND` is used as the model, which is a linear model, and 
+        `skimage.measure.ransac` is used to estimate the model parameters. Can also be set to a 
+        user-defined function, of the form f(x, *params), and `skimage.measure.ransac` is used 
+        to estimate the model parameters. If the user-defined function is used, then the `guess` 
+        parameter also needs to be passed.
+    guess : NoneType, tuple, optional
+        If model is set to a user-defined function, then a guess for the parameters must be 
+        specified. This is only used if a user-defined function is passed to `model`.
+    residual_threshold : float, optional
+        Maximum distance for adata point to be classified as an inlier. This is passed directly
+        to the `skimage.measure.ransac` function, of which this is a parameter. Default is 2.
+    kwargs
+        Keyword arguments passed to `skimage.measure.ransac`. See [1].
         
     Returns
     -------
     cbinned : array_like
         A boolean mask indicating which data points passed the baseline cut.
+        
+    Notes
+    -----
+    
+    [1] http://scikit-image.org/docs/dev/api/skimage.measure.html#skimage.measure.ransac
     
     """
     
@@ -122,11 +219,35 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgce
         
         cutoffs, bin_edges, _ = stats.binned_statistic(x[bin_cut], y[bin_cut], bins=nbins,
                                                        statistic=st)
-        
-        f = interpolate.interp1d(bin_edges[1:-1], cutoffs[1:], kind='previous', 
-                                 bounds_error=False, fill_value=(cutoffs[0], cutoffs[-1]),
-                                 assume_sorted=True)
-
+        if model is None:
+            f = interpolate.interp1d(bin_edges[1:-1], cutoffs[1:], kind='previous', 
+                                     bounds_error=False, fill_value=(cutoffs[0], cutoffs[-1]),
+                                     assume_sorted=True)
+        else: 
+            if model=="linear":
+                ModelClass = measure.LineModelND
+                min_samples = 2
+            else:
+                if guess is None:
+                    raise ValueError("guess was not set, a guess is required to use the generic model.")
+                
+                min_samples = len(guess)
+                
+                class ModelClass(GenericModel):
+                    def __init__(self):
+                        super().__init__(model, guess)
+                    
+            
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=optimize.OptimizeWarning)
+                model_robust, _ = measure.ransac(np.stack((bin_edges[1:-1], cutoffs[1:]), axis=1),
+                                                 ModelClass, min_samples, residual_threshold, 
+                                                 **kwargs)
+            if model=="linear":
+                f = lambda var: ModelClass().predict_y(var, model_robust.params)
+            else:
+                f = lambda var: model(var, *model_robust.params)
+                
     if keep_large_vals:
         cbinned = (y > f(x)) & cut
     else:
