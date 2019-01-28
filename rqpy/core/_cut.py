@@ -127,8 +127,8 @@ class GenericModel(object):
     
 
 def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgcequaldensitybins=False,
-              xlwrlim=None, xuprlim=None, model=None, guess=None, residual_threshold=2, lgcrtnparams=False,
-              **kwargs):
+              xlwrlim=None, xuprlim=None, model=None, guess=None, residual_threshold=2, min_samples=None, 
+              lgcrtnparams=False, **kwargs):
     """
     Function for calculating a cut given a desired passage fraction, based on binning the data.
     
@@ -173,8 +173,13 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgce
         If model is set to a user-defined function, then a guess for the parameters must be 
         specified. This is only used if a user-defined function is passed to `model`.
     residual_threshold : float, optional
-        Maximum distance for adata point to be classified as an inlier. This is passed directly
+        Maximum distance for a data point to be classified as an inlier. This is passed directly
         to the `skimage.measure.ransac` function, of which this is a parameter. Default is 2.
+    min_samples : NoneType, int, optional
+        The minumum number of data points to fit the model to. This is passed directly to the 
+        `skimage.measure.ransac` function, of which this is a parameter. If left as None, then this
+        is set to the length of the guess for user-defined functions or set to two for the linear 
+        model.
     lgcrtnparams : bool, optional
         Boolean flag for returning the fit parameters, in the case of a user-defined function being
         passed to `model`.
@@ -235,12 +240,14 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgce
         else: 
             if model=="linear":
                 ModelClass = measure.LineModelND
-                min_samples = 2
+                if min_samples is None:
+                    min_samples = 2
             else:
                 if guess is None:
                     raise ValueError("guess was not set, a guess is required to use the generic model.")
                 
-                min_samples = len(guess)
+                if min_samples is None:
+                    min_samples = len(guess)
                 
                 class ModelClass(GenericModel):
                     def __init__(self):
