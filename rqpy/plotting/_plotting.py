@@ -780,7 +780,7 @@ def _plot_fit_integral_ofamp(x, y, err, y_fit, sat_errors, linear_approx, linear
     ax.errorbar(x,y, marker = '.', linestyle = ' ', yerr = err, label = 'Data used for Fit',
                  elinewidth=0.3, alpha =.5, ms = 5,zorder = 50)
 
-    ax.plot(x_fit, y_fit, color = 'k',  label = f'Fit : $y = -b*ln(1-y/a)$ ({nsigma}σ bounds)')
+    ax.plot(x_fit, y_fit, color = 'k',  label = f'Fit : $y = -b*ln(1-x/a)$ ({nsigma}σ bounds)')
     ax.fill_between(x_fit, y_fit+nsigma*sat_errors, y_fit-nsigma*sat_errors, color = 'k' , alpha= .5)
     
     ax.plot(x_fit, linear_approx*x_fit,zorder = 200, c = 'r', linestyle = '--', 
