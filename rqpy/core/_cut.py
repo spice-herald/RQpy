@@ -100,8 +100,10 @@ class GenericModel(object):
             True, if model estimation succeeds.
         
         """
-        
-        self.params, _ = optimize.curve_fit(self.model, data[:, 0], data[:, 1], p0=self.guess)
+        try:
+            self.params, _ = optimize.curve_fit(self.model, data[:, 0], data[:, 1], p0=self.guess)
+        except RuntimeError:
+            self.params = self.guess
         
         return True
         
@@ -125,7 +127,8 @@ class GenericModel(object):
     
 
 def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgcequaldensitybins=False,
-              xlwrlim=None, xuprlim=None, model=None, guess=None, residual_threshold=2, **kwargs):
+              xlwrlim=None, xuprlim=None, model=None, guess=None, residual_threshold=2, min_samples=None, 
+              lgcrtnparams=False, **kwargs):
     """
     Function for calculating a cut given a desired passage fraction, based on binning the data.
     
@@ -170,8 +173,16 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgce
         If model is set to a user-defined function, then a guess for the parameters must be 
         specified. This is only used if a user-defined function is passed to `model`.
     residual_threshold : float, optional
-        Maximum distance for adata point to be classified as an inlier. This is passed directly
+        Maximum distance for a data point to be classified as an inlier. This is passed directly
         to the `skimage.measure.ransac` function, of which this is a parameter. Default is 2.
+    min_samples : NoneType, int, optional
+        The minumum number of data points to fit the model to. This is passed directly to the 
+        `skimage.measure.ransac` function, of which this is a parameter. If left as None, then this
+        is set to the length of the guess for user-defined functions or set to two for the linear 
+        model.
+    lgcrtnparams : bool, optional
+        Boolean flag for returning the fit parameters, in the case of a user-defined function being
+        passed to `model`.
     kwargs
         Keyword arguments passed to `skimage.measure.ransac`. See [1].
         
@@ -179,6 +190,9 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgce
     -------
     cbinned : array_like
         A boolean mask indicating which data points passed the baseline cut.
+    params : ndarray, optional
+        If `lgcrtnparams` is True, and a user-defined function was passed to `model`, the fit parameters
+        are also returned.
         
     Notes
     -----
@@ -226,20 +240,24 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgce
         else: 
             if model=="linear":
                 ModelClass = measure.LineModelND
-                min_samples = 2
+                if min_samples is None:
+                    min_samples = 2
             else:
                 if guess is None:
                     raise ValueError("guess was not set, a guess is required to use the generic model.")
                 
-                min_samples = len(guess)
+                if min_samples is None:
+                    min_samples = len(guess)
                 
                 class ModelClass(GenericModel):
                     def __init__(self):
                         super().__init__(model, guess)
                     
+            cutoffs[np.isnan(cutoffs)] = 0
             
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", category=optimize.OptimizeWarning)
+                warnings.filterwarnings("ignore", category=RuntimeWarning)
                 model_robust, _ = measure.ransac(np.stack((bin_edges[1:-1], cutoffs[1:]), axis=1),
                                                  ModelClass, min_samples, residual_threshold, 
                                                  **kwargs)
@@ -253,7 +271,10 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgce
     else:
         cbinned = (y < f(x)) & cut
     
-    return cbinned
+    if lgcrtnparams and model is not None and model!="linear":
+        return cbinned, model_robust.params
+    else:
+        return cbinned
 
 def inrange(vals, lwrbnd, uprbnd):
     """
