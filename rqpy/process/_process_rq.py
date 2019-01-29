@@ -519,7 +519,8 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         psddnu,OFfiltf,Wf, Wf_summed, Wt, sbTemplatef,sbTemplatet,iWt,iBB,nS,nB,bitComb  =  qp.of_nSmB_setup(template,background_templates,psd, fs)
         amp_s_nsmb = np.zeros(len(signal))
         t0_s_nsmb = np.zeros(len(signal))
-        amps_nsmb = np.zeros((len(signal),(nS+nB)))        
+        amps_nsmb = np.zeros((len(signal),(nS+nB)))
+        ampsBOnly_nsmb = np.zeros((len(signal),(nB)))
         chi2_nsmb = np.zeros(len(signal))
         chi2BOnly_nsmb = np.zeros(len(signal))
         
@@ -560,18 +561,18 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         lgcplotnsmb=False
         for jj, s in enumerate(signal):
         #for jj  in range(len(signal)):
-            #s = signal[25,:]
+            #s = signal[14,:]
             #print(f'jj={jj}')
             if lgcplotnsmb==True:
                 figNum = jj
             else:
                 figNum=False
-            amps_nsmb[jj,:],t0_s_nsmb[jj],chi2_nsmb[jj],_,_,_,chi2BOnly_nsmb[jj] = qp.of_nSmB_inside(
+            amps_nsmb[jj,:],t0_s_nsmb[jj],ampsBOnly_nsmb[jj,:], chi2_nsmb[jj],_,_,_,chi2BOnly_nsmb[jj] = qp.of_nSmB_inside(
                 s, OFfiltf, Wf, Wf_summed, Wt, sbTemplatef.T, sbTemplatet, iWt, iBB,
                 psddnu.T, fs, indwindow, nS,nB, bitComb,background_templates_shifts = background_templates_shifts,
                 lgc_interp=False,lgcplot=lgcplotnsmb,lgcsaveplots=figNum)
             if (lgcplotnsmb==True):
-                nPlots = 30
+                nPlots = 1
                 if(jj==(nPlots-1)):
                     print('Warning: stopping at', nPlots, 'events to head off any memory problems')
                     break
@@ -583,6 +584,9 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         for iB in range(nS,nB):
             rq_dict[f'ofamp_b{iB}_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
             rq_dict[f'ofamp_b{iB}_nSmB_{chan}{det}'][readout_inds] = amps_nsmb[:,iB]
+        for iB in range(nB):
+            rq_dict[f'ofampBOnly_b{iB}_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f'ofampBOnly_b{iB}_nSmB_{chan}{det}'][readout_inds] = ampsBOnly_nsmb[:,iB]
         rq_dict[f'chi2_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'chi2_nSmB_{chan}{det}'][readout_inds] = chi2_nsmb
         rq_dict[f'chi2BOnly_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
