@@ -325,8 +325,7 @@ def passage_fraction(x, cut, basecut=None, nbins=100, lgcequaldensitybins=False)
     Returns
     -------
     x_binned : ndarray
-        The corresponding `x` values for each passage fraction, corresponding to the
-        center of the bin.
+        The corresponding `x` values for each passage fraction, given as the edges of each bin.
     frac_binned : ndarray
         The passage fractions for each value of `x_binned` for the given `cut` and `basecut`.
     
@@ -344,7 +343,8 @@ def passage_fraction(x, cut, basecut=None, nbins=100, lgcequaldensitybins=False)
     hist_vals_base, x_binned = np.histogram(x[basecut], bins=nbins)
     hist_vals, _ = np.histogram(x[basecut & cut], bins=x_binned)
     
+    hist_vals_base[hist_vals_base==0] = 1
+    
     frac_binned = hist_vals/hist_vals_base
-    x_binned = (x_binned[:-1]+x_binned[1:])/2
     
     return x_binned, frac_binned
