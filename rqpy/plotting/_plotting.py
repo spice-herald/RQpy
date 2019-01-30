@@ -2,17 +2,19 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib import colors
+import rqpy as rp
 from rqpy import utils
 
 
-__all__ = ["hist", "scatter", "densityplot", "plot_gauss", "plot_n_gauss", "plot_saturation_correction"]
+__all__ = ["hist", "scatter", "densityplot", "passageplot", "plot_gauss", "plot_n_gauss", 
+           "plot_saturation_correction", "_make_iv_noiseplots", "_plot_energy_res_vs_bias", 
+           "_plot_n_noise", "_plot_sc_noise", "_plot_rload_rn_qetbias", "_plot_fit_integral_ofamp"]
 
 
-def hist(arr, nbins='sqrt', xlims=None, cutold=None, cutnew=None, lgcrawdata=True, 
-         lgceff=True, lgclegend=True, labeldict=None, ax=None):
+def hist(arr, nbins='sqrt', xlims=None, cuts=None, lgcrawdata=True, 
+         lgceff=True, lgclegend=True, labeldict=None, ax=None, cmap="viridis"):
     """
-    Function to plot histogram of RQ data. The bins are set such that all bins have the same size
-    as the raw data
+    Function to plot histogram of RQ data with multiple cuts.
     
     Parameters
     ----------
@@ -22,25 +24,28 @@ def hist(arr, nbins='sqrt', xlims=None, cutold=None, cutnew=None, lgcrawdata=Tru
         This is the same as plt.hist() bins parameter. Defaults is 'sqrt'.
     xlims : list of float, optional
         The xlimits of the histogram. This is passed to plt.hist() range parameter.
-    cutold : array of bool, optional
-        Mask of values to be plotted
-    cutnew : array of bool, optional
-        Mask of values to be plotted. This mask is added to cutold if cutold is not None. 
+    cuts : list, optional
+        List of masks of values to be plotted. The cuts will be applied in the order that they are listed, 
+        such that any number of cuts can be plotted
     lgcrawdata : bool, optional
         If True, the raw data is plotted
     lgceff : bool, optional
-        If True, the cut efficiencies are printed in the legend. The total eff will be the sum of all the 
-        cuts divided by the length of the data. The current cut eff will be the sum of the current cut 
-        divided by the sum of all the previous cuts, if any.
+        If True, the cut efficiencies are printed in the legend. 
     lgclegend : bool, optional
         If True, the legend is plotted.
     labeldict : dict, optional
-        Dictionary to overwrite the labels of the plot. defaults are : 
-            labels = {'title' : 'Histogram', 'xlabel' : 'variable', 'ylabel' : 'Count', 
-            'cutnew' : 'current', 'cutold' : 'previous'}
-        Ex: to change just the title, pass: labeldict = {'title' : 'new title'}, to histrq()
+        Dictionary to overwrite the labels of the plot. defaults are: 
+            labels = {'title' : 'Histogram', 
+                      'xlabel' : 'variable', 
+                      'ylabel' : 'Count', 
+                      'cut0' : '1st', 
+                      'cut1' : '2nd', 
+                      ...}
+        Ex: to change just the title, pass: labeldict = {'title' : 'new title'}, to hist()
     ax : axes.Axes object, optional
         Option to pass an existing Matplotlib Axes object to plot over, if it already exists.
+    cmap : str, optional
+        The colormap to use for plotting each cut. Default is 'viridis'.
     
     Returns
     -------
@@ -51,15 +56,33 @@ def hist(arr, nbins='sqrt', xlims=None, cutold=None, cutnew=None, lgcrawdata=Tru
         
     """
     
+    if cuts is None:
+        cuts = []
+    elif not isinstance(cuts, list):
+        cuts = [cuts]
+    
     labels = {'title'  : 'Histogram', 
               'xlabel' : 'variable', 
-              'ylabel' : 'Count', 
-              'cutnew' : 'current', 
-              'cutold' : 'previous'}
+              'ylabel' : 'Count'}
     
+    
+    for ii in range(len(cuts)):
+        
+        num_str = str(ii+1)
+        
+        if num_str[-1]=='1':
+            num_str+="st"
+        elif num_str[-1]=='2':
+            num_str+="nd"
+        elif num_str[-1]=='3':
+            num_str+="rd"
+        else:
+            num_str+="th"
+        
+        labels[f"cut{ii}"] = num_str
+        
     if labeldict is not None:
-        for key in labeldict:
-            labels[key] = labeldict[key]
+        labels.update(labeldict)
     
     if ax is None:
         fig, ax = plt.subplots(figsize=(9, 6))
@@ -73,68 +96,52 @@ def hist(arr, nbins='sqrt', xlims=None, cutold=None, cutnew=None, lgcrawdata=Tru
     if lgcrawdata:
         if xlims is None:
             hist, bins, _ = ax.hist(arr, bins=nbins, histtype='step', 
-                                    label='full data', linewidth=2, color='b')
+                                    label='Full data', linewidth=2, color=plt.cm.get_cmap(cmap)(0))
             xlims = (bins.min(), bins.max())
         else:
             hist, bins, _ = ax.hist(arr, bins=nbins, range=xlims, histtype='step', 
-                                    label='full data', linewidth=2, color='b')            
-    if cutold is not None:
-        oldsum = cutold.sum()
-        if cutnew is None:
-            cuteff = oldsum/cutold.shape[0]
-            cutefftot = cuteff
-        if lgcrawdata:
-            nbins = bins
-        label = f"Data passing {labels['cutold']} cut"
-        if xlims is not None:
-            ax.hist(arr[cutold], bins=nbins, range=xlims, histtype='step', 
-                    label=label, linewidth=2, color='r')
-        else:
-            res = ax.hist(arr[cutold], bins=nbins, histtype='step', 
-                    label=label, linewidth=2, color='r')
-            xlims = (res[1].min(), res[1].max())
-    if cutnew is not None:
-        newsum = cutnew.sum()
-        if cutold is not None:
-            cutnew = cutnew & cutold
-            cuteff = cutnew.sum()/oldsum
-            cutefftot = cutnew.sum()/cutnew.shape[0]
-        else:
-            cuteff = newsum/cutnew.shape[0]
-            cutefftot = cuteff
-        if lgcrawdata:
-            nbins = bins
-        if lgceff:
-            label = f"Data passing {labels['cutnew']} cut, eff :  {cuteff:.3f}"
-        else:
-            label = f"Data passing {labels['cutnew']} cut "
-        if xlims is not None:
-            ax.hist(arr[cutnew], bins=nbins, range=xlims, histtype='step', 
-                    linewidth=2, color='g', label=label)
-        else:
-            res = ax.hist(arr[cutnew], bins=nbins, histtype='step', 
-                    linewidth=2, color='g', label=label)
-            xlims = (res[1].min(), res[1].max())
-    elif (cutnew is None) & (cutold is None):
-        cuteff = 1
-        cutefftot = 1
+                                    label='Full data', linewidth=2, color=plt.cm.get_cmap(cmap)(0))
+        if nbins=="sqrt":
+            nbins = len(bins)
+            
+    colors = plt.cm.get_cmap(cmap)(np.linspace(0.1, 0.9, len(cuts)))
         
+    ctemp = np.ones(len(arr), dtype=bool)
+    
+    for ii, cut in enumerate(cuts):
+        oldsum = ctemp.sum()
+        ctemp = ctemp & cut
+        newsum = ctemp.sum()
+        cuteff = newsum/oldsum * 100
+        label = f"Data passing {labels[f'cut{ii}']} cut"
+        
+        if lgceff:
+            label+=f", Eff = {cuteff:.1f}%"
+            
+        if xlims is None:
+            hist, bins, _  = ax.hist(arr[ctemp], bins=nbins, histtype='step', 
+                                     label=label, linewidth=2, color=colors[ii])
+            xlims = (bins.min(), bins.max())
+        else:
+            hist, bins, _  = ax.hist(arr[ctemp], bins=nbins, range=xlims, histtype='step', 
+                                     label=label, linewidth=2, color=colors[ii])
+            
+        if nbins=="sqrt":
+            nbins = len(bins)
+    
     ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
     ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
     ax.tick_params(which="both", direction="in", right=True, top=True)
     ax.grid(linestyle="dashed")
     
-    if lgceff:
-        ax.plot([], [], linestyle=' ', label=f'Efficiency of total cut: {cutefftot:.3f}')
     if lgclegend:
-        ax.legend()
+        ax.legend(loc="best")
+        
     return fig, ax
     
 
-
-
-def scatter(xvals, yvals, xlims=None, ylims=None, cutold=None, cutnew=None, 
-            lgcrawdata=True, lgceff=True, lgclegend=True, labeldict=None, ms=1, a=.3, ax=None):
+def scatter(xvals, yvals, xlims=None, ylims=None, cuts=None, lgcrawdata=True, lgceff=True, 
+            lgclegend=True, labeldict=None, ms=1, a=.3, ax=None, cmap="viridis"):
     """
     Function to plot RQ data as a scatter plot.
     
@@ -150,29 +157,33 @@ def scatter(xvals, yvals, xlims=None, ylims=None, cutold=None, cutnew=None,
     ylims : list of float, optional
         This is passed to the plot as the y limits. Automatically determined from range of data
         if not set.
-    cutold : array of bool, optional
-        Mask of values to be plotted
-    cutnew : array of bool, optional
-        Mask of values to be plotted. This mask is added to cutold if cutold is not None. 
+    cuts : list, optional
+        List of masks of values to be plotted. The cuts will be applied in the order that they are listed,
+        such that any number of cuts can be plotted
     lgcrawdata : bool, optional
         If True, the raw data is plotted
     lgceff : bool, optional
-        If True, the cut efficiencies are printed in the legend. The total eff will be the sum of all the 
-        cuts divided by the length of the data. The current cut eff will be the sum of the current cut 
-        divided by the sum of all the previous cuts, if any.
+        If True, the efficiencies of each cut, with respect to the data that survived 
+        the previous cut, are printed in the legend. 
     lgclegend : bool, optional
-        If True, the legend is plotted.
+        If True, the legend is included in the plot.
     labeldict : dict, optional
-        Dictionary to overwrite the labels of the plot. defaults are : 
-            labels = {'title' : 'Histogram', 'xlabel' : 'variable', 'ylabel' : 'Count', 
-            'cutnew' : 'current', 'cutold' : 'previous'}
-        Ex: to change just the title, pass: labeldict = {'title' : 'new title'}, to histrq()
+        Dictionary to overwrite the labels of the plot. defaults are: 
+            labels = {'title' : 'Scatter Plot', 
+                      'xlabel' : 'x variable', 
+                      'ylabel' : 'y variable', 
+                      'cut0' : '1st', 
+                      'cut1' : '2nd', 
+                      ...}
+        Ex: to change just the title, pass: labeldict = {'title' : 'new title'}, to scatter()
     ms : float, optional
         The size of each marker in the scatter plot. Default is 1
     a : float, optional
         The opacity of the markers in the scatter plot, i.e. alpha. Default is 0.3
     ax : axes.Axes object, optional
         Option to pass an existing Matplotlib Axes object to plot over, if it already exists.
+    cmap : str, optional
+        The colormap to use for plotting each cut. Default is 'viridis'.
     
     Returns
     -------
@@ -183,15 +194,32 @@ def scatter(xvals, yvals, xlims=None, ylims=None, cutold=None, cutnew=None,
         
     """
 
+    if cuts is None:
+        cuts = []
+    elif not isinstance(cuts, list):
+        cuts = [cuts]
+    
     labels = {'title'  : 'Scatter Plot',
               'xlabel' : 'x variable', 
-              'ylabel' : 'y variable', 
-              'cutnew' : 'current', 
-              'cutold' : 'previous'}
+              'ylabel' : 'y variable'}
     
+    for ii in range(len(cuts)):
+        
+        num_str = str(ii+1)
+        
+        if num_str[-1]=='1':
+            num_str+="st"
+        elif num_str[-1]=='2':
+            num_str+="nd"
+        elif num_str[-1]=='3':
+            num_str+="rd"
+        else:
+            num_str+="th"
+        
+        labels[f"cut{ii}"] = num_str
+        
     if labeldict is not None:
-        for key in labeldict:
-            labels[key] = labeldict[key]
+        labels.update(labeldict)
     
     if ax is None:
         fig, ax = plt.subplots(figsize=(9, 6))
@@ -206,83 +234,60 @@ def scatter(xvals, yvals, xlims=None, ylims=None, cutold=None, cutnew=None,
         xlimitcut = (xvals>xlims[0]) & (xvals<xlims[1])
     else:
         xlimitcut = np.ones(len(xvals), dtype=bool)
+        
     if ylims is not None:
         ylimitcut = (yvals>ylims[0]) & (yvals<ylims[1])
     else:
         ylimitcut = np.ones(len(yvals), dtype=bool)
-
+    
     limitcut = xlimitcut & ylimitcut
     
-    if lgcrawdata and cutold is not None: 
-        ax.scatter(xvals[limitcut & ~cutold], yvals[limitcut & ~cutold], 
-                   label='Full Data', c='b', s=ms, alpha=a)
-    elif lgcrawdata and cutnew is not None: 
-        ax.scatter(xvals[limitcut & ~cutnew], yvals[limitcut & ~cutnew], 
+    if lgcrawdata and len(cuts) > 0: 
+        ax.scatter(xvals[limitcut & ~cuts[0]], yvals[limitcut & ~cuts[0]], 
                    label='Full Data', c='b', s=ms, alpha=a)
     elif lgcrawdata:
         ax.scatter(xvals[limitcut], yvals[limitcut], 
                    label='Full Data', c='b', s=ms, alpha=a)
-        
-    if cutold is not None:
-        oldsum = cutold.sum()
-        if cutnew is None:
-            cuteff = cutold.sum()/cutold.shape[0]
-            cutefftot = cuteff
-            
-        label = f"Data passing {labels['cutold']} cut"
-        if cutnew is None:
-            ax.scatter(xvals[cutold & limitcut], yvals[cutold & limitcut], 
-                       label=label, c='r', s=ms, alpha=a)
-        else: 
-            ax.scatter(xvals[cutold & limitcut & ~cutnew], yvals[cutold & limitcut & ~cutnew], 
-                       label=label, c='r', s=ms, alpha=a)
-        
-    if cutnew is not None:
-        newsum = cutnew.sum()
-        if cutold is not None:
-            cutnew = cutnew & cutold
-            cuteff = cutnew.sum()/oldsum
-            cutefftot = cutnew.sum()/cutnew.shape[0]
-        else:
-            cuteff = newsum/cutnew.shape[0]
-            cutefftot = cuteff
-            
-        if lgceff:
-            label = f"Data passing {labels['cutnew']} cut, eff : {cuteff:.3f}"
-        else:
-            label = f"Data passing {labels['cutnew']} cut"
-            
-        ax.scatter(xvals[cutnew & limitcut], yvals[cutnew & limitcut], 
-                   label=label, c='g', s=ms, alpha=a)
     
-    elif (cutnew is None) & (cutold is None):
-        cuteff = 1
-        cutefftot = 1
+    colors = plt.cm.get_cmap(cmap)(np.linspace(0.1, 0.9, len(cuts)))
+        
+    ctemp = np.ones(len(xvals), dtype=bool)
+    
+    for ii, cut in enumerate(cuts):
+        oldsum = ctemp.sum()
+        ctemp = ctemp & cut
+        newsum = ctemp.sum()
+        cuteff = newsum/oldsum * 100
+        label = f"Data passing {labels[f'cut{ii}']} cut"
+        
+        if lgceff:
+            label+=f", Eff = {cuteff:.1f}%"
+            
+        cplot = ctemp & limitcut
+        
+        if ii+1<len(cuts):
+            cplot = cplot & ~cuts[ii+1]
+        
+        ax.scatter(xvals[cplot], yvals[cplot], 
+                   label=label, c=colors[ii], s=ms, alpha=a)
         
     if xlims is None:
-        if lgcrawdata:
+        if lgcrawdata and len(cuts)==0:
             xrange = xvals.max()-xvals.min()
             ax.set_xlim([xvals.min()-0.05*xrange, xvals.max()+0.05*xrange])
-        elif cutold is not None:
-            xrange = xvals[cutold].max()-xvals[cutold].min()
-            ax.set_xlim([xvals[cutold].min()-0.05*xrange, xvals[cutold].max()+0.05*xrange])
-        elif cutnew is not None:
-            xrange = xvals[cutnew].max()-xvals[cutnew].min()
-            ax.set_xlim([xvals[cutnew].min()-0.05*xrange, xvals[cutnew].max()+0.05*xrange])
+        elif len(cuts)>0:
+            xrange = xvals[cuts[0]].max()-xvals[cuts[0]].min()
+            ax.set_xlim([xvals[cuts[0]].min()-0.05*xrange, xvals[cuts[0]].max()+0.05*xrange])
     else:
         ax.set_xlim(xlims)
         
     if ylims is None:
-        if lgcrawdata:
+        if lgcrawdata and len(cuts)==0:
             yrange = yvals.max()-yvals.min()
             ax.set_ylim([yvals.min()-0.05*yrange, yvals.max()+0.05*yrange])
-        elif cutold is not None:
-            yrange = yvals[cutold].max()-yvals[cutold].min()
-            ax.set_ylim([yvals[cutold].min()-0.05*yrange, yvals[cutold].max()+0.05*yrange])
-        elif cutnew is not None:
-            yrange = yvals[cutnew].max()-yvals[cutnew].min()
-            ax.set_ylim([yvals[cutnew].min()-0.05*yrange, yvals[cutnew].max()+0.05*yrange])
-        
+        elif len(cuts)>0:
+            yrange = yvals[cuts[0]].max()-yvals[cuts[0]].min()
+            ax.set_ylim([yvals[cuts[0]].min()-0.05*yrange, yvals[cuts[0]].max()+0.05*yrange])
     else:
         ax.set_ylim(ylims)
         
@@ -291,13 +296,131 @@ def scatter(xvals, yvals, xlims=None, ylims=None, cutold=None, cutnew=None,
     ax.tick_params(which="both", direction="in", right=True, top=True)
     ax.grid(linestyle="dashed")
     
-    if lgceff:
-        ax.plot([], [], linestyle=' ', label=f'Efficiency of total cut: {cutefftot:.3f}')
     if lgclegend:
         ax.legend(markerscale=6, framealpha=.9)
     
     return fig, ax
 
+def passageplot(arr, cuts, basecut=None, nbins=100, lgcequaldensitybins=False, xlims=None, ylims=(0, 1),
+                lgceff=True, lgclegend=True, labeldict=None, ax=None, cmap="viridis"):
+    """
+    Function to plot histogram of RQ data with multiple cuts.
+    
+    Parameters
+    ----------
+    arr : array_like
+        Array of values to be binned and plotted
+    cuts : list, optional
+        List of masks of values to be plotted. The cuts will be applied in the order that 
+        they are listed, such that any number of cuts can be plotted.
+    basecut : NoneType, array_like, optional
+        The base cut for comparison of the first cut in `cuts`. If left as None, then the 
+        passage fraction is calculated using all of the inputted data for the first cut.
+    nbins : int, str, optional
+        This is the same as plt.hist() bins parameter. Defaults is 'sqrt'.
+    lgcequaldensitybins : bool, optional
+        If set to True, the bin widths are set such that each bin has the same number
+        of data points within it. If left as False, then a constant bin width is used.
+    xlims : list of float, optional
+        The xlimits of the passage fraction plot. 
+    ylims : list of float, optional
+        This is passed to the plot as the y limits. Set to (0, 1) by default.
+    lgceff : bool, optional
+        If True, the total cut efficiencies are printed in the legend. 
+    lgclegend : bool, optional
+        If True, the legend is plotted.
+    labeldict : dict, optional
+        Dictionary to overwrite the labels of the plot. defaults are: 
+            labels = {'title' : 'Passage Fraction Plot', 
+                      'xlabel' : 'variable', 
+                      'ylabel' : 'Passage Fraction', 
+                      'cut0' : '1st', 
+                      'cut1' : '2nd', 
+                      ...}
+        Ex: to change just the title, pass: labeldict = {'title' : 'new title'}, to hist()
+    ax : axes.Axes object, optional
+        Option to pass an existing Matplotlib Axes object to plot over, if it already exists.
+    cmap : str, optional
+        The colormap to use for plotting each cut. Default is 'viridis'.
+    
+    Returns
+    -------
+    fig : Figure
+        Matplotlib Figure object. Set to None if ax is passed as a parameter.
+    ax : axes.Axes object
+        Matplotlib Axes object
+        
+    """
+    
+    if not isinstance(cuts, list):
+        cuts = [cuts]
+    
+    labels = {'title'  : 'Passage Fraction Plot', 
+              'xlabel' : 'variable', 
+              'ylabel' : 'Passage Fraction'}
+    
+    
+    for ii in range(len(cuts)):
+        
+        num_str = str(ii+1)
+        
+        if num_str[-1]=='1':
+            num_str+="st"
+        elif num_str[-1]=='2':
+            num_str+="nd"
+        elif num_str[-1]=='3':
+            num_str+="rd"
+        else:
+            num_str+="th"
+        
+        labels[f"cut{ii}"] = num_str
+        
+    if labeldict is not None:
+        labels.update(labeldict)
+    
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(9, 6))
+    else:
+        fig = None
+        
+    ax.set_title(labels['title'])
+    ax.set_xlabel(labels['xlabel'])
+    ax.set_ylabel(labels['ylabel'])
+
+    if basecut is None:
+        basecut = np.ones(len(arr), dtype=bool)
+            
+    colors = plt.cm.get_cmap(cmap)(np.linspace(0.1, 0.9, len(cuts)))
+
+    ctemp = np.ones(len(arr), dtype=bool) & basecut
+    
+    for ii, cut in enumerate(cuts):
+        oldsum = ctemp.sum()
+        x_binned, passage_binned = rp.passage_fraction(arr, cut, basecut=ctemp, nbins=nbins,
+                                                       lgcequaldensitybins=lgcequaldensitybins)
+        ctemp = ctemp & cut
+        newsum = ctemp.sum()
+        cuteff = newsum/oldsum * 100
+        label = f"Data passing {labels[f'cut{ii}']} cut"
+        
+        if lgceff:
+            label+=f", Total Passage: {cuteff:.1f}%"
+            
+        if xlims is None:
+            xlims = (x_binned.min()*0.9, x_binned.max()*1.1)
+            
+        ax.step(x_binned, passage_binned, where='mid', color=colors[ii], label=label)
+    
+    ax.set_xlim(xlims)
+    ax.set_ylim(ylims)
+    ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
+    ax.tick_params(which="both", direction="in", right=True, top=True)
+    ax.grid(linestyle="dashed")
+    
+    if lgclegend:
+        ax.legend(loc="best")
+    
+    return fig, ax
 
 
 def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=None, 
@@ -590,4 +713,368 @@ def plot_saturation_correction(x, y, yerr, popt, pcov, labeldict, ax = None):
     
     return fig, ax
 
+
+def _plot_fit_integral_ofamp(x, y, err, y_fit, sat_errors, linear_approx, linear_approx_errs, labeldict, ax):
+     
+    """
+    Helper function to plot the fit for fit_integral_ofamp()
     
+    Parameters
+    ----------
+    x : array
+        Array of x data
+    y : array
+        Array of y data
+    err : array-like
+        The errors in the measured energy of the spectral peaks
+    y_fit : array
+        Array of y data from fit
+    sat_errors : array
+        Array of errors for the fit
+    linear_approx : float
+        The slope of the linear approximation of the saturated function
+    linear_approx_errs : array
+        Array of errors for the approximation of the fit
+    labeldict : dict, optional
+        Dictionary to overwrite the labels of the plot. defaults are : 
+            labels = {'title' : 'Energy Saturation Correction', 
+                      'xlabel' : 'True Energy [eV]',
+                      'ylabel' : 'Measured Energy [eV]'}
+        Ex: to change just the title, pass: labeldict = {'title' : 'new title'}
+    ax : axes.Axes object, optional
+        Option to pass an existing Matplotlib Axes object to plot over, if it already exists.
+        
+    Returns
+    -------
+    fig : matrplotlib figure object
+    
+    ax : matplotlib axes object
+    
+    """
+    
+    labels = {'title'  : 'OF Amplitude vs Integral Saturation Correction',
+              'xlabel' : 'OF Amplitude [A]', 
+              'ylabel' : 'Integrated Charge [C]',
+              'nsigma' : 2} 
+
+    if labeldict is not None:
+        for key in labeldict:
+            labels[key] = labeldict[key]
+    nsigma = labels['nsigma'] 
+    
+    x_fit = np.linspace(0, max(x), 50)
+    
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(12, 8))
+    else:
+        fig = None
+    ax.set_title(labels['title'], fontsize = 16)
+    ax.set_xlabel(labels['xlabel'], fontsize = 14)
+    ax.set_ylabel(labels['ylabel'], fontsize = 14)
+    ax.grid(True, linestyle = 'dashed')
+    
+    ax.grid(True, linestyle = '--')
+    ax.set_xlim(0, max(x)*1.05)
+    ax.set_ylim(0, max(y)*1.05)
+
+    ax.errorbar(x,y, marker = '.', linestyle = ' ', yerr = err, label = 'Data used for Fit',
+                 elinewidth=0.3, alpha =.5, ms = 5,zorder = 50)
+
+    ax.plot(x_fit, y_fit, color = 'k',  label = f'Fit : $y = -b*ln(1-x/a)$ ({nsigma}σ bounds)')
+    ax.fill_between(x_fit, y_fit+nsigma*sat_errors, y_fit-nsigma*sat_errors, color = 'k' , alpha= .5)
+    
+    ax.plot(x_fit, linear_approx*x_fit,zorder = 200, c = 'r', linestyle = '--', 
+            label = f'Linear approximation ({nsigma}σ bounds) ')
+    ax.fill_between(x_fit, linear_approx*x_fit+nsigma*linear_approx_errs,
+                    linear_approx*x_fit-nsigma*linear_approx_errs, color = 'r' , alpha= .5)
+    ax.legend()    
+
+    
+    
+    
+    
+def _make_iv_noiseplots(IVanalysisOBJ, lgcsave=False):
+    """
+    Helper function to plot average noise/didv traces in time domain, as well as 
+    corresponding noise PSDs, for all QET bias points in IV/dIdV sweep.
+
+    Parameters
+    ----------
+    IVanalysisOBJ : rqpy.IVanalysis
+         The IV analysis object that contains the data to use for plotting.
+    lgcsave : bool, optional
+        If True, all the plots will be saved in the a folder
+        Avetrace_noise/ within the user specified directory
+
+    Returns
+    -------
+    None
+
+    """
+
+    for (noiseind, noiserow), (didvind, didvrow) in zip(IVanalysisOBJ.df[IVanalysisOBJ.noiseinds].iterrows(), IVanalysisOBJ.df[IVanalysisOBJ.didvinds].iterrows()):
+        fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(16, 6))
+
+        t = np.arange(0,len(noiserow.avgtrace))/noiserow.fs
+        tdidv = np.arange(0, len(didvrow.avgtrace))/noiserow.fs
+        axes[0].set_title(f"{noiserow.seriesnum} Avg Trace, QET bias = {noiserow.qetbias*1e6:.2f} $\mu A$")
+        axes[0].plot(t*1e6, noiserow.avgtrace * 1e6, label=f"{self.chname} Noise", alpha=0.5)
+        axes[0].plot(tdidv*1e6, didvrow.avgtrace * 1e6, label=f"{self.chname} dIdV", alpha=0.5)
+        axes[0].grid(which="major")
+        axes[0].grid(which="minor", linestyle="dotted", alpha=0.5)
+        axes[0].tick_params(axis="both", direction="in", top=True, right=True, which="both")
+        axes[0].set_ylabel("Current [μA]", fontsize = 14)
+        axes[0].set_xlabel("Time [μs]", fontsize = 14)
+        axes[0].legend()
+
+        axes[1].loglog(noiserow.f, noiserow.psd**0.5 * 1e12, label=f"{self.chname} PSD")
+        axes[1].set_title(f"{noiserow.seriesnum} PSD, QET bias = {noiserow.qetbias*1e6:.2f} $\mu A$")
+        axes[1].grid(which="major")
+        axes[1].grid(which="minor", linestyle="dotted", alpha=0.5)
+        axes[1].set_ylim(1, 1e3)
+        axes[1].tick_params(axis="both", direction="in", top=True, right=True, which="both")
+        axes[1].set_ylabel(r"PSD [pA/$\sqrt{\mathrm{Hz}}$]", fontsize = 14)
+        axes[1].set_xlabel("Frequency [Hz]", fontsize = 14)
+        axes[1].legend()
+
+        plt.tight_layout()
+        if lgcsave:
+            if not savepath.endswith('/'):
+                savepath += '/'
+            fullpath = f'{IVanalysisOBJ.figsavepath}avetrace_noise/'
+            if not os.path.isdir(fullpath):
+                os.makedirs(fullpath)
+
+            plt.savefig(fullpath + f'{noiserow.qetbias*1e6:.2f}_didvnoise.png')
+        plt.show()
+            
+def _plot_rload_rn_qetbias(IVanalysisOBJ, lgcsave, xlims_rl, ylims_rl, xlims_rn, ylims_rn):
+    """
+    Helper function to plot rload and rnormal as a function of
+    QETbias from the didv fits of SC and Normal data for IVanalysis object.
+
+    Parameters
+    ----------
+    IVanalysisOBJ : rqpy.IVanalysis
+         The IV analysis object that contains the data to use for plotting.
+    lgcsave : bool, optional
+        If True, all the plots will be saved 
+    xlims_rl : NoneType, tuple, optional
+        Limits to be passed to ax.set_xlim()for the 
+        rload plot
+    ylims_rl : NoneType, tuple, optional
+        Limits to be passed to ax.set_ylim() for the
+        rload plot
+    xlims_rn : NoneType, tuple, optional
+        Limits to be passed to ax.set_xlim()for the 
+        rtot plot
+    ylims_rn : NoneType, tuple, optional
+        Limits to be passed to ax.set_ylim() for the
+        rtot plot
+    
+
+    Returns
+    -------
+    None
+
+    """
+
+    fig, axes = plt.subplots(1,2, figsize = (16,6))
+    fig.suptitle("Rload and Rtot from dIdV Fits", fontsize = 18)
+    
+    if xlims_rl is not None:
+        axes[0].set_xlim(xlims_rl)
+    if ylims_rl is not None:
+        axes[0].set_ylim(ylims_rl)
+    if xlims_rn is not None:
+        axes[1].set_xlim(xlims_rn)
+    if ylims_rn is not None:
+        axes[1].set_ylim(ylis_rn)
+
+    axes[0].errorbar(IVanalysisOBJ.vb[0,0,IVanalysisOBJ.scinds]*1e6,
+                     np.array(IVanalysisOBJ.rload_list)*1e3, 
+                     yerr = IVanalysisOBJ.rshunt_err*1e3, linestyle = '', marker = '.', ms = 10)
+    axes[0].grid(True, linestyle = 'dashed')
+    axes[0].set_title('Rload vs Vbias', fontsize = 14)
+    axes[0].set_ylabel(r'$R_ℓ$ [mΩ]', fontsize = 14)
+    axes[0].set_xlabel(r'$V_{bias}$ [μV]', fontsize = 14)
+    axes[0].tick_params(axis="both", direction="in", top=True, right=True, which="both")
+
+    axes[1].errorbar(IVanalysisOBJ.vb[0,0,IVanalysisOBJ.norminds]*1e6,
+                     np.array(IVanalysisOBJ.rtot_list)*1e3, 
+                     yerr = IVanalysisOBJ.rshunt_err*1e3, linestyle = '', marker = '.', ms = 10)
+    axes[1].grid(True, linestyle = 'dashed')
+    axes[1].set_title('Rtotal vs Vbias', fontsize = 14)
+    axes[1].set_ylabel(r'$R_{N} + R_ℓ$ [mΩ]', fontsize = 14)
+    axes[1].set_xlabel(r'$V_{bias}$ [μV]', fontsize = 14)
+    axes[1].tick_params(axis="both", direction="in", top=True, right=True, which="both")
+
+    plt.tight_layout()
+    if lgcsave:
+        plt.savefig(IVanalysisOBJ.figsavepath + 'rload_rtot_variation.png')
+            
+            
+def _plot_energy_res_vs_bias(r0s, energy_res, qets, optimum_r0, figsavepath, lgcsave,
+                            xlims, ylims):
+    """
+    Helper function for the IVanalysis class to plot the expected energy resolution as 
+    a function of QET bias and TES resistance.
+    
+    Parameters
+    ----------
+    r0s : array
+        Array of r0 values
+    energy_res : array
+        Array of expected energy resolutions
+    qets : array
+        Array of QET bias values
+    optimum_r0 : float
+        The TES resistance corresponding to the 
+        lowest energy resolution
+    figsavepath : str
+        Directory to save the figure
+    lgcsave : bool
+        If true, the figure is saved
+    xlims : NoneType, tuple, optional
+            Limits to be passed to ax.set_xlim()
+    ylims : NoneType, tuple, optional
+        Limits to be passed to ax.set_ylim()
+        
+    Returns
+    -------
+    None
+
+    """
+
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(9, 6))
+    if xlims is not None:
+        ax.set_xlim(xlims)
+    if ylims is not None:
+        ax.set_ylim(ylims)
+        
+    ax.plot(r0s, energy_res, linestyle = ' ', marker = '.', ms = 10, c='g')
+    ax.plot(r0s, energy_res, linestyle = '-', marker = ' ', alpha = .3, c='g')
+    ax.grid(True, which = 'both', linestyle = '--')
+    ax.set_xlabel('$R_0$ [mΩ]')
+    ax.set_ylabel(r'$σ_E$ [eV]')
+    ax2 = ax.twiny()
+    ax2.plot(qets[::-1], energy_res, linestyle = ' ')
+    ax2.xaxis.set_ticks_position('bottom')
+    ax2.xaxis.set_label_position('bottom') 
+    ax2.spines['bottom'].set_position(('outward', 36))
+    ax2.set_xlabel('QET bias [μA]')
+    ax3 = plt.gca()
+    plt.draw()
+    ax3.get_xticklabels()
+    newlabels = [thing for thing in ax3.get_xticklabels()][::-1]
+    ax2.set_xticklabels(newlabels)
+    ax.axvline(optimum_r0, linestyle = '--', color = 'r', label = r'Optimum QET bias (minumum $σ_E$)')
+    ax.set_title('Expected Energy Resolution vs QET bias and $R_0$')
+    ax.legend()
+
+    if lgcsave:
+        plt.savefig(f'{figsavepath}energy_res_vs_bias.png')
+        
+        
+        
+def _plot_sc_noise(f, psd, noise_sim, qetbias, figsavepath, lgcsave, xlims, ylims):
+    """
+    Helper function to plot SC noise for IVanalysis class
+    
+    Parameters
+    ----------
+    f : array
+        Array of frequency values
+    psd : array
+        One sided Power spectral density
+    noise_sim : TESnoise object
+        The noise simulation object
+    qetbias : float
+        Applied QET bias
+    figsavepath : str
+        Directory to save the figure
+    lgcsave : bool
+        If true, the figure is saved
+    xlims : NoneType, tuple, optional
+        Limits to be passed to ax.set_xlim()
+    ylims : NoneType, tuple, optional
+        Limits to be passed to ax.set_ylim()
+    
+    Returns
+    -------
+    None
+
+    """
+
+    f = f[1:]
+    psd = psd[1:]
+    fig, ax = plt.subplots(1,1, figsize=(11,6))
+    if xlims is not None:
+        ax.set_xlim(xlims)
+    if ylims is not None:
+        ax.set_ylim(ylims)
+        
+    ax.grid(True, linestyle = '--')
+    ax.loglog(f, np.sqrt(psd), alpha = .5, label = 'Raw Data')
+    ax.loglog(f, np.sqrt(noise_sim.s_isquid(f)), label = 'Squid+Electronics Noise')
+    ax.loglog(f, np.sqrt(noise_sim.s_iloadsc(f)),label= 'Load Noise')
+    ax.loglog(f, np.sqrt(noise_sim.s_itotsc(f)),label= 'Total Noise')
+    ax.legend()
+    ax.set_xlabel('Frequency [Hz]')
+    ax.set_ylabel('Input Referenced Current Noise [A/$\sqrt{\mathrm{Hz}}$]')
+    ax.set_title(f'Normal State noise for QETbias: {qetbias*1e6} $\mu$A')
+    
+    if lgcsave:
+        plt.savefig(f'{figsavepath}SC_noise_qetbias{qetbias}.png')
+        
+        
+def _plot_n_noise(f, psd, noise_sim, qetbias, figsavepath, lgcsave, xlims, ylims):
+    """
+    Helper function to plot normal state noise for IVanalysis class
+    
+    Parameters
+    ----------
+    f : array
+        Array of frequency values
+    psd : array
+        One sided Power spectral density
+    noise_sim : TESnoise object
+        The noise simulation object
+    qetbias : float
+        Applied QET bias
+    figsavepath : str
+        Directory to save the figure
+    lgcsave : bool
+        If true, the figure is saved
+    xlims : NoneType, tuple, optional
+        Limits to be passed to ax.set_xlim()
+    ylims : NoneType, tuple, optional
+        Limits to be passed to ax.set_ylim()    
+    
+    Returns
+    -------
+    None
+
+    """   
+
+    f = f[1:]
+    psd = psd[1:]
+    fig, ax = plt.subplots(1,1, figsize=(11,6))
+    if xlims is not None:
+        ax.set_xlim(xlims)
+    if ylims is not None:
+        ax.set_ylim(ylims)
+        
+    ax.grid(True, linestyle = '--')
+    ax.loglog(f, np.sqrt(psd), alpha = .5, label = 'Raw Data')
+    ax.loglog(f, np.sqrt(noise_sim.s_isquid(f)), label = 'Squid+Electronics Noise')
+    ax.loglog(f, np.sqrt(noise_sim.s_itesnormal(f)),label= 'TES johnson Noise')
+    ax.loglog(f, np.sqrt(noise_sim.s_iloadnormal(f)),label= 'Load Noise')
+    ax.loglog(f, np.sqrt(noise_sim.s_itotnormal(f)),label= 'Total Noise')
+    ax.legend()
+    ax.set_xlabel('Frequency [Hz]')
+    ax.set_ylabel('Input Referenced Current Noise [A/$\sqrt{\mathrm{Hz}}$]')
+    ax.set_title(f'Normal State noise for QETbias: {qetbias*1e6} $\mu$A')
+    
+    if lgcsave:
+        plt.savefig(f'{figsavepath}Normal_noise_qetbias{qetbias}.png')

@@ -125,7 +125,7 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
             
             dets = [int("".join(filter(str.isdigit, d))) for d in det]
             
-            arr = getRawEvents(f"{basepath}{snum_str}/", "", channelList=channels, detectorList=dets,
+            arr = getRawEvents(f"{basepath}{snum_str}/", "", channelList=channels, detectorList=list(set(dets)),
                                outputFormat=3, eventNumbers=evtnums[cseries].astype(int).tolist())
         elif filetype == "npz":
             inds = np.mod(evtnums[cseries], 10000) - 1
@@ -133,18 +133,24 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
                 arr = f["traces"][inds]
     
         arrs.append(arr)
-        
+    
     if filetype == "mid.gz":
-        if len(set(dets))==1:
-            if channels != arr[det[0]]["pChan"]:
-                chans = [arr[det[0]]["pChan"].index(ch) for ch in channels]
-                x = arr[det[0]]["p"][:, chans].astype(float)
+        xs = []
+        for arr in arrs:
+            if len(set(dets))==1:
+                if channels != arr[det[0]]["pChan"]:
+                    chans = [arr[det[0]]["pChan"].index(ch) for ch in channels]
+                    x = arr[det[0]]["p"][:, chans].astype(float)
+                else:
+                    x = arr[det[0]]["p"].astype(float)
             else:
-                x = arr[det[0]]["p"].astype(float)
-        else:
-            chans = [arr[d]["pChan"].index(ch) for d, ch in zip(det, channels)]
-            x = [arr[d]["p"][:, ch].astype(float) for d, ch in zip(det, chans)]
-            x = np.stack(x, axis=1)
+                chans = [arr[d]["pChan"].index(ch) for d, ch in zip(det, channels)]
+                x = [arr[d]["p"][:, ch].astype(float) for d, ch in zip(det, chans)]
+                x = np.stack(x, axis=1)
+            
+            xs.append(x)
+            
+        x = np.vstack(xs)
         
     elif filetype == "npz":
         x = np.vstack(arrs).astype(float)

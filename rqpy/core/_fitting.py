@@ -3,7 +3,7 @@ from scipy.optimize import curve_fit
 from rqpy import plotting, utils
 
 
-__all__ = ["fit_multi_gauss", "fit_gauss", "fit_saturation"]
+__all__ = ["fit_multi_gauss", "fit_gauss"]
 
 
 def fit_multi_gauss(arr, guess, ngauss, xrange=None, nbins='sqrt', lgcplot=True, 
@@ -129,7 +129,7 @@ def fit_gauss(arr, xrange=None, nbins='sqrt', noiserange=None, lgcplot=False, la
     peakerr : float
         The full error in the location of the peak
     fitparams : tuple
-        The best fit parameters of the fit; A, mu, sigma
+        The best fit parameters of the fit; A, mu, sigma, background
     errors : ndarray
         The uncertainty in the fit parameters
         
@@ -181,60 +181,4 @@ def fit_gauss(arr, xrange=None, nbins='sqrt', noiserange=None, lgcplot=False, la
     return peakloc, peakerr, fitparams, errors
 
 
-def fit_saturation(x, y, yerr, guess, labeldict=None, lgcplot=True, ax=None):
-    """
-    Function to fit the saturation of the measured calibration spectrum. 
-    
-    Parameters
-    ----------
-    x : array_like
-        The true energy of the spectral peaks in eV
-    y : array_like
-        The measured energy (or similar quantity) of the spectral peaks in eV
-    yerr : array_like
-        The errors in the measured energy of the spectral peaks in eV
-    guess : array_like
-        Array of initial guess parameters (a,b) to be passed to saturation_func(). See Notes
-        for the functional form these parameters apply to.
-    labeldict : dict, optional
-        Dictionary to overwrite the labels of the plot. defaults are : 
-            labels = {'title' : 'Energy Saturation Correction', 
-                      'xlabel' : 'True Energy [eV]',
-                      'ylabel' : 'Measured Energy [eV]',
-                      'nsigma' : 2} # Note, nsigma is the number of sigma error bars 
-                                      to plot 
-        Ex: to change just the title, pass: labeldict = {'title' : 'new title'}
-    lgcplot : bool, optional
-            If True, the fit and spectrum will be plotted    
-    ax : axes.Axes object, optional
-        Option to pass an existing Matplotlib Axes object to plot over, if it already exists.
-        
-    Returns
-    -------
-    popt : ndarray
-        Array of best fit paramters
-    pcov : ndarray
-        Covariance matrix from fit
-    slope_linear : float
-        The slope of the Taylor expansion of the saturation function 
-        evaluated at the best fit parameters
-        
-    Notes
-    -----
-    This function fits the function y = a(1-exp(-x/b)) to the given data. This function
-    is then Taylor expanded about x=0 to find the linear part of the calibration at
-    low energies. There errors in this taylor expanded function y~ax/b, are determined
-    via the covariance matrix returned from the initial fit.
-    
-    """
-    
-    popt, pcov = curve_fit(utils.saturation_func, x, y, sigma = yerr, p0 = guess, 
-                           absolute_sigma=True, maxfev = 10000)
-    if lgcplot:
-        plotting.plot_saturation_correction(x, y, yerr, popt, pcov, labeldict, ax)
-        
-    slope_linear = utils.sat_func_expansion(1, *popt)
-    
-    return popt, pcov, slope_linear
-    
-    
+
