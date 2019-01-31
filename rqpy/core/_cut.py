@@ -128,7 +128,7 @@ class GenericModel(object):
 
 def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgcequaldensitybins=False,
               xlwrlim=None, xuprlim=None, model=None, guess=None, residual_threshold=2, min_samples=None, 
-              lgcrtnparams=False, **kwargs):
+              **kwargs):
     """
     Function for calculating a cut given a desired passage fraction, based on binning the data.
     
@@ -180,9 +180,6 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgce
         `skimage.measure.ransac` function, of which this is a parameter. If left as None, then this
         is set to the length of the guess for user-defined functions or set to two for the linear 
         model.
-    lgcrtnparams : bool, optional
-        Boolean flag for returning the fit parameters, in the case of a user-defined function being
-        passed to `model`.
     kwargs
         Keyword arguments passed to `skimage.measure.ransac`. See [1].
         
@@ -190,9 +187,10 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgce
     -------
     cbinned : array_like
         A boolean mask indicating which data points passed the baseline cut.
-    params : ndarray, optional
-        If `lgcrtnparams` is True, and a user-defined function was passed to `model`, the fit parameters
-        are also returned.
+    cutobj : object
+        An object that contains the parameters of the fitted model (if `model` is not None, otherwise 
+        this is None) and the function that generates the cut boundary, where the two attributes are
+        `params` and `f_boundary`, respectively.
         
     Notes
     -----
@@ -237,6 +235,7 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgce
             f = interpolate.interp1d(bin_edges[1:-1], cutoffs[1:], kind='previous', 
                                      bounds_error=False, fill_value=(cutoffs[0], cutoffs[-1]),
                                      assume_sorted=True)
+            params = None
         else: 
             if model=="linear":
                 ModelClass = measure.LineModelND
@@ -261,20 +260,23 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgce
                 model_robust, _ = measure.ransac(np.stack((bin_edges[1:-1], cutoffs[1:]), axis=1),
                                                  ModelClass, min_samples, residual_threshold, 
                                                  **kwargs)
+            params = model_robust.params
             if model=="linear":
-                f = lambda var: ModelClass().predict_y(var, model_robust.params)
+                f = lambda var: ModelClass().predict_y(var, params)
             else:
-                f = lambda var: model(var, *model_robust.params)
+                f = lambda var: model(var, *params)
                 
     if keep_large_vals:
-        cbinned = (y > f(x)) & cut
+        f_cut = lambda var: (y > f(var)) & cut
     else:
-        cbinned = (y < f(x)) & cut
+        f_cut = lambda var: (y < f(var)) & cut
     
-    if lgcrtnparams and model is not None and model!="linear":
-        return cbinned, model_robust.params
-    else:
-        return cbinned
+    cbinned = f_cut(x)
+    
+    cutobj = type('cutobj', (object,), {'params'     : params,
+                                        'f_boundary' : f})
+    
+    return cbinned, cutobj
 
 def inrange(vals, lwrbnd, uprbnd):
     """
@@ -325,8 +327,7 @@ def passage_fraction(x, cut, basecut=None, nbins=100, lgcequaldensitybins=False)
     Returns
     -------
     x_binned : ndarray
-        The corresponding `x` values for each passage fraction, corresponding to the
-        center of the bin.
+        The corresponding `x` values for each passage fraction, given as the edges of each bin.
     frac_binned : ndarray
         The passage fractions for each value of `x_binned` for the given `cut` and `basecut`.
     
@@ -344,7 +345,8 @@ def passage_fraction(x, cut, basecut=None, nbins=100, lgcequaldensitybins=False)
     hist_vals_base, x_binned = np.histogram(x[basecut], bins=nbins)
     hist_vals, _ = np.histogram(x[basecut & cut], bins=x_binned)
     
+    hist_vals_base[hist_vals_base==0] = 1
+    
     frac_binned = hist_vals/hist_vals_base
-    x_binned = (x_binned[:-1]+x_binned[1:])/2
     
     return x_binned, frac_binned

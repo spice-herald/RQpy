@@ -394,10 +394,20 @@ def passageplot(arr, cuts, basecut=None, nbins=100, lgcequaldensitybins=False, x
 
     ctemp = np.ones(len(arr), dtype=bool) & basecut
     
+    if xlims is None:
+        xlimitcut = np.ones(len(arr), dtype=bool)
+    else:
+        xlimitcut = rp.inrange(arr, xlims[0], xlims[1])
+    
     for ii, cut in enumerate(cuts):
         oldsum = ctemp.sum()
-        x_binned, passage_binned = rp.passage_fraction(arr, cut, basecut=ctemp, nbins=nbins,
-                                                       lgcequaldensitybins=lgcequaldensitybins)
+        
+        if ii==0:
+            x_binned, passage_binned = rp.passage_fraction(arr, cut, basecut=ctemp & xlimitcut, nbins=nbins,
+                                                           lgcequaldensitybins=lgcequaldensitybins)
+        else:
+            x_binned, passage_binned = rp.passage_fraction(arr, cut, basecut=ctemp & xlimitcut, nbins=x_binned)
+        
         ctemp = ctemp & cut
         newsum = ctemp.sum()
         cuteff = newsum/oldsum * 100
@@ -408,8 +418,11 @@ def passageplot(arr, cuts, basecut=None, nbins=100, lgcequaldensitybins=False, x
             
         if xlims is None:
             xlims = (x_binned.min()*0.9, x_binned.max()*1.1)
-            
-        ax.step(x_binned, passage_binned, where='mid', color=colors[ii], label=label)
+        
+        bin_centers = (x_binned[1:]+x_binned[:-1])/2
+        
+        ax.hist(bin_centers, bins=x_binned, weights=passage_binned, histtype='step', 
+                color=colors[ii], label=label, linewidth=2)
     
     ax.set_xlim(xlims)
     ax.set_ylim(ylims)
