@@ -297,7 +297,7 @@ def scatter(xvals, yvals, xlims=None, ylims=None, cuts=None, lgcrawdata=True, lg
     ax.grid(linestyle="dashed")
     
     if lgclegend:
-        ax.legend(markerscale=6, framealpha=.9)
+        ax.legend(markerscale=6, framealpha=.9, loc='upper left')
     
     return fig, ax
 
