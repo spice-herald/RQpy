@@ -262,7 +262,7 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgce
                                                  **kwargs)
             params = model_robust.params
             if model=="linear":
-                f = lambda var: ModelClass().predict_y(var, params)
+                f = lambda var: ModelClass().predict_y(list(var), params=params)
             else:
                 f = lambda var: model(var, *params)
                 

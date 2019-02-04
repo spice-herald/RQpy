@@ -269,7 +269,7 @@ def scatter(xvals, yvals, xlims=None, ylims=None, cuts=None, lgcrawdata=True, lg
             cplot = cplot & ~cuts[ii+1]
         
         ax.scatter(xvals[cplot], yvals[cplot], 
-                   label=label, c=colors[ii], s=ms, alpha=a)
+                   label=label, c=colors[ii][np.newaxis,...], s=ms, alpha=a)
         
     if xlims is None:
         if lgcrawdata and len(cuts)==0:
