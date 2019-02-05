@@ -1,6 +1,6 @@
 import numpy as np
 import qetpy as qp
-from scipy.signal import decimate
+from scipy import signal
 
 
 __all__ = ["shift", "make_ideal_template", "downsample_truncate"]
