@@ -593,6 +593,8 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         rq_dict[f'chi2_nSmB_{chan}{det}'][readout_inds] = chi2_nsmb
         rq_dict[f'chi2_nSmB_lf_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'chi2_nSmB_lf_{chan}{det}'][readout_inds] = chi2_nsmb_lf
+        rq_dict[f'chi2BOnly_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2BOnly_nSmB_{chan}{det}'][readout_inds] = chi2BOnly_nsmb
         rq_dict[f'chi2BOnly_nSmB_lf_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'chi2BOnly_nSmB_lf_{chan}{det}'][readout_inds] = chi2BOnly_nsmb_lf
 
