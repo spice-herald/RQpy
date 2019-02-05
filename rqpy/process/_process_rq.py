@@ -583,12 +583,12 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         rq_dict[f'ofamp_s_nSmB_{chan}{det}'][readout_inds] = amps_nsmb[:,0]
         rq_dict[f't0_s_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f't0_s_nSmB_{chan}{det}'][readout_inds] = t0_s_nsmb
-        for iB in range(nS,nB):
-            rq_dict[f'ofamp_b{iB}_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-            rq_dict[f'ofamp_b{iB}_nSmB_{chan}{det}'][readout_inds] = amps_nsmb[:,iB]
+        for iB in range(nS,nS+nB):
+            rq_dict[f'ofamp_b{iB:02d}_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f'ofamp_b{iB:02d}_nSmB_{chan}{det}'][readout_inds] = amps_nsmb[:,iB]
         for iB in range(nB):
-            rq_dict[f'ofampBOnly_b{iB}_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-            rq_dict[f'ofampBOnly_b{iB}_nSmB_{chan}{det}'][readout_inds] = ampsBOnly_nsmb[:,iB]
+            rq_dict[f'ofampBOnly_b{(iB+1):02d}_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f'ofampBOnly_b{(iB+1):02d}_nSmB_{chan}{det}'][readout_inds] = ampsBOnly_nsmb[:,iB]
         rq_dict[f'chi2_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'chi2_nSmB_{chan}{det}'][readout_inds] = chi2_nsmb
         rq_dict[f'chi2_nSmB_lf_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
