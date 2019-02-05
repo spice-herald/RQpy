@@ -1,8 +1,9 @@
 import numpy as np
+import qetpy as qp
 from scipy.signal import decimate
 
 
-__all__ = ["shift", "make_ideal_template", "ds_trunc"]
+__all__ = ["shift", "make_ideal_template", "downsample_truncate"]
 
 
 def shift(arr, num, fill_value=0):
@@ -72,57 +73,61 @@ def make_ideal_template(t, tau_r, tau_f, offset=0):
     return template_normed
 
 
-def ds_trunc(traces, fs, trunc, ds, template = None):
+def downsample_truncate(traces, fs, trunc, ds, template=None, calcpsd=False):
     """
-    Function to downsample and/or truncate time series data. 
-    Note, this will likely change the DC offset of the traces
+    Function to downsample and/or truncate time series data. Note that this will 
+    likely change the DC offset of the traces.
     
     Parameters
     ----------
     traces : ndarray
-        array or time series traces
+        Array of time series traces.
     fs : int
-        sample rate
+        Digitization rate of the inputted traces in Hz.
     trunc : int
-        index of where the trace should be truncated
+        Length of the truncated trace in bins.
     ds : int
-        scale factor for how much downsampling to be done
-        ex: ds = 16 means traces will be downsampled by a factor
-        of 16
+        Scale factor for how much downsampling to be done, e.g. ds = 16 means 
+        traces will be downsampled by a factor of 16.
     template : ndarray, optional
-        pulse template to be downsampled
+        Pulse template to be downsampled and truncated.
+    calcpsd : bool, optional
+        Boolean flag for whether or not to calculate the PSD of the downsampled
+        and truncated traces.
     
     Returns
     -------
-    traces_ds : ndarray
-        downsampled/truncated traces
-    psd_ds : ndarray
-        psd made from downsampled traces
-    fs_ds : int
-        downsampled frequency
-    template_ds : ndarray, optional
-        downsampled template
+    res : dict
+        The results of the downsampling/truncation of the traces.
+        The returned keys are:
+            'traces_ds'   : Array of the downsampled and truncated traces.
+            'fs_ds'       : Downsampled digitization frequency in Hz.
+            'psd_ds'      : PSD made from the downsampled and truncated traces. (optional)
+            'template_ds' : Downsampled and truncated pulse template. (optional)
         
     """
     
-    # truncate the traces/template
-    traces_trunc = traces[..., :trunc]
+    traces_trunc = traces[..., (traces.shape[-1]-trunc)//2:(traces.shape[-1]-trunc)//2+trunc]
     
     trunc_time = trunc/fs
     
-    # low pass filter and downsample the traces/template
+    traces_ds = signal.decimate(traces_trunc, ds, zero_phase=True)
+    
+    fs_ds = traces_ds.shape[-1]/trunc_time
+    
+    res = {}
+    res['traces_ds'] = traces_ds
+    res['fs_ds'] = fs_ds
+    
     if template is not None:
         template_trunc = template[(len(template)-trunc)//2:(len(template)-trunc)//2+trunc]
-        template_ds = decimate(template_trunc, ds, zero_phase=True)
-    traces_ds = decimate(traces_trunc, ds, zero_phase=True)
+        template_ds = signal.decimate(template_trunc, ds, zero_phase=True)
+        res['template_ds'] = template_ds
     
-    fs_ds = len(traces_ds)/trunc_time
+    if calcpsd:
+        f_ds, psd_ds = qp.calc_psd(traces_ds, fs=fs_ds, folded_over=False)
+        res['psd_ds'] = pds_ds
     
-    f_ds, psd_ds = calc_psd(traces_ds, fs=fs_ds, folded_over=False)
-    if template is not None:
-        return traces_ds, template_ds, psd_ds, fs_ds
-    else:
-        return traces_ds, psd_ds, fs_ds
-    
-    
-    
+    return res
+
+
