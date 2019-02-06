@@ -1121,6 +1121,9 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
     if setup.do_optimumfilters_smooth[chan_num]:
         psd_smooth = qp.smooth_psd(psd)
         OF_smooth = qp.OptimumFilter(signal[0], template, psd_smooth, fs)
+        
+    if setup.do_ofnonlin[chan_num]:
+        nlin = qp.OFnonlin(psd, fs, template=template)
     
     for jj, s in enumerate(signal):
         if jj!=0:
@@ -1207,10 +1210,14 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                                                                    nconstrain=setup.ofamp_baseline_nconstrain[chan_num])
         
         if setup.do_ofnonlin[chan_num]:
-            nlin = qp.OFnonlin(psd, fs, template=template)
-            params_nlin, errors_nlin, _, reducedchi2_nlin = nlin.fit_falltimes(s, npolefit=2, lgcfullrtn=True)
+            if setup.ofnonlin_positive_pulses[chan_num]:
+                flip = 1
+            else:
+                flip = -1
             
-            amp_nonlin[jj] = params_nlin[0]
+            params_nlin, errors_nlin, _, reducedchi2_nlin = nlin.fit_falltimes(flip*s, npolefit=2, lgcfullrtn=True)
+            
+            amp_nonlin[jj] = flip*params_nlin[0]
             amp_nonlin_err[jj] = errors_nlin[0]
             taurise_nonlin[jj] = params_nlin[1]
             taurise_nonlin_err[jj] = errors_nlin[1]
