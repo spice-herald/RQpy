@@ -939,8 +939,7 @@ class SetupRQ(object):
         
         """
         
-        lgcrun, npolefit, taurise, positive_pulses = self._check_arg_length(lgcrun=lgcrun, 
-                                                                            positive_pulses=positive_pulses)
+        lgcrun, positive_pulses = self._check_arg_length(lgcrun=lgcrun, positive_pulses=positive_pulses)
         
         if any(lgcrun):
             warnings.warn("The nonlinear OF should only be run on a cluster due to the slow computation speed.")
