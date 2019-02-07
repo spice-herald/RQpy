@@ -302,7 +302,7 @@ class OptimumFilt(object):
             raise ValueError("trig values have been inputted, but trigtemplate attribute has not been set, cannot filter the trig values")
         elif trig is not None:
             # apply the FIR filter to each trace
-            self.trigfilts = np.array([np.correlate(trace, self.trigtemplate, mode="same")/self.trignorm for trace in trig])
+            self.trigfilts = np.array([correlate(trace, self.trigtemplate, mode="same")/self.trignorm for trace in trig])
 
             # set the filtered values to zero near the edges, so as not to use the padded values in the analysis
             # also so that the traces that will be saved will be equal to the tracelength
