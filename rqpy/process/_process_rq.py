@@ -3,6 +3,8 @@ import pandas as pd
 import os
 import multiprocessing
 from itertools import repeat
+import warnings
+
 import rqpy as rp
 from rqpy import io
 import qetpy as qp
@@ -203,6 +205,13 @@ class SetupRQ(object):
     t0_shifted : ndarray
         Attribute used to save the times to shift the non-trigger channels. Only used if `do_ofamp_shifted`
         is True.
+    do_ofnonlin : list of bool
+        Boolean flag for whether or not the nonlinear optimum filter fit with floating rise and fall time 
+        should be calculated. Default is False. Each value in the list specifies this attribute for each channel.
+    ofnonlin_positive_pulses : list of bool
+        If True, then the pulses are assumed to be in the positive direction. If False, then the 
+        pulses are assumed to be in the negative direction. Default is True. Each value in the list specifies
+        this attribute for each channel.
     do_optimumfilters : list of bool
         Boolean flag for whether or not any of the optimum filters will be calculated. If only
         calculating non-OF-related RQs, then this will be False, and processing time will not
@@ -347,6 +356,9 @@ class SetupRQ(object):
         self.indstart_maxmin = [0]*self.nchan
         self.indstop_maxmin = [len(self.templates[0])]*self.nchan
         
+        self.do_ofnonlin = [False]*self.nchan
+        self.ofnonlin_positive_pulses = [True]*self.nchan
+        
         self.do_optimumfilters = [True]*self.nchan
         self.do_optimumfilters_smooth = [False]*self.nchan
         
@@ -372,8 +384,6 @@ class SetupRQ(object):
             do_optimumfilters = [ii or jj for ii, jj in zip(do_optimumfilters, self.do_chi2_lowfreq)]
         if any(self.do_ofamp_baseline):
             do_optimumfilters = [ii or jj for ii, jj in zip(do_optimumfilters, self.do_ofamp_baseline)]
-        if any(self.do_ofamp_shifted):
-            do_optimumfilters = [ii or jj for ii, jj in zip(do_optimumfilters, self.do_ofamp_shifted)]
         
         self.do_optimumfilters = do_optimumfilters
         
@@ -391,8 +401,6 @@ class SetupRQ(object):
             do_optimumfilters_smooth = [ii or jj for ii, jj in zip(do_optimumfilters_smooth, self.do_chi2_nopulse_smooth)]
         if any(self.do_ofamp_baseline_smooth):
             do_optimumfilters_smooth = [ii or jj for ii, jj in zip(do_optimumfilters_smooth, self.do_ofamp_baseline_smooth)]
-        if any(self.do_ofamp_shifted_smooth):
-            do_optimumfilters_smooth = [ii or jj for ii, jj in zip(do_optimumfilters_smooth, self.do_ofamp_shifted_smooth)]
             
         self.do_optimumfilters_smooth = do_optimumfilters_smooth
         
@@ -824,8 +832,6 @@ class SetupRQ(object):
         self.indstart_energy_absorbed = indstart
         self.indstop_energy_absorbed = indstop
         
-        
-        
     def adjust_maxmin(self, lgcrun=True, use_min=False, indstart=None, indstop=None):
         """
         Method for adjusting the calculation of the range of a trace.
@@ -918,8 +924,28 @@ class SetupRQ(object):
             
         self.shifted_fit = which_fit
         
-        self._check_of()
+    def adjust_ofnonlin(self, lgcrun=True, positive_pulses=True):
+        """
+        Method for adjusting the calculation of the nonlinear optimum filter fit with rise and 
+        fall time floating.
         
+        Parameters
+        ----------
+        lgcrun : bool, list of bool, optional
+            Boolean flag for whether or not the nonlinear optimum filter fit should be calculated.
+        positive_pulses : bool, list of bool, optional
+            If True, then the pulses are assumed to be in the positive direction. If False, then the 
+            pulses are assumed to be in the negative direction. Default is True.
+        
+        """
+        
+        lgcrun, positive_pulses = self._check_arg_length(lgcrun=lgcrun, positive_pulses=positive_pulses)
+        
+        if any(lgcrun):
+            warnings.warn("The nonlinear OF should only be run on a cluster due to the slow computation speed.")
+        
+        self.do_ofnonlin = lgcrun
+        self.ofnonlin_positive_pulses = positive_pulses
         
 def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, chan_num, det):
     """
@@ -1078,12 +1104,26 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
             if setup.ofamp_constrained_pulse_constraint[chan_num]!=0:
                 chi2low_constrain_pcon = np.zeros(len(signal))
     
+    if setup.do_ofnonlin[chan_num]:
+        amp_nonlin = np.zeros(len(signal))
+        amp_nonlin_err = np.zeros(len(signal))
+        taurise_nonlin = np.zeros(len(signal))
+        taurise_nonlin_err = np.zeros(len(signal))
+        taufall_nonlin = np.zeros(len(signal))
+        taufall_nonlin_err = np.zeros(len(signal))
+        t0_nonlin = np.zeros(len(signal))
+        t0_nonlin_err = np.zeros(len(signal))
+        chi2_nonlin = np.zeros(len(signal))
+    
     # run the OF class for each trace
     if setup.do_optimumfilters[chan_num]:
         OF = qp.OptimumFilter(signal[0], template, psd, fs)
     if setup.do_optimumfilters_smooth[chan_num]:
         psd_smooth = qp.smooth_psd(psd)
         OF_smooth = qp.OptimumFilter(signal[0], template, psd_smooth, fs)
+        
+    if setup.do_ofnonlin[chan_num]:
+        nlin = qp.OFnonlin(psd, fs, template=template)
     
     for jj, s in enumerate(signal):
         if jj!=0:
@@ -1168,6 +1208,24 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         if setup.do_ofamp_baseline_smooth[chan_num]:
             amp_baseline_smooth[jj], t0_baseline_smooth[jj], chi2_baseline_smooth[jj] = OF_smooth.ofamp_baseline(
                                                                    nconstrain=setup.ofamp_baseline_nconstrain[chan_num])
+        
+        if setup.do_ofnonlin[chan_num]:
+            if setup.ofnonlin_positive_pulses[chan_num]:
+                flip = 1
+            else:
+                flip = -1
+            
+            params_nlin, errors_nlin, _, reducedchi2_nlin = nlin.fit_falltimes(flip*s, npolefit=2, lgcfullrtn=True)
+            
+            amp_nonlin[jj] = flip*params_nlin[0]
+            amp_nonlin_err[jj] = errors_nlin[0]
+            taurise_nonlin[jj] = params_nlin[1]
+            taurise_nonlin_err[jj] = errors_nlin[1]
+            taufall_nonlin[jj] = params_nlin[2]
+            taufall_nonlin_err[jj] = errors_nlin[2]
+            t0_nonlin[jj] = params_nlin[3]
+            t0_nonlin_err[jj] = errors_nlin[3]
+            chi2_nonlin[jj] = reducedchi2_nlin * (len(nlin.data)-nlin.dof)
     
     # save variables to dict
     if setup.do_chi2_nopulse[chan_num]:
@@ -1294,6 +1352,26 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         rq_dict[f't0_baseline_smooth_{chan}{det}'][readout_inds] = t0_baseline_smooth
         rq_dict[f'chi2_baseline_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'chi2_baseline_smooth_{chan}{det}'][readout_inds] = chi2_baseline_smooth
+    
+    if setup.do_ofnonlin[chan_num]:
+        rq_dict[f'ofamp_nlin_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'ofamp_nlin_{chan}{det}'][readout_inds] = amp_nonlin
+        rq_dict[f'ofamp_nlin_err_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'ofamp_nlin_err_{chan}{det}'][readout_inds] = amp_nonlin_err
+        rq_dict[f'oftaurise_nlin_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'oftaurise_nlin_{chan}{det}'][readout_inds] = taurise_nonlin
+        rq_dict[f'oftaurise_nlin_err_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'oftaurise_nlin_err_{chan}{det}'][readout_inds] = taurise_nonlin_err
+        rq_dict[f'oftaufall_nlin_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'oftaufall_nlin_{chan}{det}'][readout_inds] = taufall_nonlin
+        rq_dict[f'oftaufall_nlin_err_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'oftaufall_nlin_err_{chan}{det}'][readout_inds] = taufall_nonlin_err
+        rq_dict[f't0_nlin_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f't0_nlin_{chan}{det}'][readout_inds] = t0_nonlin
+        rq_dict[f't0_nlin_err_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f't0_nlin_err_{chan}{det}'][readout_inds] = t0_nonlin_err
+        rq_dict[f'chi2_nlin_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2_nlin_{chan}{det}'][readout_inds] = chi2_nonlin
     
     if any(setup.do_ofamp_shifted) and setup.trigger is not None:
         # do the shifted OF on each trace
