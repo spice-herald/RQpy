@@ -235,8 +235,8 @@ def get_trace_gain(path, chan, det, gainfactors = {'rfb': 5000, 'loopgain' : 2.4
     series = path.split('/')[-1]
     settings = getDetectorSettings(path, series)
     qetbias = settings[det][chan]['qetBias']
-    drivergain = settings[det][chan]['driverGain']*2
-    convtoamps = 1/(gainfactors['rfb'] * gainfactors['loopgain'] * drivergain * gainfactors['adcpervolt'])
+    drivergain = settings[det][chan]['driverGain']
+    convtoamps = 1/(gainfactors['rfb'] * gainfactors['loopgain'] * drivergain *2 * gainfactors['adcpervolt'])
     
     return convtoamps, drivergain, qetbias
 
