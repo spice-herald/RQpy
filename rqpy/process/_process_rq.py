@@ -223,8 +223,9 @@ class SetupRQ(object):
     
     """
     
+
     def __init__(self, templates, psds, fs, summed_template=None, summed_psd=None, trigger=None,
-                 indstart=None, indstop=None):
+                 indstart=None, indstop=None, background_templates=None, background_templates_shifts=None):
         """
         Initialization of the SetupRQ class.
         
@@ -254,15 +255,19 @@ class SetupRQ(object):
         indstop : int, NoneType, optional
             The index at we should truncate the end of the traces up to when calculating RQs. If left as 
             None, then we do not truncate the end of the trace. See `indstart`.
-        
+        background_templates : ndarray, optional
+            The m background templates for the nSmB optimal filter. All should be normalized to max(temp)=1)
+            Dimensions: (time bins) X (m)
+        background_templates_shifts : ndarray, optional
+            The bin offsets/shifts between the background templates
         """
         
         if not isinstance(templates, list):
             templates = [templates]
             
         if not isinstance(psds, list):
-            psds = [psds]
-            
+            psds = [psds]           
+        
         if len(templates) != len(psds):
             raise ValueError("Different numbers of templates and psds were inputted")
         
@@ -285,6 +290,9 @@ class SetupRQ(object):
         
         self.summed_template = summed_template
         self.summed_psd = summed_psd
+
+        self.background_templates = background_templates
+        self.background_templates_shifts = background_templates_shifts
         
         if trigger is None or trigger in list(range(self.nchan)):
             self.trigger = trigger
@@ -321,6 +329,12 @@ class SetupRQ(object):
         
         self.do_chi2_nopulse = [True]*self.nchan
         self.do_chi2_nopulse_smooth = [False]*self.nchan
+
+        if background_templates is None:
+            self.do_ofamp_nSmB = False
+        else:
+            self.do_ofamp_nSmB = True
+
         
         self.do_chi2_lowfreq = [True]*self.nchan
         self.chi2_lowfreq_fcutoff = [10000]*self.nchan
@@ -947,7 +961,8 @@ class SetupRQ(object):
         self.do_ofnonlin = lgcrun
         self.ofnonlin_positive_pulses = positive_pulses
         
-def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, chan_num, det):
+def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, chan_num, det, background_templates=None,
+                            background_templates_shifts=None):
     """
     Helper function for calculating RQs for an array of traces corresponding to a single channel.
     
@@ -1331,6 +1346,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         rq_dict[f'chi2_pileup_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'chi2_pileup_smooth_{chan}{det}'][readout_inds] = chi2_pileup_smooth
         
+
     if setup.do_ofamp_baseline[chan_num]:
         rq_dict[f'ofamp_baseline_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'ofamp_baseline_{chan}{det}'][readout_inds] = amp_baseline
@@ -1422,6 +1438,89 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
             rq_dict[f'chi2_shifted_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
             rq_dict[f'chi2_shifted_smooth_{chan}{det}'][readout_inds] = chi2_shifted_smooth
     
+
+    if setup.do_ofamp_nSmB:
+        psddnu,OFfiltf,Wf, Wf_summed, Wt, sbTemplatef,sbTemplatet,iWt,iBB,BB,nS,nB,bitComb  = qp.of_nSmB_setup(template,background_templates,psd, fs)
+        
+        amp_s_nsmb = np.zeros(len(signal))
+        t0_s_nsmb = np.zeros(len(signal))
+        amps_nsmb = np.zeros((len(signal),(nS+nB)))
+        ampsBOnly_nsmb = np.zeros((len(signal),(nB)))
+        chi2_nsmb = np.zeros(len(signal))
+        chi2_nsmb_lf = np.zeros(len(signal))
+        chi2BOnly_nsmb = np.zeros(len(signal))
+        chi2BOnly_nsmb_lf = np.zeros(len(signal))
+        
+        # allow signal template to move anywhere along trace
+        indwindow = np.arange(0,len(template))
+        # make indwindow dimensions 1 X (time bins)
+        indwindow = indwindow[:,None].T
+        
+        # find all indices within -lowInd and +highInd bins of background_template_shifts
+        # manually do the first range
+        #lowInd = 13
+        lowInd = 1
+        #highInd = 14
+        highInd = 1
+        restrictInd = np.arange(-lowInd,highInd+1);
+        for ii in range(1,nB-1):
+            # start with the second index
+            restrictInd = np.concatenate((restrictInd,
+                                         np.arange(int(background_templates_shifts[ii]-lowInd),
+                                                   int(background_templates_shifts[ii]+highInd+1))))
+        
+        # if values of restrictInd are negative
+        # wrap them around to the end of the window
+        lgcneg = restrictInd<0
+        restrictInd[lgcneg] = len(template)+restrictInd[lgcneg]
+        
+        # make restictInd 1 X (time bins)
+        restrictInd = restrictInd[:,None].T
+        
+        # delete the restrictedInd from indwindow
+        indwindow = np.delete(indwindow,restrictInd)
+        
+        # make indwindow dimensions 1 X (time bins)
+        indwindow = indwindow[:,None].T
+
+        #lgcplotnsmb=True
+        lgcplotnsmb=False
+        for jj, s in enumerate(signal):
+        #for jj  in range(len(signal)):
+            s = signal[4,:]
+            #print(f'jj={jj}')
+            if lgcplotnsmb==True:
+                figNum = jj
+            else:
+                figNum=False
+            amps_nsmb[jj,:],t0_s_nsmb[jj],ampsBOnly_nsmb[jj,:], chi2_nsmb[jj], chi2_nsmb_lf[jj],_,_,_,chi2BOnly_nsmb[jj],chi2BOnly_nsmb_lf[jj] = qp.of_nSmB_inside(s, OFfiltf, Wf, Wf_summed, Wt, sbTemplatef.T, sbTemplatet, iWt, iBB, BB, psddnu.T, fs, indwindow, nS,nB, bitComb,background_templates_shifts = background_templates_shifts,
+                lgc_interp=False,lgcplot=lgcplotnsmb,lgcsaveplots=figNum)
+            if (lgcplotnsmb==True):
+                nPlots = 1
+                if(jj==(nPlots-1)):
+                    print('Warning: stopping at', nPlots, 'events to head off any memory problems')
+                    break
+        
+        rq_dict[f'ofamp_s_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'ofamp_s_nSmB_{chan}{det}'][readout_inds] = amps_nsmb[:,0]
+        rq_dict[f't0_s_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f't0_s_nSmB_{chan}{det}'][readout_inds] = t0_s_nsmb
+        for iB in range(nS,nS+nB):
+            rq_dict[f'ofamp_b{iB:02d}_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f'ofamp_b{iB:02d}_nSmB_{chan}{det}'][readout_inds] = amps_nsmb[:,iB]
+        for iB in range(nB):
+            rq_dict[f'ofampBOnly_b{(iB+1):02d}_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f'ofampBOnly_b{(iB+1):02d}_nSmB_{chan}{det}'][readout_inds] = ampsBOnly_nsmb[:,iB]
+        rq_dict[f'chi2_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2_nSmB_{chan}{det}'][readout_inds] = chi2_nsmb
+        rq_dict[f'chi2_nSmB_lf_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2_nSmB_lf_{chan}{det}'][readout_inds] = chi2_nsmb_lf
+        rq_dict[f'chi2BOnly_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2BOnly_nSmB_{chan}{det}'][readout_inds] = chi2BOnly_nsmb
+        rq_dict[f'chi2BOnly_nSmB_lf_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2BOnly_nSmB_lf_{chan}{det}'][readout_inds] = chi2BOnly_nsmb_lf
+
+
     return rq_dict
     
 def _calc_rq(traces, channels, det, setup, readout_inds=None):
@@ -1468,18 +1567,25 @@ def _calc_rq(traces, channels, det, setup, readout_inds=None):
             signal = traces[readout_inds, ii, setup.indstart:setup.indstop]
             template = setup.templates[ii]
             psd = setup.psds[ii]
+            background_templates = setup.background_templates
+            background_templates_shifts = setup.background_templates_shifts
+    
+            chan_dict = _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ii, d, background_templates,
+                                               background_templates_shifts)
 
-            chan_dict = _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ii, d)
-            
             rq_dict.update(chan_dict)
             
     if setup.calcsum:
         signal = traces[readout_inds, :, setup.indstart:setup.indstop].sum(axis=1)
         template = setup.summed_template
         psd = setup.summed_psd
+        background_templates = setup.background_templates
+        background_templates_shifts = setup.background_templates_shifts
+
         chan = "sum"
 
-        sum_dict = _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, 0, "")
+        sum_dict = _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, 0, "", background_templates,
+                                          background_templates_shifts)
 
         rq_dict.update(sum_dict)
     
@@ -1530,7 +1636,7 @@ def _rq(file, channels, det, setup, convtoamps, savepath, lgcsavedumps, filetype
         dump = f"{int(seriesnum.split('_')[-1]):04d}"
         
     print(f"On Series: {seriesnum},  dump: {dump}")
-    
+
     if isinstance(channels, str):
         channels = [channels]
         
