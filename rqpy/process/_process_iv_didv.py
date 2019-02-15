@@ -12,7 +12,7 @@ from qetpy.utils import calc_offset
 
 if HAS_SCDMSPYTOOLS:
     from scdmsPyTools.BatTools.IO import getRawEvents, getDetectorSettings
-    import rawdata_reader as rawdata
+    from scdmsPyTools.BatTools import rawdata_reader as rawdata
 
 __all__ = ["process_ivsweep"]
 
