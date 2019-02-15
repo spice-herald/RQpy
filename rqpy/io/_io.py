@@ -129,7 +129,8 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
                                outputFormat=3, eventNumbers=evtnums[cseries].astype(int).tolist())
         elif filetype == "npz":
             inds = np.mod(evtnums[cseries], 10000) - 1
-            with np.load(f"{basepath}/{snum}.npz") as f:
+            snum_alone = "_".join(snum.split("_",2)[:2])
+            with np.load(f"{basepath}/{snum_alone}/{snum}.npz") as f:
                 arr = f["traces"][inds]
     
         arrs.append(arr)

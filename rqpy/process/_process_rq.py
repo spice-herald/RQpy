@@ -565,7 +565,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         lgcplotnsmb=False
         for jj, s in enumerate(signal):
         #for jj  in range(len(signal)):
-            #s = signal[14,:]
+            s = signal[4,:]
             #print(f'jj={jj}')
             if lgcplotnsmb==True:
                 figNum = jj
@@ -574,7 +574,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
             amps_nsmb[jj,:],t0_s_nsmb[jj],ampsBOnly_nsmb[jj,:], chi2_nsmb[jj], chi2_nsmb_lf[jj],_,_,_,chi2BOnly_nsmb[jj],chi2BOnly_nsmb_lf[jj] = qp.of_nSmB_inside(s, OFfiltf, Wf, Wf_summed, Wt, sbTemplatef.T, sbTemplatet, iWt, iBB, BB, psddnu.T, fs, indwindow, nS,nB, bitComb,background_templates_shifts = background_templates_shifts,
                 lgc_interp=False,lgcplot=lgcplotnsmb,lgcsaveplots=figNum)
             if (lgcplotnsmb==True):
-                nPlots = 5
+                nPlots = 1
                 if(jj==(nPlots-1)):
                     print('Warning: stopping at', nPlots, 'events to head off any memory problems')
                     break
@@ -642,7 +642,7 @@ def _calc_rq(traces, channels, det, setup, readout_inds=None):
             background_templates = setup.background_templates
             background_templates_shifts = setup.background_templates_shifts
     
-            chan_dict = _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ii, background_templates,
+            chan_dict = _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ii, "", background_templates,
                                                background_templates_shifts)
 
             rq_dict.update(chan_dict)
