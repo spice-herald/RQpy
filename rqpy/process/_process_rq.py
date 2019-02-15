@@ -10,9 +10,6 @@ from rqpy import io
 import qetpy as qp
 from rqpy import HAS_SCDMSPYTOOLS
 
-if HAS_SCDMSPYTOOLS:
-    from scdmsPyTools.BatTools.IO import getRawEvents, getDetectorSettings
-
 __all__ = ["SetupRQ", "rq"]
 
 class SetupRQ(object):
