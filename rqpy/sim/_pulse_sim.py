@@ -36,8 +36,8 @@ def buildfakepulses(rq, cut, template1, amplitudes1, tdelay1, basepath, evtnums,
     amplitudes1 : ndarray
         The amplitudes by which to scale the template to add the the traces. Must be same length as cut
     telay1 : ndarray
-        The time delay offset, in seconds, by which to shift the template to add to the traces. Bin interpolation
-        not implemented
+        The time delay offset, in seconds, by which to shift the template to add to the traces.
+        Bin interpolation implemented
     basepath : str
         The base path to the directory that contains the folders that the event dumps 
         are in. The folders in this directory should be the series numbers.
@@ -150,9 +150,9 @@ def _buildfakepulses_seg(rq, cut, template1, amplitudes1, tdelay1, basepath, evt
         The template to be added to the traces. The template start time should be centered on the center bin
     amplitudes1 : ndarray
         The amplitudes by which to scale the template to add the the traces. Must be same length as cut
-    telay1 : ndarray
-        The time delay offset, in seconds, by which to shift the template to add to the traces. Bin interpolation
-        not implemented
+    tdelay1 : ndarray
+        The time delay offset, in seconds, by which to shift the template to add to the traces.
+        Bin interpolation implemented
     basepath : str
         The base path to the directory that contains the folders that the event dumps 
         are in. The folders in this directory should be the series numbers.
@@ -164,7 +164,7 @@ def _buildfakepulses_seg(rq, cut, template1, amplitudes1, tdelay1, basepath, evt
         The 2nd template to be added to the traces, otherwise same as template1
     amplitudes2 : ndarray, optional
         The amplitudes by which to scale the 2nd template, otherwise same as amplitudes1
-    telay2 : ndarray, optional
+    tdelay2 : ndarray, optional
         The time delay offset for the 2nd template, otherwise same as tdelay1
     channels : list, optional
         A list of strings that contains all of the channels that should be loaded.
@@ -202,6 +202,13 @@ def _buildfakepulses_seg(rq, cut, template1, amplitudes1, tdelay1, basepath, evt
     
     """
     
+    if template2 is not None:
+        if amplitudes2 is None:
+            raise ValueError("amplitudes2 must be defined if template2 is defined")
+        if tdelay2 is None:
+            raise ValueError("tdelay2 must be defined if template2 is defined")
+
+
     # load all traces selected by cut
     nTraces = np.sum(cut)
     t, traces, _ = io.getrandevents(basepath, rq.eventnumber, rq.seriesnumber,
@@ -222,7 +229,11 @@ def _buildfakepulses_seg(rq, cut, template1, amplitudes1, tdelay1, basepath, evt
     tracesSum = np.sum(traces, axis=1)
 
     # convert tdelay1 to bins
-    tdelay1Bin = tdelay1*(1/fs)
+    tdelay1Bin = tdelay1*(fs)
+    
+    if tdelay2 is not None:
+        tdelay2Bin = tdelay2*(fs)
+    
     
     # initialize ndarray with same dimension
     # as traces to be saved
@@ -231,6 +242,11 @@ def _buildfakepulses_seg(rq, cut, template1, amplitudes1, tdelay1, basepath, evt
     for i in range(nTraces):
         # scale and shift template1 by amplitudes1 and tdelay1
         newTrace = tracesSum[i] + amplitudes1[i]*core.shift(template1,tdelay1Bin[i])
+        
+        # add second pulse if template2 is defined
+        if template2 is not None:
+            newTrace = newTrace + amplitudes2[i]*core.shift(template2,tdelay2Bin[i])
+        
         # multiply by reciprocal of the relative calibration such that
         # when the processing script creates the total channel pulse
         # it will be equal to newTrace
@@ -243,13 +259,18 @@ def _buildfakepulses_seg(rq, cut, template1, amplitudes1, tdelay1, basepath, evt
                 # so set to zeros to avoid division by zero
                 fakepulses[i,j,:]=np.zeros(shapeTraces[2])
 
+                
     if lgcsavefile:
         if (filetype=='npz'):
             trigtypes = np.zeros((nTraces,3))
-            process._trigger._saveevents(pulsetimes=rq.pulsetimes[cut],
-                                         pulseamps=rq.pulseamps[cut],
-                                         trigtimes=rq.pulsetimes[cut],
-                                         trigamps =rq.pulseamps[cut],
+            # save the data. note that we are storing the truth
+            # information in some of the inputs intended for use
+            # by the continuous trigger code.
+            # TODO: save truth information in a better way
+            process._trigger._saveevents(pulsetimes=tdelay1,
+                                         pulseamps=amplitudes1,
+                                         trigtimes=tdelay2,
+                                         trigamps =amplitudes2,
                                          traces=fakepulses,
                                          trigtypes=trigtypes,
                                          savepath=savefilepath,
