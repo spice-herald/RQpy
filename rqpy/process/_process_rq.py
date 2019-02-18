@@ -222,7 +222,8 @@ class SetupRQ(object):
     
 
     def __init__(self, templates, psds, fs, summed_template=None, summed_psd=None, trigger=None,
-                 indstart=None, indstop=None, background_templates=None, background_templates_shifts=None):
+                 indstart=None, indstop=None, background_templates=None, background_templates_shifts=None,
+                bkgpolarityconstraint=None, sigpolarityconstraint=None):
         """
         Initialization of the SetupRQ class.
         
@@ -253,10 +254,18 @@ class SetupRQ(object):
             The index at we should truncate the end of the traces up to when calculating RQs. If left as 
             None, then we do not truncate the end of the trace. See `indstart`.
         background_templates : ndarray, optional
-            The m background templates for the nSmB optimal filter. All should be normalized to max(temp)=1)
+            The m background templates for the nsmb optimal filter. All should be normalized to max(temp)=1)
             Dimensions: (time bins) X (m)
         background_templates_shifts : ndarray, optional
             The bin offsets/shifts between the background templates
+        bkgpolarityconstraint : ndarray
+            The array to tell the nsmb of fit whether or not to constrain the polarity
+            of the amplitude.
+                If 0, then no constraint on the pulse direction is set
+                If 1, then a positive pulse constraint is set.
+                If -1, then a negative pulse constraint is set.
+        sigpolarityconstraint : int
+            Same as bkgpolarityconstraint but for the signal template
         """
         
         if not isinstance(templates, list):
@@ -290,7 +299,8 @@ class SetupRQ(object):
 
         self.background_templates = background_templates
         self.background_templates_shifts = background_templates_shifts
-        
+        self.bkgpolarityconstraint = bkgpolarityconstraint
+        self.sigpolarityconstraint = sigpolarityconstraint
         if trigger is None or trigger in list(range(self.nchan)):
             self.trigger = trigger
         else:
@@ -328,9 +338,9 @@ class SetupRQ(object):
         self.do_chi2_nopulse_smooth = [False]*self.nchan
 
         if background_templates is None:
-            self.do_ofamp_nSmB = False
+            self.do_ofamp_nsmb = False
         else:
-            self.do_ofamp_nSmB = True
+            self.do_ofamp_nsmb = True
 
         
         self.do_chi2_lowfreq = [True]*self.nchan
@@ -959,7 +969,7 @@ class SetupRQ(object):
         self.ofnonlin_positive_pulses = positive_pulses
         
 def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, chan_num, det, background_templates=None,
-                            background_templates_shifts=None):
+                            background_templates_shifts=None,bkgpolarityconstraint=None, sigpolarityconstraint=None):
     """
     Helper function for calculating RQs for an array of traces corresponding to a single channel.
     
@@ -984,6 +994,14 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         The corresponding number for the channel being processed.
     det : str
         Name of the detector corresponding to the channel that is being processed.
+    bkgpolarityconstraint : ndarray
+        The array to tell the nsmb of fit whether or not to constrain the polarity
+        of the amplitude.
+            If 0, then no constraint on the pulse direction is set
+            If 1, then a positive pulse constraint is set.
+            If -1, then a negative pulse constraint is set.
+    sigpolarityconstraint : int
+        Same as bkgpolarityconstraint but for the signal template
     
     Returns
     -------
@@ -1436,8 +1454,14 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
             rq_dict[f'chi2_shifted_smooth_{chan}{det}'][readout_inds] = chi2_shifted_smooth
     
 
-    if setup.do_ofamp_nSmB:
-        psddnu,OFfiltf,Wf, Wf_summed, Wt, sbTemplatef,sbTemplatet,iWt,iBB,BB,nS,nB,bitComb  = qp.of_nSmB_setup(template,background_templates,psd, fs)
+    if setup.do_ofamp_nsmb:
+        
+        #=== Concatenate signal and background template matrices and take FFT====
+        sbtemplatef, sbtemplatet = qp.of_nsmb_fftTemplate(np.expand_dims(template,1), background_templates)
+
+        (psddnu,OFfiltf,Wf, Wf_summed, Wt, 
+         sbTemplatef,sbTemplatet,iWt,iBB,
+         BB,nS,nB,bitComb)  = qp.of_nsmb_setup(template,background_templates,psd, fs)
         
         amp_s_nsmb = np.zeros(len(signal))
         t0_s_nsmb = np.zeros(len(signal))
@@ -1455,13 +1479,10 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         
         # find all indices within -lowInd and +highInd bins of background_template_shifts
         # manually do the first range
-        #lowInd = 13
         lowInd = 1
-        #highInd = 14
         highInd = 1
-        restrictInd = np.arange(-lowInd,highInd+1);
-        for ii in range(1,nB-1):
-            # start with the second index
+        restrictInd = np.empty(0)
+        for ii in range(0,nB-2):
             restrictInd = np.concatenate((restrictInd,
                                          np.arange(int(background_templates_shifts[ii]-lowInd),
                                                    int(background_templates_shifts[ii]+highInd+1))))
@@ -1480,8 +1501,8 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         # make indwindow dimensions 1 X (time bins)
         indwindow = indwindow[:,None].T
 
-        #lgcplotnsmb=True
-        lgcplotnsmb=False
+        lgcplotnsmb=True
+        #lgcplotnsmb=False
         for jj, s in enumerate(signal):
         #for jj  in range(len(signal)):
             s = signal[4,:]
@@ -1490,32 +1511,41 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                 figNum = jj
             else:
                 figNum=False
-            amps_nsmb[jj,:],t0_s_nsmb[jj],ampsBOnly_nsmb[jj,:], chi2_nsmb[jj], chi2_nsmb_lf[jj],_,_,_,chi2BOnly_nsmb[jj],chi2BOnly_nsmb_lf[jj] = qp.of_nSmB_inside(s, OFfiltf, Wf, Wf_summed, Wt, sbTemplatef.T, sbTemplatet, iWt, iBB, BB, psddnu.T, fs, indwindow, nS,nB, bitComb,background_templates_shifts = background_templates_shifts,
-                lgc_interp=False,lgcplot=lgcplotnsmb,lgcsaveplots=figNum)
+            
+            (amps_nsmb[jj,:],t0_s_nsmb[jj],ampsBOnly_nsmb[jj,:], 
+             chi2_nsmb[jj],chi2_nsmb_lf[jj],_,_,_,chi2BOnly_nsmb[jj],
+             chi2BOnly_nsmb_lf[jj]) = qp.of_nsmb_inside(s, OFfiltf, Wf, Wf_summed,
+                                                        Wt, sbTemplatef.T, sbTemplatet,
+                                                        iWt, iBB, BB, psddnu.T,
+                                                        fs, indwindow, nS,nB, bitComb,
+                                                        background_templates_shifts = background_templates_shifts,
+                                                        bkgpolarityconstraint = bkgpolarityconstraint,
+                                                        sigpolarityconstraint = sigpolarityconstraint,
+                                                        lgc_interp=False,lgcplot=lgcplotnsmb,lgcsaveplots=figNum)
             if (lgcplotnsmb==True):
                 nPlots = 1
                 if(jj==(nPlots-1)):
                     print('Warning: stopping at', nPlots, 'events to head off any memory problems')
                     break
         
-        rq_dict[f'ofamp_s_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'ofamp_s_nSmB_{chan}{det}'][readout_inds] = amps_nsmb[:,0]
-        rq_dict[f't0_s_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f't0_s_nSmB_{chan}{det}'][readout_inds] = t0_s_nsmb
+        rq_dict[f'ofamp_s_nsmb_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'ofamp_s_nsmb_{chan}{det}'][readout_inds] = amps_nsmb[:,0]
+        rq_dict[f't0_s_nsmb_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f't0_s_nsmb_{chan}{det}'][readout_inds] = t0_s_nsmb
         for iB in range(nS,nS+nB):
-            rq_dict[f'ofamp_b{iB:02d}_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-            rq_dict[f'ofamp_b{iB:02d}_nSmB_{chan}{det}'][readout_inds] = amps_nsmb[:,iB]
+            rq_dict[f'ofamp_b{iB:02d}_nsmb_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f'ofamp_b{iB:02d}_nsmb_{chan}{det}'][readout_inds] = amps_nsmb[:,iB]
         for iB in range(nB):
-            rq_dict[f'ofampBOnly_b{(iB+1):02d}_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-            rq_dict[f'ofampBOnly_b{(iB+1):02d}_nSmB_{chan}{det}'][readout_inds] = ampsBOnly_nsmb[:,iB]
-        rq_dict[f'chi2_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'chi2_nSmB_{chan}{det}'][readout_inds] = chi2_nsmb
-        rq_dict[f'chi2_nSmB_lf_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'chi2_nSmB_lf_{chan}{det}'][readout_inds] = chi2_nsmb_lf
-        rq_dict[f'chi2BOnly_nSmB_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'chi2BOnly_nSmB_{chan}{det}'][readout_inds] = chi2BOnly_nsmb
-        rq_dict[f'chi2BOnly_nSmB_lf_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'chi2BOnly_nSmB_lf_{chan}{det}'][readout_inds] = chi2BOnly_nsmb_lf
+            rq_dict[f'ofampBOnly_b{(iB+1):02d}_nsmb_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f'ofampBOnly_b{(iB+1):02d}_nsmb_{chan}{det}'][readout_inds] = ampsBOnly_nsmb[:,iB]
+        rq_dict[f'chi2_nsmb_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2_nsmb_{chan}{det}'][readout_inds] = chi2_nsmb
+        rq_dict[f'chi2_nsmb_lf_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2_nsmb_lf_{chan}{det}'][readout_inds] = chi2_nsmb_lf
+        rq_dict[f'chi2BOnly_nsmb_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2BOnly_nsmb_{chan}{det}'][readout_inds] = chi2BOnly_nsmb
+        rq_dict[f'chi2BOnly_nsmb_lf_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2BOnly_nsmb_lf_{chan}{det}'][readout_inds] = chi2BOnly_nsmb_lf
 
 
     return rq_dict
@@ -1566,9 +1596,11 @@ def _calc_rq(traces, channels, det, setup, readout_inds=None):
             psd = setup.psds[ii]
             background_templates = setup.background_templates
             background_templates_shifts = setup.background_templates_shifts
+            bkgpolarityconstraint = setup.bkgpolarityconstraint
+            sigpolarityconstraint = setup.sigpolarityconstraint
     
             chan_dict = _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ii, d, background_templates,
-                                               background_templates_shifts)
+                                               background_templates_shifts, bkgpolarityconstraint, sigpolarityconstraint)
 
             rq_dict.update(chan_dict)
             
@@ -1578,11 +1610,13 @@ def _calc_rq(traces, channels, det, setup, readout_inds=None):
         psd = setup.summed_psd
         background_templates = setup.background_templates
         background_templates_shifts = setup.background_templates_shifts
+        bkgpolarityconstraint = setup.bkgpolarityconstraint
+        sigpolarityconstraint = setup.sigpolarityconstraint
 
         chan = "sum"
 
         sum_dict = _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, 0, "", background_templates,
-                                          background_templates_shifts)
+                                          background_templates_shifts, bkgpolarityconstraint, sigpolarityconstraint)
 
         rq_dict.update(sum_dict)
     
