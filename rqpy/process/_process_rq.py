@@ -1505,7 +1505,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         lgcplotnsmb=False
         for jj, s in enumerate(signal):
         #for jj  in range(len(signal)):
-            s = signal[4,:]
+            #s = signal[4,:]
             #print(f'jj={jj}')
             if lgcplotnsmb==True:
                 figNum = jj
