@@ -1501,8 +1501,8 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         # make indwindow dimensions 1 X (time bins)
         indwindow = indwindow[:,None].T
 
-        lgcplotnsmb=True
-        #lgcplotnsmb=False
+        #lgcplotnsmb=True
+        lgcplotnsmb=False
         for jj, s in enumerate(signal):
         #for jj  in range(len(signal)):
             s = signal[4,:]
