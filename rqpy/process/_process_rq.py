@@ -1522,6 +1522,9 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                                                         bkgpolarityconstraint = bkgpolarityconstraint,
                                                         sigpolarityconstraint = sigpolarityconstraint,
                                                         lgc_interp=False,lgcplot=lgcplotnsmb,lgcsaveplots=figNum)
+            #if (np.amax(amps_nsmb[jj,0:-2]) > 0.0):
+                #print(f'jj = {jj} amps_nsmb= {amps_nsmb[jj,:]}')
+    
             if (lgcplotnsmb==True):
                 nPlots = 1
                 if(jj==(nPlots-1)):
