@@ -2,18 +2,22 @@ import numpy as np
 import pandas as pd
 import os
 from glob import glob
+from math import log10, floor
 
 import rqpy as rp
 from rqpy import io
+from rqpy import HAS_SCDMSPYTOOLS
 
+if HAS_SCDMSPYTOOLS:
+    from scdmsPyTools.BatTools.IO import getDetectorSettings
 
 __all__ = ["buildfakepulses"]
 
 
 def buildfakepulses(rq, cut, template1, amplitudes1, tdelay1, basepath, evtnums, seriesnums,
-                    template2=None, amplitudes2=None, tdelay2=None, channels=["PDS1"], relcal=None,
+                    template2=None, amplitudes2=None, tdelay2=None, channels="PDS1", relcal=None,
                     det="Z1", sumchans=False, convtoamps=1, fs=625e3, neventsperdump = 1000,
-                    filetype="mid.gz", lgcsavefile=False,savefilepath="/galbascratch/wpage/",savefilename=""):
+                    filetype="mid.gz", lgcsavefile=False, savefilepath="", savefilename=""):
 
     """
     Function for building fake pulses by adding a template, scaled to certain amplitudes and
@@ -84,6 +88,9 @@ def buildfakepulses(rq, cut, template1, amplitudes1, tdelay1, basepath, evtnums,
     
     """
     
+    if filetype == "mid.gz" and not HAS_SCDMSPYTOOLS:
+        raise ImportError("Cannot use filetype mid.gz because scdmsPyTools is not installed.")
+    
     # number traces passing cut
     nTraces = np.sum(cut)
 
@@ -128,10 +135,9 @@ def buildfakepulses(rq, cut, template1, amplitudes1, tdelay1, basepath, evtnums,
     
     
 def _buildfakepulses_seg(rq, cut, template1, amplitudes1, tdelay1, basepath, evtnums, seriesnums,
-                         template2=None, amplitudes2=None, tdelay2=None, channels=["PDS1"], relcal=None,
+                         template2=None, amplitudes2=None, tdelay2=None, channels="PDS1", relcal=None,
                          det="Z1", sumchans=False, convtoamps=1, fs=625e3, dumpnum=1, filetype="mid.gz",
                          lgcsavefile=False,savefilepath="",savefilename=""):
-    
     """
     Hidden helper function for building fake pulses
               
@@ -145,7 +151,7 @@ def _buildfakepulses_seg(rq, cut, template1, amplitudes1, tdelay1, basepath, evt
     template1 : ndarray
         The template to be added to the traces. The template start time should be centered on the center bin
     amplitudes1 : ndarray
-        The amplitudes by which to scale the template to add the the traces. Must be same length as cut
+        The amplitudes by which to scale the template to add to the traces. Must be same length as cut
     tdelay1 : ndarray
         The time delay offset, in seconds, by which to shift the template to add to the traces.
         Bin interpolation implemented
@@ -203,13 +209,14 @@ def _buildfakepulses_seg(rq, cut, template1, amplitudes1, tdelay1, basepath, evt
             raise ValueError("amplitudes2 must be defined if template2 is defined")
         if tdelay2 is None:
             raise ValueError("tdelay2 must be defined if template2 is defined")
-
+    
+    seriesnumber = list(set(rq.seriesnumber[cut]))[0]
 
     # load all traces selected by cut
     nTraces = np.sum(cut)
     t, traces, _ = io.getrandevents(basepath, rq.eventnumber, rq.seriesnumber,
-                                    cut=cut, channels=channels,det=det,sumchans=sumchans,
-                                    convtoamps=convtoamps,fs=fs,ntraces = nTraces,filetype=filetype,
+                                    cut=cut, channels=channels, det=det, sumchans=sumchans,
+                                    convtoamps=convtoamps, fs=fs, ntraces=nTraces,filetype=filetype,
                                     lgcplot=False)
     
     shapeTraces = np.shape(traces)
@@ -218,8 +225,8 @@ def _buildfakepulses_seg(rq, cut, template1, amplitudes1, tdelay1, basepath, evt
     if relcal is None:
         relcal = np.ones(nchan)
     else:
-        if(nchan != np.size(relcal)):
-            print('Error: relcal must have size equal to number of channels')
+        if nchan != len(relcal):
+            raise ValueError('relcal must have length equal to number of channels')
         
     # sum traces along channel dimension
     tracesSum = np.sum(traces, axis=1)
@@ -257,7 +264,7 @@ def _buildfakepulses_seg(rq, cut, template1, amplitudes1, tdelay1, basepath, evt
 
                 
     if lgcsavefile:
-        if (filetype=='npz'):
+        if filetype=='npz':
             trigtypes = np.zeros((nTraces,3))
             # save the data. note that we are storing the truth
             # information in some of the inputs intended for use
@@ -272,7 +279,137 @@ def _buildfakepulses_seg(rq, cut, template1, amplitudes1, tdelay1, basepath, evt
                               savepath=savefilepath,
                               savename=savefilename,
                               dumpnum=dumpnum)
-
+            
+        elif filetype=="mid.gz":
+            
+            if np.issubdtype(type(seriesnumber), np.integer):
+                snum_str = f"{seriesnumber:012}"
+                snum_str = snum_str[:8] + '_' + snum_str[8:]
+            else:
+                snum_str = seriesnumber
+                
+            full_settings_dict = getDetectorSettings(f"{basepath}{snum_str}", "")
+            
+            settings_dict = {d: full_settings_dict[d] for d in det}
+            
+            for ch, d in zip(channels, det):
+                settings_dict[d]["detectorType"] = 710
+                settings_dict[d]["phononTraceLength"] = int(settings_dict[d][ch]["binsPerTrace"])
+                settings_dict[d]["phononPreTriggerLength"] = settings_dict[d]["phononTraceLength"]//2
+                settings_dict[d]["phononSampleRate"] = int(1/settings_dict[d][ch]["timePerBin"])
+            
+            events_list = _create_events_list(tdelay1, amplitudes1, fakepulses, channels, 
+                                              det, convtoamps, seriesnumber, settings_dict, dumpnum)
+            
+            io.saveevents_midgz(events=events_list, settings=settings_dict, 
+                                savepath=savefilepath, savename=savefilename, dumpnum=dumpnum)
         else:
-            print('WORK IN PROGRESS: midas file writing here')
+            raise ValueError('Inputted filetype is not supported.')
+    
+
+def _round_sig(x, sig=2):
+    """
+    Function for rounding a float to the specified number of significant figures.
+    
+    Parameters
+    ----------
+    x : float
+        Number to round to the specified number of significant figures.
+    sig : int
+        The number of significant figures to round.
+        
+    Returns
+    -------
+    y : float
+        `x` rounded to the number of significant figures specified by `sig`.
+    
+    """
+    
+    if x == 0:
+        return 0
+    else:
+        return round(x, sig-int(floor(log10(abs(x))))-1)
+    
+
+def _create_events_list(pulsetimes, pulseamps, traces, channels, det, convtoamps, seriesnumber, dumpnum):
+    """
+    Function for structuring the events list correctly for use with `rqpy.io.save_events_midgz` when 
+    saving `mid.gz` files.
+    
+    Parameters
+    ----------
+    pulsetimes : ndarray
+        The true values of the time of the inputted pulses in the simulated data, in seconds.
+    pulseamps : ndarray
+        The true values of the amplitudes of the inputted pulses in the simulated data, in Amps.
+    traces : ndarray
+        The array of traces after adding the specified pulses, in Amps. Has shape (number of traces,
+        number of channels, 
+    channels : list of str
+        The list of channels that were used when making the simulated data. The order is assumed to correspond
+        to the order of channels in `traces`.
+    det : list of str
+        The corresponding detector IDs for each channel in `channels`.
+    convtoamps : float
+        The factor that converts from ADC bins to Amps. This is used to convert back to ADC bins.
+    seriesnumber : int
+        The series number that the data was pulled from before adding the pulses.
+    dumpnum : int
+        The dump number for this file, used for correctly setting the event number.
+    
+    Returns
+    -------
+    None
+    
+    """
+    
+    events = list()
+    
+    pchans = ["PAS1", "PBS1", "PCS1", "PDS1", "PES1", "PFS1", "PAS2", "PBS2", "PCS2", "PDS2", "PES2", "PFS2"]
+    
+    for ii, (pulsetime, pulseamp, trace) in enumerate(zip(pulsetimes, pulseamps, traces)):
+
+        event_dict = {'SeriesNumber': seriesnumber,
+                      'EventNumber' : dumpnum*(10000)+ii,
+                      'EventTime'   : 0,
+                      'TriggerType' : 1,
+                      'SimAvgX'     : 0,
+                      'SimAvgY'     : _round_sig(pulseamp, sig=6),
+                      'SimAvgZ'     : 0}
+
+        trigger_dict = {'TriggerUnixTime1'  : 0,
+                        'TriggerTime1'      : 0, 
+                        'TriggerTimeFrac1'  : 0, 
+                        'TriggerDetNum1'    : 0, 
+                        'TriggerAmplitude1' : 0,
+                        'TriggerStatus1'    : 3,
+                        'TriggerUnixTime2'  : 0,
+                        'TriggerTime2'      : 0,
+                        'TriggerTimeFrac2'  : int(pulsetime/100e-9),
+                        'TriggerDetNum2'    : 1,
+                        'TriggerAmplitude2' : (pulseamp/convtoamps).astype(np.int32),
+                        'TriggerStatus2'    : 1,
+                        'TriggerUnixTime3'  : 0,
+                        'TriggerTime3'      : 0,
+                        'TriggerTimeFrac3'  : 0,
+                        'TriggerDetNum3'    : 0,
+                        'TriggerAmplitude3' : 0,
+                        'TriggerStatus3'    : 8}
+        
+        events_dict = {'event'   : event_dict,
+                       'trigger' : trigger_dict}
+        
+        for d in set(det):
+            events_dict[d] = dict()
+        
+        for jj, (ch, d) in enumerate(zip(channels, det)):
+            for pch in pchans:
+                if pch==ch:
+                    events_dict[d][ch] = (trace[jj]/convtoamps).astype(np.int32)
+                else:
+                    events_dict[d][pch] = np.zeros(trace.shape[-1], dtype=np.int32)
+        
+        events.append(events_dict)
+    
+    return events
 
