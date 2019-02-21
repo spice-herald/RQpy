@@ -32,12 +32,8 @@ def shift(arr, num, fill_value=0):
     
     result = np.empty_like(arr)
     
-    # check if num is a whole number
-    lgcwholebin = (np.abs(float(num)).is_integer())
-    
-    if lgcwholebin:
-        # force num to int type for slicing
-        num = int(num)
+    if float(num).is_integer():
+        num = int(num) # force num to int type for slicing
         
         if num > 0:
             result[:num] = fill_value
@@ -48,8 +44,7 @@ def shift(arr, num, fill_value=0):
         else:
             result[:] = arr
     else:
-        # interpolate using scipy ndimage module
-        result = ndimage.shift(arr,num, order=1, mode='constant', cval=fill_value)
+        result = ndimage.shift(arr, num, order=1, mode='constant', cval=fill_value)
         
     return result
 
