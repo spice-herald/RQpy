@@ -3,11 +3,8 @@ import pandas as pd
 import os
 from glob import glob
 
+import rqpy as rp
 from rqpy import io
-from rqpy import core
-from rqpy import process
-from rqpy import HAS_SCDMSPYTOOLS
-
 
 
 __all__ = ["buildfakepulses"]
@@ -83,7 +80,7 @@ def buildfakepulses(rq, cut, template1, amplitudes1, tdelay1, basepath, evtnums,
         
     Returns
     -------
-    
+    None
     
     """
     
@@ -116,7 +113,7 @@ def buildfakepulses(rq, cut, template1, amplitudes1, tdelay1, basepath, evtnums,
         maskIndEnd = nonZeroCutInd[jstop] + 1
         
         # create mask for cut
-        mask = np.zeros(sizeCut,dtype=bool)
+        mask = np.zeros(sizeCut, dtype=bool)
         mask[maskIndStart:maskIndEnd] = True
         
         # apply mask
@@ -129,12 +126,11 @@ def buildfakepulses(rq, cut, template1, amplitudes1, tdelay1, basepath, evtnums,
                              dumpnum=(iDump+1), filetype=filetype, lgcsavefile=lgcsavefile, savefilepath=savefilepath,
                              savefilename=savefilename)
     
-    return
     
 def _buildfakepulses_seg(rq, cut, template1, amplitudes1, tdelay1, basepath, evtnums, seriesnums,
-                    template2=None, amplitudes2=None, tdelay2=None, channels=["PDS1"], relcal=None,
-                    det="Z1", sumchans=False, convtoamps=1, fs=625e3, dumpnum=1, filetype="mid.gz",
-                    lgcsavefile=False,savefilepath="",savefilename=""):
+                         template2=None, amplitudes2=None, tdelay2=None, channels=["PDS1"], relcal=None,
+                         det="Z1", sumchans=False, convtoamps=1, fs=625e3, dumpnum=1, filetype="mid.gz",
+                         lgcsavefile=False,savefilepath="",savefilename=""):
     
     """
     Hidden helper function for building fake pulses
@@ -198,7 +194,7 @@ def _buildfakepulses_seg(rq, cut, template1, amplitudes1, tdelay1, basepath, evt
         
     Returns
     -------
-    
+    None
     
     """
     
@@ -212,9 +208,9 @@ def _buildfakepulses_seg(rq, cut, template1, amplitudes1, tdelay1, basepath, evt
     # load all traces selected by cut
     nTraces = np.sum(cut)
     t, traces, _ = io.getrandevents(basepath, rq.eventnumber, rq.seriesnumber,
-                                 cut=cut, channels=channels,det=det,sumchans=sumchans,
-                                 convtoamps=convtoamps,fs=fs,ntraces = nTraces,filetype=filetype,
-                                 lgcplot=False)
+                                    cut=cut, channels=channels,det=det,sumchans=sumchans,
+                                    convtoamps=convtoamps,fs=fs,ntraces = nTraces,filetype=filetype,
+                                    lgcplot=False)
     
     shapeTraces = np.shape(traces)
     nchan = shapeTraces[1]
@@ -241,11 +237,11 @@ def _buildfakepulses_seg(rq, cut, template1, amplitudes1, tdelay1, basepath, evt
     
     for i in range(nTraces):
         # scale and shift template1 by amplitudes1 and tdelay1
-        newTrace = tracesSum[i] + amplitudes1[i]*core.shift(template1,tdelay1Bin[i])
+        newTrace = tracesSum[i] + amplitudes1[i]*rp.shift(template1,tdelay1Bin[i])
         
         # add second pulse if template2 is defined
         if template2 is not None:
-            newTrace = newTrace + amplitudes2[i]*core.shift(template2,tdelay2Bin[i])
+            newTrace = newTrace + amplitudes2[i]*rp.shift(template2,tdelay2Bin[i])
         
         # multiply by reciprocal of the relative calibration such that
         # when the processing script creates the total channel pulse
@@ -267,21 +263,16 @@ def _buildfakepulses_seg(rq, cut, template1, amplitudes1, tdelay1, basepath, evt
             # information in some of the inputs intended for use
             # by the continuous trigger code.
             # TODO: save truth information in a better way
-            process._trigger._saveevents(pulsetimes=tdelay1,
-                                         pulseamps=amplitudes1,
-                                         trigtimes=tdelay2,
-                                         trigamps =amplitudes2,
-                                         traces=fakepulses,
-                                         trigtypes=trigtypes,
-                                         savepath=savefilepath,
-                                         savename=savefilename,
-                                         dumpnum=dumpnum)
+            io.saveevents_npz(pulsetimes=tdelay1,
+                              pulseamps=amplitudes1,
+                              trigtimes=tdelay2,
+                              trigamps=amplitudes2,
+                              traces=fakepulses,
+                              trigtypes=trigtypes,
+                              savepath=savefilepath,
+                              savename=savefilename,
+                              dumpnum=dumpnum)
 
         else:
             print('WORK IN PROGRESS: midas file writing here')
-            
-    return
 
-
- 
-            
