@@ -1,10 +1,15 @@
 import numpy as np
+from rqpy import HAS_SCDMSPYTOOLS
 
-__all__ = ["saveevents_npz"]
+if HAS_SCDMSPYTOOLS:
+    from scdmsPyTools.BatTools import rawdata_writer as writer
 
-def saveevents_npz(pulsetimes=None, pulseamps=None, trigtimes=None,
-                    trigamps=None, randomstimes=None, traces=None, trigtypes=None, 
-                    savepath=None, savename=None, dumpnum=None):
+
+__all__ = ["saveevents_npz", "saveevents_midgz"]
+
+
+def saveevents_npz(pulsetimes=None, pulseamps=None, trigtimes=None, trigamps=None, randomstimes=None, 
+                   traces=None, trigtypes=None, savepath=None, savename=None, dumpnum=None):
     """
     Function for simple saving of events to .npz file.
     
@@ -44,7 +49,49 @@ def saveevents_npz(pulsetimes=None, pulseamps=None, trigtimes=None,
         trigamps = np.zeros_like(randomstimes)
     
     filename = f"{savepath}{savename}_{dumpnum:04d}.npz"
-    np.savez(filename, pulsetimes=pulsetimes, pulseamps=pulseamps, 
-             trigtimes=trigtimes, trigamps=trigamps, randomstimes=randomstimes, 
-             traces=traces, trigtypes=trigtypes)
+    np.savez(filename, 
+             pulsetimes=pulsetimes, 
+             pulseamps=pulseamps, 
+             trigtimes=trigtimes, 
+             trigamps=trigamps, 
+             randomstimes=randomstimes, 
+             traces=traces, 
+             trigtypes=trigtypes)
+
+def saveevents_midgz(events=None, settings=None, savepath=None, savename=None, dumpnum=None):
+    """
+    Function for writing events to MIDAS files.
+    
+    Parameters
+    ----------
+    pulsetimes : ndarray, optional
+        If we triggered on a pulse, the time of the pulse trigger in seconds. Otherwise this is zero.
+    pulseamps : ndarray, optional
+        If we triggered on a pulse, the optimum amplitude at the pulse trigger time. Otherwise this is zero.
+    traces : ndarray, optional
+        The corresponding trace for each detected event.
+    trigtypes: ndarray, optional
+        Array of boolean vectors each of length 3. The first value indicates if the trace is a random or not.
+        The second value indicates if we had a pulse trigger. The third value indicates if we had a ttl trigger.
+    savepath : NoneType, str, optional
+        Path to save the events to.
+    savename : NoneType, str, optional
+        Filename to save the events as.
+    dumpnum : int, optional
+        The dump number of the current file.
+    
+    """
+    
+    if not HAS_SCDMSPYTOOLS:
+        raise ImportError("Cannot use save mid.gz files because scdmsPyTools is not installed.")
+    
+    mywriter = writer.DataWriter()
+    
+    filename_out = f"{savename}_S{dumpnum:04}.mid.gz"
+    mywriter.open_file(filename_out, savepath)
+    mywriter.write_settings_from_dict(settings)
+    mywriter.write_events(events)
+    mywriter.close_file()
+
+
 
