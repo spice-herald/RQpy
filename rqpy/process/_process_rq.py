@@ -1553,7 +1553,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
 
     return rq_dict
     
-def _calc_rq(traces, channels, det, setup, readout_inds=None):
+def _calc_rq(traces, channels, det, setup, readout_inds=None, relcal=None):
     """
     Helper function for calculating RQs for arrays of traces.
     
@@ -1572,7 +1572,8 @@ def _calc_rq(traces, channels, det, setup, readout_inds=None):
     readout_inds : ndarray of bool, optional
         Boolean mask that specifies which traces should be used to calculate the RQs. RQs for the 
         excluded traces are set to -999999.0. 
-    
+    relcal : ndarray, optional
+        A relative channel weighting/calibration for creating the total pulse
     Returns
     -------
     rq_dict : dict
@@ -1608,7 +1609,15 @@ def _calc_rq(traces, channels, det, setup, readout_inds=None):
             rq_dict.update(chan_dict)
             
     if setup.calcsum:
-        signal = traces[readout_inds, :, setup.indstart:setup.indstop].sum(axis=1)
+        if relcal is not None:
+
+            if (len(relcal) != traces.shape[1]):
+                raise ValueError(f"Dim of relcal ({len(relcal)}) is not equal to the number of channels ({traces.shape[1]})")
+                
+            signal = (traces * relcal[:,np.newaxis]).sum(axis=1)
+        else:
+            signal = traces[readout_inds, :, setup.indstart:setup.indstop].sum(axis=1)
+            
         template = setup.summed_template
         psd = setup.summed_psd
         background_templates = setup.background_templates
@@ -1625,7 +1634,7 @@ def _calc_rq(traces, channels, det, setup, readout_inds=None):
     
     return rq_dict
 
-def _rq(file, channels, det, setup, convtoamps, savepath, lgcsavedumps, filetype):
+def _rq(file, channels, det, setup, convtoamps, savepath, lgcsavedumps, filetype, relcal=None):
     """
     Helper function for processing raw data to calculate RQs for single files.
     
@@ -1651,7 +1660,9 @@ def _rq(file, channels, det, setup, convtoamps, savepath, lgcsavedumps, filetype
     filetype : str
         The string that corresponds to the file type that will be opened. Supports two 
         types -"mid.gz" and "npz".
-    
+    relcal : ndarray, optional
+        A relative channel weighting/calibration for creating the total pulse
+        
     Returns
     -------
     rq_df : pandas.DataFrame
@@ -1698,7 +1709,7 @@ def _rq(file, channels, det, setup, convtoamps, savepath, lgcsavedumps, filetype
     elif filetype == "npz":
         readout_inds = None
     
-    rq_dict = _calc_rq(traces, channels, det, setup, readout_inds=readout_inds)
+    rq_dict = _calc_rq(traces, channels, det, setup, readout_inds=readout_inds, relcal=relcal)
     
     data.update(rq_dict)
     
@@ -1710,7 +1721,7 @@ def _rq(file, channels, det, setup, convtoamps, savepath, lgcsavedumps, filetype
     return rq_df
 
 
-def rq(filelist, channels, setup, det="Z1", savepath='', lgcsavedumps=False, nprocess=1, filetype="mid.gz"):
+def rq(filelist, channels, setup, det="Z1", savepath='', lgcsavedumps=False, nprocess=1, filetype="mid.gz", relcal=None):
     """
     Function for processing raw data to calculate RQs. Supports multiprocessing.
     
@@ -1740,6 +1751,8 @@ def rq(filelist, channels, setup, det="Z1", savepath='', lgcsavedumps=False, npr
     filetype : str, optional
         The string that corresponds to the file type that will be opened. Supports two 
         types -"mid.gz" and "npz". "mid.gz" is the default.
+    relcal : ndarray, optional
+        A relative channel weighting/calibration for creating the total pulse
     
     Returns
     -------
@@ -1775,12 +1788,12 @@ def rq(filelist, channels, setup, det="Z1", savepath='', lgcsavedumps=False, npr
     if nprocess == 1:
         results = []
         for f in filelist:
-            results.append(_rq(f, channels, det, setup, convtoamps, savepath, lgcsavedumps, filetype))
+            results.append(_rq(f, channels, det, setup, convtoamps, savepath, lgcsavedumps, filetype, relcal))
     else:
         pool = multiprocessing.Pool(processes = nprocess)
         results = pool.starmap(_rq, zip(filelist, repeat(channels), repeat(det), repeat(setup), 
                                         repeat(convtoamps), repeat(savepath), repeat(lgcsavedumps),
-                                        repeat(filetype)))
+                                        repeat(filetype), repeat(relcal)))
         pool.close()
         pool.join()
     
