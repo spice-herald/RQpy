@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import pandas as pd
 from scipy.io import loadmat
@@ -232,6 +233,10 @@ def get_trace_gain(path, chan, det, gainfactors = {'rfb': 5000, 'loopgain' : 2.4
         raise ImportError("Cannot use get_trace_gain because scdmsPyTools is not installed.")
     
     series = path.split('/')[-1]
+    
+    if os.path.splitext(path)[-1]:
+        path = os.path.dirname(path)
+    
     settings = getDetectorSettings(path, series)
     qetbias = settings[det][chan]['qetBias']
     drivergain = settings[det][chan]['driverGain']
