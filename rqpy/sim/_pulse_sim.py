@@ -11,34 +11,35 @@ from rqpy import HAS_SCDMSPYTOOLS
 if HAS_SCDMSPYTOOLS:
     from scdmsPyTools.BatTools.IO import getDetectorSettings
 
+
 __all__ = ["buildfakepulses"]
 
 
 def buildfakepulses(rq, cut, template1, amplitudes1, tdelay1, basepath, evtnums, seriesnums,
-                    template2=None, amplitudes2=None, tdelay2=None, channels="PDS1", relcal=None,
-                    det="Z1", sumchans=False, convtoamps=1, fs=625e3, neventsperdump = 1000,
-                    filetype="mid.gz", lgcsavefile=False, savefilepath="", savefilename=""):
-
+                    template2=None, amplitudes2=None, tdelay2=None, channels="PDS1",
+                    det="Z1", relcal=None, convtoamps=1, fs=625e3, neventsperdump=1000,
+                    filetype="mid.gz", lgcsavefile=False, savefilepath=None, savefilename=None):
     """
     Function for building fake pulses by adding a template, scaled to certain amplitudes and
     certain time delays, to an existing trace (typically a random).
     
-    This function calls _buildfakepulses_seg which does the heavy lifting
+    This function calls `_buildfakepulses_seg` which does the heavy lifting
               
     Parameters
     ----------
     rq : pandas.DataFrame
-        A pandas DataFrame object that contains all of the RQs for the dataset specified
+        A pandas DataFrame object that contains all of the RQs for the dataset specified.
     cut : array_like
         A boolean array for the cut that selects the traces that will be loaded from the dump files. These
         traces serve as the underlying data to which a template is added.
     template1 : ndarray
-        The template to be added to the traces. The template start time should be centered on the center bin
+        The template to be added to the traces. The template start time should be centered on the center bin.
     amplitudes1 : ndarray
-        The amplitudes by which to scale the template to add the the traces. Must be same length as cut
+        The amplitudes, in Amps, by which to scale the template to add the the traces. Must be 
+        same length as cut.
     telay1 : ndarray
-        The time delay offset, in seconds, by which to shift the template to add to the traces.
-        Bin interpolation implemented
+        The time delay offset, in seconds, by which to shift the template to add to the traces. Bin interpolation 
+        is implemented for values that are not a multiple the reciprocal of the digitization rate.
     basepath : str
         The base path to the directory that contains the folders that the event dumps 
         are in. The folders in this directory should be the series numbers.
@@ -47,40 +48,37 @@ def buildfakepulses(rq, cut, template1, amplitudes1, tdelay1, basepath, evtnums,
     seriesnums : array_like
         An array of the corresponding series numbers for each event number in evtnums.
     template2 : ndarray, optional
-        The 2nd template to be added to the traces, otherwise same as template1
+        The 2nd template to be added to the traces, otherwise same as `template1`.
     amplitudes2 : ndarray, optional
-        The amplitudes by which to scale the 2nd template, otherwise same as amplitudes1
+        The amplitudes by which to scale the 2nd template, otherwise same as `amplitudes1`.
     telay2 : ndarray, optional
-        The time delay offset for the 2nd template, otherwise same as tdelay1
-    channels : list, optional
+        The time delay offset for the 2nd template, otherwise same as `tdelay1`.
+    channels : str, list of str, optional
         A list of strings that contains all of the channels that should be loaded.
-    relcal : ndarray, optional
-        An array with the amplitude scalings between channels used when making the total 
-        If channels is supplied, relcal indices correspond to that list
-        Default is all 1 (no relative scaling)
-    det : str or list of str, optional
+    det : str, list of str, optional
         String or list of strings that specifies the detector name. Only used if filetype=='mid.gz'. 
         If a list of strings, then should each value should directly correspond to the channel names.
         If a string is inputted and there are multiple channels, then it is assumed that the detector
         name is the same for each channel.
-    sumchans : bool, optional
-        A boolean flag for whether or not to sum the channels when plotting. If False, each 
-        channel is plotted individually.
-    convtoamps : float or list of floats, optional
+    relcal : ndarray, optional
+        An array with the amplitude scalings between channels used when making the total 
+        If channels is supplied, relcal indices correspond to that list
+        Default is all 1 (no relative scaling).
+    convtoamps : float, optional
         The factor that the traces should be multiplied by to convert ADC bins to Amperes.
     fs : float, optional
         The sample rate in Hz of the data.
     neventsperdump : int, optional
-        The number of events to be saved per dump file
+        The number of events to be saved per dump file.
     filetype : str, optional
         The string that corresponds to the file type that will be opened. Supports two 
-        types -"mid.gz" and ".npz". "mid.gz" is the default.
+        types: "mid.gz" and "npz". "mid.gz" is the default.
     lgcsavefile : bool, optional
-        A boolean flag for whether or not to save the fake data to a file
+        A boolean flag for whether or not to save the fake data to a file.
     savefilepath : str, optional
-        The string that corresponds to the file path that will be saved
+        The string that corresponds to the file path that will be saved.
     savefilename : str, optional
-        The string that corresponds to the file name that will be adjoined to dumpnum and saved
+        The string that corresponds to the file name that will be adjoined to dumpnum and saved.
         
     Returns
     -------
@@ -91,70 +89,78 @@ def buildfakepulses(rq, cut, template1, amplitudes1, tdelay1, basepath, evtnums,
     if filetype == "mid.gz" and not HAS_SCDMSPYTOOLS:
         raise ImportError("Cannot use filetype mid.gz because scdmsPyTools is not installed.")
     
-    # number traces passing cut
-    nTraces = np.sum(cut)
-
-    # size of cut
-    sizeCut = np.size(cut)
+    if isinstance(channels, str):
+        channels = [channels]
     
-    # segment the fake event building and file saving if
-    # there are more traces than number of events per file
-    nDump = nTraces//neventsperdump + 1
+    if isinstance(det, str):
+        det = [det]*len(channels)
     
-    # get indices of non-zero entries in the cut
-    nonZeroCutInd = np.where(cut)[0]
+    if len(det)!=len(channels):
+        raise ValueError("channels and det should have the same length.")
+    
+    if template2 is not None:
+        if amplitudes2 is None:
+            raise ValueError("amplitudes2 must be defined if template2 is defined.")
+        if tdelay2 is None:
+            raise ValueError("tdelay2 must be defined if template2 is defined.")
+    
+    if len(set(rq.seriesnumber[cut])) > 1:
+        raise ValueError("There cannot be multiple series numbers included in the inputted cut.")
+    
+    if lgcsavefile and (savefilename is None or savefilepath is None):
+        raise ValueError("In order to save the simulated data, you must specify savefilename and savefilepath.")
+    
+    ntraces = np.sum(cut)
+    cutlen = len(cut)
+    
+    ndump = ntraces//neventsperdump + 1
+    
+    nonzerocutinds = np.flatnonzero(cut)
  
-    for iDump in range(nDump):
+    for idump in range(ndump):
+        jstart = idump*neventsperdump
+        jstop = (idump + 1)*neventsperdump - 1
         
-        # get indices for events for this dump
-        jstart = (iDump*neventsperdump)
-        jstop = ((iDump + 1)*neventsperdump - 1)
-        
-        # handle case for last dump which will have
-        # fewer than neventsperdump in the dump
-        if (jstop >= nTraces):
-            jstop = nTraces - 1
+        if (jstop >= ntraces):
+            jstop = ntraces - 1
        
-        # get first and last indices for the cut mask
-        maskIndStart = nonZeroCutInd[jstart]
-        maskIndEnd = nonZeroCutInd[jstop] + 1
+        maskindstart = nonzerocutinds[jstart]
+        maskindend = nonzerocutinds[jstop] + 1
         
-        # create mask for cut
-        mask = np.zeros(sizeCut, dtype=bool)
-        mask[maskIndStart:maskIndEnd] = True
+        mask = np.zeros(cutlen, dtype=bool)
+        mask[maskindstart:maskindend] = True
         
-        # apply mask
         cut_seg = cut & mask
         
-        # call hidden buildfakepulses function with masked cut
         _buildfakepulses_seg(rq, cut_seg, template1, amplitudes1, tdelay1, basepath, evtnums, seriesnums,
                              template2=template2, amplitudes2=amplitudes2, tdelay2=tdelay2, channels=channels,
-                             relcal=relcal, det=det, sumchans=sumchans, convtoamps=convtoamps, fs=fs,
-                             dumpnum=(iDump+1), filetype=filetype, lgcsavefile=lgcsavefile, savefilepath=savefilepath,
+                             relcal=relcal, det=det, convtoamps=convtoamps, fs=fs, dumpnum=idump+1, 
+                             filetype=filetype, lgcsavefile=lgcsavefile, savefilepath=savefilepath,
                              savefilename=savefilename)
     
     
 def _buildfakepulses_seg(rq, cut, template1, amplitudes1, tdelay1, basepath, evtnums, seriesnums,
                          template2=None, amplitudes2=None, tdelay2=None, channels="PDS1", relcal=None,
-                         det="Z1", sumchans=False, convtoamps=1, fs=625e3, dumpnum=1, filetype="mid.gz",
-                         lgcsavefile=False,savefilepath="",savefilename=""):
+                         det="Z1", convtoamps=1, fs=625e3, dumpnum=1, filetype="mid.gz",
+                         lgcsavefile=False, savefilepath=None, savefilename=None):
     """
-    Hidden helper function for building fake pulses
+    Hidden helper function for building fake pulses.
               
     Parameters
     ----------
     rq : pandas.DataFrame
-        A pandas DataFrame object that contains all of the RQs for the dataset specified
+        A pandas DataFrame object that contains all of the RQs for the dataset specified.
     cut : array_like
         A boolean array for the cut that selects the traces that will be loaded from the dump files. These
         traces serve as the underlying data to which a template is added.
     template1 : ndarray
-        The template to be added to the traces. The template start time should be centered on the center bin
+        The template to be added to the traces. The template start time should be centered on the center bin.
     amplitudes1 : ndarray
-        The amplitudes by which to scale the template to add to the traces. Must be same length as cut
-    tdelay1 : ndarray
-        The time delay offset, in seconds, by which to shift the template to add to the traces.
-        Bin interpolation implemented
+        The amplitudes, in Amps, by which to scale the template to add the the traces. Must be 
+        same length as cut.
+    telay1 : ndarray
+        The time delay offset, in seconds, by which to shift the template to add to the traces. Bin interpolation 
+        is implemented for values that are not a multiple the reciprocal of the digitization rate.
     basepath : str
         The base path to the directory that contains the folders that the event dumps 
         are in. The folders in this directory should be the series numbers.
@@ -163,40 +169,35 @@ def _buildfakepulses_seg(rq, cut, template1, amplitudes1, tdelay1, basepath, evt
     seriesnums : array_like
         An array of the corresponding series numbers for each event number in evtnums.
     template2 : ndarray, optional
-        The 2nd template to be added to the traces, otherwise same as template1
+        The 2nd template to be added to the traces, otherwise same as `template1`.
     amplitudes2 : ndarray, optional
-        The amplitudes by which to scale the 2nd template, otherwise same as amplitudes1
-    tdelay2 : ndarray, optional
-        The time delay offset for the 2nd template, otherwise same as tdelay1
-    channels : list, optional
+        The amplitudes by which to scale the 2nd template, otherwise same as `amplitudes1`.
+    telay2 : ndarray, optional
+        The time delay offset for the 2nd template, otherwise same as `tdelay1`.
+    channels : str, list of str, optional
         A list of strings that contains all of the channels that should be loaded.
-    relcal : ndarray, optional
-        An array with the amplitude scalings between channels used when making the total 
-        If channels is supplied, relcal indices correspond to that list
-        Default is all 1 (no relative scaling)
-    det : str or list of str, optional
+    det : str, list of str, optional
         String or list of strings that specifies the detector name. Only used if filetype=='mid.gz'. 
         If a list of strings, then should each value should directly correspond to the channel names.
         If a string is inputted and there are multiple channels, then it is assumed that the detector
         name is the same for each channel.
-    sumchans : bool, optional
-        A boolean flag for whether or not to sum the channels when plotting. If False, each 
-        channel is plotted individually.
-    convtoamps : float or list of floats, optional
+    relcal : ndarray, optional
+        An array with the amplitude scalings between channels used when making the total 
+        If channels is supplied, relcal indices correspond to that list
+        Default is all 1 (no relative scaling).
+    convtoamps : float, optional
         The factor that the traces should be multiplied by to convert ADC bins to Amperes.
     fs : float, optional
         The sample rate in Hz of the data.
-    dumpnum : int, optional
-        The dump number used in the file name
     filetype : str, optional
         The string that corresponds to the file type that will be opened. Supports two 
-        types -"mid.gz" and ".npz". "mid.gz" is the default.
+        types: "mid.gz" and "npz". "mid.gz" is the default.
     lgcsavefile : bool, optional
-        A boolean flag for whether or not to save the fake data to a file
+        A boolean flag for whether or not to save the fake data to a file.
     savefilepath : str, optional
-        The string that corresponds to the file path that will be saved
+        The string that corresponds to the file path that will be saved.
     savefilename : str, optional
-        The string that corresponds to the file name that will be adjoined to dumpnum and saved
+        The string that corresponds to the file name that will be adjoined to dumpnum and saved.
         
     Returns
     -------
@@ -204,68 +205,45 @@ def _buildfakepulses_seg(rq, cut, template1, amplitudes1, tdelay1, basepath, evt
     
     """
     
-    if template2 is not None:
-        if amplitudes2 is None:
-            raise ValueError("amplitudes2 must be defined if template2 is defined")
-        if tdelay2 is None:
-            raise ValueError("tdelay2 must be defined if template2 is defined")
-    
     seriesnumber = list(set(rq.seriesnumber[cut]))[0]
-
-    # load all traces selected by cut
-    nTraces = np.sum(cut)
-    t, traces, _ = io.getrandevents(basepath, rq.eventnumber, rq.seriesnumber,
-                                    cut=cut, channels=channels, det=det, sumchans=sumchans,
-                                    convtoamps=convtoamps, fs=fs, ntraces=nTraces,filetype=filetype,
-                                    lgcplot=False)
     
-    shapeTraces = np.shape(traces)
-    nchan = shapeTraces[1]
+    ntraces = np.sum(cut)
+    t, traces, _ = io.getrandevents(basepath, rq.eventnumber, rq.seriesnumber, cut=cut, 
+                                    channels=channels, det=det, convtoamps=convtoamps, fs=fs, 
+                                    ntraces=ntraces, filetype=filetype)
+    
+    nchan = traces.shape[1]
     
     if relcal is None:
         relcal = np.ones(nchan)
-    else:
-        if nchan != len(relcal):
-            raise ValueError('relcal must have length equal to number of channels')
+    elif nchan != len(relcal):
+        raise ValueError('relcal must have length equal to number of channels')
         
-    # sum traces along channel dimension
-    tracesSum = np.sum(traces, axis=1)
-
-    # convert tdelay1 to bins
-    tdelay1Bin = tdelay1*(fs)
+    tracessum = np.sum(traces, axis=1)
+    
+    tdelay1bin = tdelay1*fs
     
     if tdelay2 is not None:
-        tdelay2Bin = tdelay2*(fs)
+        tdelay2bin = tdelay2*fs
     
+    fakepulses = np.zeros(traces.shape)
     
-    # initialize ndarray with same dimension
-    # as traces to be saved
-    fakepulses = np.zeros(shapeTraces)
-    
-    for i in range(nTraces):
-        # scale and shift template1 by amplitudes1 and tdelay1
-        newTrace = tracesSum[i] + amplitudes1[i]*rp.shift(template1,tdelay1Bin[i])
+    for ii in range(ntraces):
+        newtrace = tracessum[ii] + amplitudes1[ii]*rp.shift(template1, tdelay1bin[ii])
         
-        # add second pulse if template2 is defined
         if template2 is not None:
-            newTrace = newTrace + amplitudes2[i]*rp.shift(template2,tdelay2Bin[i])
+            newtrace += amplitudes2[ii]*rp.shift(template2, tdelay2bin[ii])
         
-        # multiply by reciprocal of the relative calibration such that
-        # when the processing script creates the total channel pulse
-        # it will be equal to newTrace
-        for j in range(nchan):
-            if (relcal[j]!=0):
-                fakepulses[i,j,:]=newTrace/(relcal[j]*nchan)
-            else:
-                # the relative calibration of this channel is zero
-                # thus it does not matter what the trace is equal to
-                # so set to zeros to avoid division by zero
-                fakepulses[i,j,:]=np.zeros(shapeTraces[2])
+        # multiply by reciprocal of the relative calibration such that when the processing script 
+        # creates the total channel pulse, it will be equal to newtrace
+        for jj in range(nchan):
+            if (relcal[jj]!=0):
+                fakepulses[ii, jj] = newtrace/(relcal[jj]*nchan)
 
                 
     if lgcsavefile:
         if filetype=='npz':
-            trigtypes = np.zeros((nTraces,3))
+            trigtypes = np.zeros((ntraces, 3), dtype=bool)
             # save the data. note that we are storing the truth
             # information in some of the inputs intended for use
             # by the continuous trigger code.
@@ -299,7 +277,7 @@ def _buildfakepulses_seg(rq, cut, template1, amplitudes1, tdelay1, basepath, evt
                 settings_dict[d]["phononSampleRate"] = int(1/settings_dict[d][ch]["timePerBin"])
             
             events_list = _create_events_list(tdelay1, amplitudes1, fakepulses, channels, 
-                                              det, convtoamps, seriesnumber, settings_dict, dumpnum)
+                                              det, convtoamps, seriesnumber, dumpnum)
             
             io.saveevents_midgz(events=events_list, settings=settings_dict, 
                                 savepath=savefilepath, savename=savefilename, dumpnum=dumpnum)
