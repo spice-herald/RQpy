@@ -156,7 +156,7 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
         
     elif filetype == "npz":
         x = np.vstack(arrs).astype(float)
-        chans = list(range(x.shape[1]))
+        channels = list(range(x.shape[1]))
         
     t = np.arange(x.shape[-1])/fs
     
@@ -181,10 +181,7 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
             else:
                 colors = plt.cm.viridis(np.linspace(0, 1, num=x.shape[1]), alpha=0.5)
                 for jj, chan in enumerate(channels):
-                    if filetype == "mid.gz":
-                        label = f"Channel {chan}"
-                    elif filetype == "npz":
-                        label = f"Channel {chan}"
+                    label = f"Channel {chan}"
                     
                     if indbasepre is not None:
                         baseline = np.mean(x[ii, jj, :indbasepre])
