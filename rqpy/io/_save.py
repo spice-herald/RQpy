@@ -58,27 +58,27 @@ def saveevents_npz(pulsetimes=None, pulseamps=None, trigtimes=None, trigamps=Non
              traces=traces, 
              trigtypes=trigtypes)
 
-def saveevents_midgz(events=None, settings=None, savepath=None, savename=None, dumpnum=None):
+def saveevents_midgz(events, settings, savepath, savename, dumpnum):
     """
     Function for writing events to MIDAS files.
     
     Parameters
     ----------
-    pulsetimes : ndarray, optional
-        If we triggered on a pulse, the time of the pulse trigger in seconds. Otherwise this is zero.
-    pulseamps : ndarray, optional
-        If we triggered on a pulse, the optimum amplitude at the pulse trigger time. Otherwise this is zero.
-    traces : ndarray, optional
-        The corresponding trace for each detected event.
-    trigtypes: ndarray, optional
-        Array of boolean vectors each of length 3. The first value indicates if the trace is a random or not.
-        The second value indicates if we had a pulse trigger. The third value indicates if we had a ttl trigger.
-    savepath : NoneType, str, optional
+    events : list
+        The list of events, which has been set up by `rqpy.sim._pulsesim._create_events_list`. This list
+        must have a very specific format in order to be successfully saved to a MIDAS file.
+    settings : dict
+        Dictionary that contains all of the relevant detector settings for saving a MIDAS file.
+    savepath : str
         Path to save the events to.
-    savename : NoneType, str, optional
+    savename : str
         Filename to save the events as.
-    dumpnum : int, optional
+    dumpnum : int
         The dump number of the current file.
+    
+    Returns
+    -------
+    None
     
     """
     
@@ -92,6 +92,4 @@ def saveevents_midgz(events=None, settings=None, savepath=None, savename=None, d
     mywriter.write_settings_from_dict(settings)
     mywriter.write_events(events)
     mywriter.close_file()
-
-
 
