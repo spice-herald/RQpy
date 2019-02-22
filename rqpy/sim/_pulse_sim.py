@@ -359,7 +359,8 @@ def _create_events_list(pulsetimes, pulseamps, traces, channels, det, convtoamps
     
     Returns
     -------
-    None
+    events : list
+        List of all of the simulated events with the required fields for saving as a MIDAS file.
     
     """
     
