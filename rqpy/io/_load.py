@@ -129,12 +129,22 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
             arr = getRawEvents(f"{basepath}{snum_str}/", "", channelList=channels, detectorList=list(set(dets)),
                                outputFormat=3, eventNumbers=evtnums[cseries].astype(int).tolist())
         elif filetype == "npz":
-            inds = np.mod(evtnums[cseries], 10000) - 1
-            # snum_alone is the sliced snum string up to the second underscore
-            snum_alone = "_".join(snum.split("_",2)[:2])
-            with np.load(f"{basepath}/{snum_alone}/{snum}.npz") as f:
-                arr = f["traces"][inds]
-    
+            dumpnums = np.asarray(rq.eventnumber/10000, dtype=int)
+            
+            snum_str = f"{snum:010}"
+            snum_str = snum_str[:6] + '_' + snum_str[6:]
+            
+            arr = list()
+            
+            for dumpnum in set(dumpnums[cseries]):
+                cdump = dumpnums == dumpnum
+                inds = np.mod(evtnums[cseries & cdump], 10000) - 1
+            
+                with np.load(f"{basepath}/{snum_str}/{snum_str}_*_{dumpnum:04d}.npz") as f:
+                    arr.append(f["traces"][inds])
+                    
+            arr = np.vstack(arr)
+            
         arrs.append(arr)
     
     if filetype == "mid.gz":
@@ -449,8 +459,9 @@ def get_traces_npz(path):
     trigtypes = []
     
     for file in path:
-        seriesnum = file.split('/')[-1].split('.')[0]
-        dumpnum = int(seriesnum.split('_')[-1])
+        filename = file.split('/')[-1].split('.')[0]
+        seriesnum = int(str().join(filename.split('_')[:2]))
+        dumpnum = int(filename.split('_')[-1])
         
         with np.load(file) as data:
             trigtimes.append(data["trigtimes"])
