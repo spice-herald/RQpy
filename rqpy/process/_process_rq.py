@@ -1501,20 +1501,24 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         # make indwindow dimensions 1 X (time bins)
         indwindow = indwindow[:,None].T
 
-        #lgcplotnsmb=True
-        lgcplotnsmb=False
+        lgcplotnsmb=True
+        #lgcplotnsmb=False
         for jj, s in enumerate(signal):
-        #for jj  in range(len(signal)):
-            #s = signal[4,:]
-            #print(f'jj={jj}')
             if lgcplotnsmb==True:
                 figNum = jj
             else:
                 figNum=False
             
-            (amps_nsmb[jj,:],t0_s_nsmb[jj],ampsBOnly_nsmb[jj,:], 
-             chi2_nsmb[jj],chi2_nsmb_lf[jj],_,_,_,chi2BOnly_nsmb[jj],
-             chi2BOnly_nsmb_lf[jj]) = qp.of_nsmb_inside(s, OFfiltf, Wf, Wf_summed,
+            (ampsBOnly_nsmb[jj,:], chi2BOnly_nsmb[jj],
+             chi2BOnly_nsmb_lf[jj]) = qp.of_mb(s, OFfiltf, sbTemplatef.T, sbTemplatet,
+                                                iBB, BB, psddnu.T, fs, nS, nB,
+                                                background_templates_shifts = background_templates_shifts,
+                                                bkgpolarityconstraint = bkgpolarityconstraint,
+                                                sigpolarityconstraint = sigpolarityconstraint,
+                                                lgc_interp=False, lgcplot=lgcplotnsmb, lgcsaveplots=figNum)
+                
+            (amps_nsmb[jj,:],t0_s_nsmb[jj], 
+             chi2_nsmb[jj],chi2_nsmb_lf[jj],_,_,_) = qp.of_nsmb_inside(s, OFfiltf, Wf, Wf_summed,
                                                         Wt, sbTemplatef.T, sbTemplatet,
                                                         iWt, iBB, BB, psddnu.T,
                                                         fs, indwindow, nS,nB, bitComb,
@@ -1526,7 +1530,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                 #print(f'jj = {jj} amps_nsmb= {amps_nsmb[jj,:]}')
     
             if (lgcplotnsmb==True):
-                nPlots = 1
+                nPlots = 5
                 if(jj==(nPlots-1)):
                     print('Warning: stopping at', nPlots, 'events to head off any memory problems')
                     break
