@@ -1459,9 +1459,14 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         #=== Concatenate signal and background template matrices and take FFT====
         sbtemplatef, sbtemplatet = qp.of_nsmb_fftTemplate(np.expand_dims(template,1), background_templates)
 
-        (psddnu,OFfiltf,Wf, Wf_summed, Wt, 
-         sbTemplatef,sbTemplatet,iWt,iBB,
-         BB,nS,nB,bitComb)  = qp.of_nsmb_setup(template,background_templates,psd, fs)
+        
+        (psddnu, OFfiltf, Wf_summed, Wt,
+         sbTemplatef, sbTemplatet, iBB,
+         BB, nS, nB, bitComb, lfindex)  = qp.of_nsmb_setup(template, background_templates, psd, fs)
+        
+        if (bkgpolarityconstraint is None) and (sigpolarityconstraint is None):
+            iPt = qp.of_nsmb_getiPt(Wt)
+        
         
         amp_s_nsmb = np.zeros(len(signal))
         t0_s_nsmb = np.zeros(len(signal))
@@ -1511,26 +1516,33 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
             
             (ampsBOnly_nsmb[jj,:], chi2BOnly_nsmb[jj],
              chi2BOnly_nsmb_lf[jj]) = qp.of_mb(s, OFfiltf, sbTemplatef.T, sbTemplatet,
-                                                iBB, BB, psddnu.T, fs, nS, nB,
+                                                iBB, BB, psddnu.T, fs, nS, nB, lfindex,
                                                 background_templates_shifts = background_templates_shifts,
                                                 bkgpolarityconstraint = bkgpolarityconstraint,
                                                 sigpolarityconstraint = sigpolarityconstraint,
                                                 lgc_interp=False, lgcplot=lgcplotnsmb, lgcsaveplots=figNum)
                 
-            (amps_nsmb[jj,:],t0_s_nsmb[jj], 
-             chi2_nsmb[jj],chi2_nsmb_lf[jj],_,_,_) = qp.of_nsmb_inside(s, OFfiltf, Wf, Wf_summed,
-                                                        Wt, sbTemplatef.T, sbTemplatet,
-                                                        iWt, iBB, BB, psddnu.T,
-                                                        fs, indwindow, nS,nB, bitComb,
-                                                        background_templates_shifts = background_templates_shifts,
-                                                        bkgpolarityconstraint = bkgpolarityconstraint,
-                                                        sigpolarityconstraint = sigpolarityconstraint,
-                                                        lgc_interp=False,lgcplot=lgcplotnsmb,lgcsaveplots=figNum)
+            if (bkgpolarityconstraint is None) and (sigpolarityconstraint is None):
+                (amps_nsmb[jj,:], t0_s_nsmb[jj],
+                 chi2_nsmb[jj],chi2_nsmb_lf[jj]) = qp.of_nsmb(s, OFfiltf, sbTemplatef.T, sbTemplatet,
+                                                            iPt, psddnu.T,
+                                                            fs, indwindow, nS,nB, bitComb, lfindex,
+                                                            background_templates_shifts = background_templates_shifts,
+                                                            lgc_interp=False,lgcplot=lgcplotnsmb,lgcsaveplots=figNum)
+            else:
+                (amps_nsmb[jj,:],t0_s_nsmb[jj], 
+                 chi2_nsmb[jj],chi2_nsmb_lf[jj],_) = qp.of_nsmb_con(s, OFfiltf, Wf_summed,
+                                                            Wt, sbTemplatef.T, sbTemplatet,
+                                                            psddnu.T, fs, indwindow, nS,nB, bitComb, lfindex,
+                                                            background_templates_shifts = background_templates_shifts,
+                                                            bkgpolarityconstraint = bkgpolarityconstraint,
+                                                            sigpolarityconstraint = sigpolarityconstraint,
+                                                            lgc_interp=False,lgcplot=lgcplotnsmb,lgcsaveplots=figNum)
             #if (np.amax(amps_nsmb[jj,0:-2]) > 0.0):
                 #print(f'jj = {jj} amps_nsmb= {amps_nsmb[jj,:]}')
     
             if (lgcplotnsmb==True):
-                nPlots = 5
+                nPlots = 1
                 if(jj==(nPlots-1)):
                     print('Warning: stopping at', nPlots, 'events to head off any memory problems')
                     break
