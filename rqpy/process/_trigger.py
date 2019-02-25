@@ -4,7 +4,7 @@ from numpy.fft import ifft, fft, fftfreq, rfft, rfftfreq
 from numpy.random import choice
 from collections import Counter
 from math import log10, floor
-from rqpy.io import loadstanfordfile
+from rqpy import io
 import datetime
 
 
@@ -526,7 +526,7 @@ def acquire_randoms(filelist, n, l, datashape=None, iotype="stanford", savepath=
     if datashape is None:
         # get the shape of data from the first dataset, we assume the shape is the same for all files
         if iotype=="stanford":
-            traces = loadstanfordfile(filelist[0])[0]
+            traces = io.loadstanfordfile(filelist[0])[0]
             datashape = (traces.shape[0], traces.shape[-1])
         else:
             raise ValueError("Unrecognized iotype inputted.")
@@ -545,7 +545,7 @@ def acquire_randoms(filelist, n, l, datashape=None, iotype="stanford", savepath=
     for key in counts.keys():
 
         if iotype=="stanford":
-            traces, t, fs, _ = loadstanfordfile(filelist[key])
+            traces, t, fs, _ = io.loadstanfordfile(filelist[key])
         else:
             raise ValueError("Unrecognized iotype inputted.")
             
@@ -567,10 +567,12 @@ def acquire_randoms(filelist, n, l, datashape=None, iotype="stanford", savepath=
             
             for ii in range(len(evttimes)//maxevts):
                 
-                _saveevents(randomstimes=evttimes[:maxevts], 
-                            traces=res[:maxevts], 
-                            trigtypes=trigtypes[:maxevts], 
-                            savepath=savepath, savename=savename, dumpnum=dumpnum)
+                io.saveevents_npz(randomstimes=evttimes[:maxevts], 
+                                  traces=res[:maxevts], 
+                                  trigtypes=trigtypes[:maxevts], 
+                                  savepath=savepath, 
+                                  savename=savename, 
+                                  dumpnum=dumpnum)
                 dumpnum+=1
                 
                 evttimes = evttimes[maxevts:]
@@ -600,10 +602,12 @@ def acquire_randoms(filelist, n, l, datashape=None, iotype="stanford", savepath=
 
         for ii in range(np.ceil(len(evttimes)/maxevts).astype(int)):
             
-            _saveevents(randomstimes=evttimes[:maxevts], 
-                        traces=res[:maxevts], 
-                        trigtypes=trigtypes[:maxevts], 
-                        savepath=savepath, savename=savename, dumpnum=dumpnum)
+            io.saveevents_npz(randomstimes=evttimes[:maxevts], 
+                              traces=res[:maxevts], 
+                              trigtypes=trigtypes[:maxevts], 
+                              savepath=savepath, 
+                              savename=savename, 
+                              dumpnum=dumpnum)
             dumpnum+=1
             
             if ii+1!=np.ceil(len(evttimes)/maxevts).astype(int):
@@ -687,7 +691,7 @@ def acquire_pulses(filelist, template, noisepsd, tracelength, thresh, nchan=2, t
     for f in filelist:
         
         if iotype=="stanford":
-            traces, times, fs, trig = loadstanfordfile(f)
+            traces, times, fs, trig = io.loadstanfordfile(f)
             if trigtemplate is None:
                 trig = None
         else:
@@ -723,13 +727,15 @@ def acquire_pulses(filelist, template, noisepsd, tracelength, thresh, nchan=2, t
             
             for ii in range(numextra//maxevts + 1):
                 
-                _saveevents(pulsetimes=pulsetimes, 
-                            pulseamps=pulseamps, 
-                            trigtimes=trigtimes, 
-                            trigamps=trigamps, 
-                            traces=evttraces, 
-                            trigtypes=trigtypes, 
-                            savepath=savepath, savename=savename, dumpnum=dumpnum)
+                io.saveevents_npz(pulsetimes=pulsetimes, 
+                                  pulseamps=pulseamps, 
+                                  trigtimes=trigtimes, 
+                                  trigamps=trigamps, 
+                                  traces=evttraces, 
+                                  trigtypes=trigtypes, 
+                                  savepath=savepath, 
+                                  savename=savename, 
+                                  dumpnum=dumpnum)
                 dumpnum+=1
                 
                 pulsetimes.fill(0)
@@ -756,57 +762,12 @@ def acquire_pulses(filelist, template, noisepsd, tracelength, thresh, nchan=2, t
     
     # clean up the rest of the events
     if evt_counter > 0:
-        _saveevents(pulsetimes=pulsetimes, 
-                    pulseamps=pulseamps, 
-                    trigtimes=trigtimes, 
-                    trigamps=trigamps, 
-                    traces=evttraces, 
-                    trigtypes=trigtypes, 
-                    savepath=savepath, savename=savename, dumpnum=dumpnum)
-        
-    
-def _saveevents(pulsetimes=None, pulseamps=None, trigtimes=None,
-               trigamps=None, randomstimes=None, traces=None, trigtypes=None, 
-               savepath=None, savename=None, dumpnum=None):
-    """
-    Hidden helper function for simple saving of events to .npz file.
-    
-    Parameters
-    ----------
-    pulsetimes : ndarray
-        If we triggered on a pulse, the time of the pulse trigger in seconds. Otherwise this is zero.
-    pulseamps : 
-        If we triggered on a pulse, the optimum amplitude at the pulse trigger time. Otherwise this is zero.
-    trigtimes : ndarray
-        If we triggered due to ttl, the time of the ttl trigger in seconds. Otherwise this is zero.
-    trigamps : 
-        If we triggered due to ttl, the optimum amplitude at the ttl trigger time. Otherwise this is zero.
-    randomstimes : ndarray
-        Array of the corresponding event times for each section
-    traces : ndarray
-        The corresponding trace for each detected event.
-    trigtypes: ndarray
-        Array of boolean vectors each of length 3. The first value indicates if the trace is a random or not.
-        The second value indicates if we had a pulse trigger. The third value indicates if we had a ttl trigger.
-    savepath : NoneType, str, optional
-        Path to save the events to.
-    savename : NoneType, str, optional
-        Filename to save the events as.
-    dumpnum : int, optional
-        The dump number of the current file.
-        
-    """
-    
-    if randomstimes is None:
-        randomstimes = np.zeros_like(pulsetimes)
-        
-    if pulsetimes is None:
-        pulsetimes = np.zeros_like(randomstimes)
-        pulseamps = np.zeros_like(randomstimes)
-        trigtimes = np.zeros_like(randomstimes)
-        trigamps = np.zeros_like(randomstimes)
-    
-    filename = f"{savepath}{savename}_{dumpnum:04d}.npz"
-    np.savez(filename, pulsetimes=pulsetimes, pulseamps=pulseamps, 
-             trigtimes=trigtimes, trigamps=trigamps, randomstimes=randomstimes, 
-             traces=traces, trigtypes=trigtypes)
+        io.saveevents_npz(pulsetimes=pulsetimes, 
+                          pulseamps=pulseamps, 
+                          trigtimes=trigtimes, 
+                          trigamps=trigamps, 
+                          traces=evttraces, 
+                          trigtypes=trigtypes, 
+                          savepath=savepath, 
+                          savename=savename, 
+                          dumpnum=dumpnum)
