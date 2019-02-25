@@ -1466,7 +1466,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
 
     if setup.do_ofamp_nsmb:
         
-        #=== Concatenate signal and background template matrices and take FFT====
+        # concatenate signal and background template matrices and take FFT
         sbtemplatef, sbtemplatet = qp.of_nsmb_ffttemplate(np.expand_dims(template,1), background_templates)
 
         
@@ -1508,46 +1508,56 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                                                 sigpolarityconstraint = sigpolarityconstraint,
                                                 lgc_interp=False, lgcplot=lgcplotnsmb, lgcsaveplots=figNum)
                 
-            if (bkgpolarityconstraint is None) and (sigpolarityconstraint is None):
-                (amps_nsmb[jj,:], t0_s_nsmb[jj],
-                 chi2_nsmb[jj],chi2_nsmb_lf[jj], resid) = qp.of_nsmb(s, phi, sbtemplatef.T, sbtemplatet,
-                                                            iP, psddnu.T,
-                                                            fs, indwindow_nsmb, ns,nb, bitcomb, lfindex, 
-                                                            background_templates_shifts = background_templates_shifts,
-                                                            lgc_interp=False,lgcplot=lgcplotnsmb,lgcsaveplots=figNum)
+            if (chan=='sum'):
+                if (bkgpolarityconstraint is None) and (sigpolarityconstraint is None):
+                    (amps_nsmb[jj,:], t0_s_nsmb[jj],
+                     chi2_nsmb[jj],chi2_nsmb_lf[jj], resid) = qp.of_nsmb(s, phi, sbtemplatef.T, sbtemplatet,
+                                                                iP, psddnu.T,
+                                                                fs, indwindow_nsmb, ns,nb, bitcomb, lfindex, 
+                                                                background_templates_shifts = background_templates_shifts,
+                                                                lgc_interp=False,lgcplot=lgcplotnsmb,lgcsaveplots=figNum)
+                else:
+                    (amps_nsmb[jj,:],t0_s_nsmb[jj], 
+                     chi2_nsmb[jj],chi2_nsmb_lf[jj],
+                     resid,amps_sig_nsmb_cwindow[jj],
+                     chi2_nsmb_cwindow[jj]) = qp.of_nsmb_con(s, phi, Pfs,
+                                                             P, sbtemplatef.T, sbtemplatet,
+                                                             psddnu.T, fs, indwindow_nsmb, ns,nb, bitcomb, lfindex,
+                                                             background_templates_shifts = background_templates_shifts,
+                                                             bkgpolarityconstraint = bkgpolarityconstraint,
+                                                             sigpolarityconstraint = sigpolarityconstraint,
+                                                             lgc_interp=False,lgcplot=lgcplotnsmb,lgcsaveplots=figNum)
             else:
-                (amps_nsmb[jj,:],t0_s_nsmb[jj], 
-                 chi2_nsmb[jj],chi2_nsmb_lf[jj],
-                 resid,amps_sig_nsmb_cwindow[jj],
-                 chi2_nsmb_cwindow[jj]) = qp.of_nsmb_con(s, phi, Pfs,
-                                                         P, sbtemplatef.T, sbtemplatet,
-                                                         psddnu.T, fs, indwindow_nsmb, ns,nb, bitcomb, lfindex,
-                                                         background_templates_shifts = background_templates_shifts,
-                                                         bkgpolarityconstraint = bkgpolarityconstraint,
-                                                         sigpolarityconstraint = sigpolarityconstraint,
-                                                         lgc_interp=False,lgcplot=lgcplotnsmb,lgcsaveplots=figNum)
-            
-    
+                # if fitting the individual channels do not run the nsmb fit. rather
+                # run an amplitude constrained OF that has the time offset constrained to
+                # the value found by the total
+                (amps_nsmb[jj,0], t0_s_nsmb[jj], 
+                 chi2_nsmb[jj]) = OF.ofamp_withdelay(nconstrain=500, pulse_direction_constraint=sigpolarityconstraint)
+                
+                
             if (lgcplotnsmb==True):
                 nPlots = 1
                 if(jj==(nPlots-1)):
                     print('Warning: stopping at', nPlots, 'events to head off any memory problems')
                     break
         
+        
         rq_dict[f'ofamp_s_nsmb_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'ofamp_s_nsmb_{chan}{det}'][readout_inds] = amps_nsmb[:,0]
         rq_dict[f't0_s_nsmb_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f't0_s_nsmb_{chan}{det}'][readout_inds] = t0_s_nsmb
-        for iB in range(ns,ns+nb):
-            rq_dict[f'ofamp_b{iB:02d}_nsmb_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-            rq_dict[f'ofamp_b{iB:02d}_nsmb_{chan}{det}'][readout_inds] = amps_nsmb[:,iB]
-        for iB in range(nb):
-            rq_dict[f'ofampBOnly_b{(iB+1):02d}_nsmb_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-            rq_dict[f'ofampBOnly_b{(iB+1):02d}_nsmb_{chan}{det}'][readout_inds] = ampsBOnly_nsmb[:,iB]
+        for ib in range(ns,ns+nb):
+            rq_dict[f'ofamp_b{ib:02d}_nsmb_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            if (chan=='sum'):
+                rq_dict[f'ofamp_b{ib:02d}_nsmb_{chan}{det}'][readout_inds] = amps_nsmb[:,ib]
+        for ib in range(nb):
+            rq_dict[f'ofampBOnly_b{(ib+1):02d}_nsmb_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f'ofampBOnly_b{(ib+1):02d}_nsmb_{chan}{det}'][readout_inds] = ampsBOnly_nsmb[:,ib]
         rq_dict[f'chi2_nsmb_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'chi2_nsmb_{chan}{det}'][readout_inds] = chi2_nsmb
         rq_dict[f'chi2_nsmb_lf_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'chi2_nsmb_lf_{chan}{det}'][readout_inds] = chi2_nsmb_lf
+        if (chan=='sum'):
+            rq_dict[f'chi2_nsmb_lf_{chan}{det}'][readout_inds] = chi2_nsmb_lf
         rq_dict[f'chi2BOnly_nsmb_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'chi2BOnly_nsmb_{chan}{det}'][readout_inds] = chi2BOnly_nsmb
         rq_dict[f'chi2BOnly_nsmb_lf_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
@@ -1598,6 +1608,8 @@ def _calc_rq(traces, channels, det, setup, readout_inds=None, relcal=None):
     rq_dict = {}
     
     if setup.calcchans:
+        
+        print('inside calcchans')
         vals = list(enumerate(zip(channels, det)))
         
         if setup.do_ofamp_shifted and setup.trigger is not None:
@@ -1621,7 +1633,10 @@ def _calc_rq(traces, channels, det, setup, readout_inds=None, relcal=None):
 
             rq_dict.update(chan_dict)
             
+
+            
     if setup.calcsum:
+        
         if relcal is not None:
 
             if (len(relcal) != traces.shape[1]):
@@ -1639,7 +1654,6 @@ def _calc_rq(traces, channels, det, setup, readout_inds=None, relcal=None):
         sigpolarityconstraint = setup.sigpolarityconstraint
         indwindow_nsmb = setup.indwindow_nsmb
 
-
         chan = "sum"
 
         sum_dict = _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, 0, "", background_templates,
@@ -1647,6 +1661,13 @@ def _calc_rq(traces, channels, det, setup, readout_inds=None, relcal=None):
                                           indwindow_nsmb)
 
         rq_dict.update(sum_dict)
+    
+    #print('sum_dict')
+    #t0_s_nsmb_{chan}{det} rq.t0_s_nsmb_sum
+    #print(sum_dict[f'ofamp_s_win{iwin:02d}_nsmb_{chan}{det}']
+    t0dict = sum_dict['t0_s_nsmb_sum']
+    #print('type(test)=',type(test))
+    #print('np.shape(test)=', np.shape(test))
     
     return rq_dict
 
