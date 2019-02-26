@@ -181,7 +181,7 @@ class TrigSim(object):
         """
         
         if not self.lgc_can_run_trigger:
-            raise ValueError("The threshold was not set, please use the TrigSim.set_threhold method.")
+            raise ValueError("The threshold was not set, please use the TrigSim.set_threshold method.")
         
         input_traces = [(x[k:] - 32768).astype('int64')] + [np.zeros(len(x[k:]),dtype='int64')]*11 + \
                        [np.zeros(4*len(x[k:]),dtype='int64')]*4
