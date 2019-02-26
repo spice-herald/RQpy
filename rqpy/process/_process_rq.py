@@ -1486,12 +1486,14 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         amp_s_nsmb = np.zeros(len(signal))
         t0_s_nsmb = np.zeros(len(signal))
         amps_nsmb = np.zeros((len(signal),(ns+nb)))
-        ampsBOnly_nsmb = np.zeros((len(signal),(nb)))
+        ampsbonly_nsmb = np.zeros((len(signal),(nb)))
         chi2_nsmb = np.zeros(len(signal))
         chi2_nsmb_lf = np.zeros(len(signal))
-        chi2BOnly_nsmb = np.zeros(len(signal))
-        chi2BOnly_nsmb_lf = np.zeros(len(signal))
+        chi2bonly_nsmb = np.zeros(len(signal))
+        chi2bonly_nsmb_lf = np.zeros(len(signal))
 
+        amp_resid = np.zeros(len(signal))
+        
         amps_sig_nsmb_cwindow = np.zeros((len(signal),(ns),ncwindow))
         chi2_nsmb_cwindow = np.zeros((len(signal),ncwindow))
         
@@ -1503,8 +1505,8 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
             else:
                 figNum=False
             
-            (ampsBOnly_nsmb[jj,:], chi2BOnly_nsmb[jj],
-             chi2BOnly_nsmb_lf[jj]) = qp.of_mb(s, phi, sbtemplatef.T, sbtemplatet,
+            (ampsbonly_nsmb[jj,:], chi2bonly_nsmb[jj],
+             chi2bonly_nsmb_lf[jj]) = qp.of_mb(s, phi, sbtemplatef.T, sbtemplatet,
                                                 iB, B, psddnu.T, fs, ns, nb, lfindex,
                                                 background_templates_shifts = background_templates_shifts,
                                                 bkgpolarityconstraint = bkgpolarityconstraint,
@@ -1530,6 +1532,10 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                                                              bkgpolarityconstraint = bkgpolarityconstraint,
                                                              sigpolarityconstraint = sigpolarityconstraint,
                                                              lgc_interp=False,lgcplot=lgcplotnsmb,lgcsaveplots=figNum)
+                
+                # do unconstrained OF on the residual
+                OF.update_signal(np.squeeze(resid))
+                amp_resid[jj],_,_ = OF.ofamp_withdelay(pulse_direction_constraint=sigpolarityconstraint)
             else:
                 # if fitting the individual channels do not run the nsmb fit. rather
                 # run an amplitude constrained OF that has the time offset constrained to
@@ -1540,14 +1546,15 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                 else:
                     windowcenter = 0
                 
-                
+                OF.update_signal(s)
                 (amps_nsmb[jj,0], t0_s_nsmb[jj], 
                  chi2_nsmb[jj]) = OF.ofamp_withdelay(nconstrain=1, 
                                                      pulse_direction_constraint=sigpolarityconstraint, 
                                                      windowcenter=windowcenter)
+
                                 
             if (lgcplotnsmb==True):
-                nPlots = 1
+                nPlots = 3
                 if(jj==(nPlots-1)):
                     print('Warning: stopping at', nPlots, 'events to head off any memory problems')
                     break
@@ -1563,16 +1570,19 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                 rq_dict[f'ofamp_b{ib:02d}_nsmb_{chan}{det}'][readout_inds] = amps_nsmb[:,ib]
         for ib in range(nb):
             rq_dict[f'ofampbonly_b{(ib+1):02d}_nsmb_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-            rq_dict[f'ofampbonly_b{(ib+1):02d}_nsmb_{chan}{det}'][readout_inds] = ampsBOnly_nsmb[:,ib]
+            rq_dict[f'ofampbonly_b{(ib+1):02d}_nsmb_{chan}{det}'][readout_inds] = ampsbonly_nsmb[:,ib]
         rq_dict[f'chi2_nsmb_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'chi2_nsmb_{chan}{det}'][readout_inds] = chi2_nsmb
         rq_dict[f'chi2_nsmb_lf_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         if (chan=='sum'):
             rq_dict[f'chi2_nsmb_lf_{chan}{det}'][readout_inds] = chi2_nsmb_lf
+        rq_dict[f'amp_resid_nsmb_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        if (chan=='sum'):
+            rq_dict[f'amp_resid_nsmb_{chan}{det}'][readout_inds] = amp_resid
         rq_dict[f'chi2bonly_nsmb_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'chi2bonly_nsmb_{chan}{det}'][readout_inds] = chi2BOnly_nsmb
+        rq_dict[f'chi2bonly_nsmb_{chan}{det}'][readout_inds] = chi2bonly_nsmb
         rq_dict[f'chi2bonly_nsmb_lf_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'chi2bonly_nsmb_lf_{chan}{det}'][readout_inds] = chi2BOnly_nsmb_lf
+        rq_dict[f'chi2bonly_nsmb_lf_{chan}{det}'][readout_inds] = chi2bonly_nsmb_lf
 
         # custom window rqs
         ncwindow = len(indwindow_nsmb)-1
