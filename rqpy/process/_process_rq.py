@@ -976,7 +976,7 @@ class SetupRQ(object):
         
 def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, chan_num, det, background_templates=None,
                             background_templates_shifts=None,bkgpolarityconstraint=None, sigpolarityconstraint=None,
-                           indwindow_nsmb=None):
+                           indwindow_nsmb=None, tdelay_chargeleakage=None):
     """
     Helper function for calculating RQs for an array of traces corresponding to a single channel.
     
@@ -1012,6 +1012,9 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
     indwindow_nsmb : list of ndarray
         Each ndarray of the list has indices over which the nsmb fit searches for the minimum chi2. Multiple
         entries in the list will output multiple RQs corresponding to the different windows
+    tdelay_chargeleakage: ndarray, optional
+        An array of time delays, relative to start point of template, where previous fit indicated there
+        is charge leakage
     
     Returns
     -------
@@ -1492,8 +1495,8 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         amps_sig_nsmb_cwindow = np.zeros((len(signal),(ns),ncwindow))
         chi2_nsmb_cwindow = np.zeros((len(signal),ncwindow))
         
-        lgcplotnsmb=True
-        #lgcplotnsmb=False
+        #lgcplotnsmb=True
+        lgcplotnsmb=False
         for jj, s in enumerate(signal):
             if lgcplotnsmb==True:
                 figNum = jj
@@ -1531,10 +1534,18 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                 # if fitting the individual channels do not run the nsmb fit. rather
                 # run an amplitude constrained OF that has the time offset constrained to
                 # the value found by the total
+                
+                if tdelay_chargeleakage is not None:
+                    windowcenter = int(np.rint(tdelay_chargeleakage[jj]*fs))
+                else:
+                    windowcenter = 0
+                
+                
                 (amps_nsmb[jj,0], t0_s_nsmb[jj], 
-                 chi2_nsmb[jj]) = OF.ofamp_withdelay(nconstrain=500, pulse_direction_constraint=sigpolarityconstraint)
-                
-                
+                 chi2_nsmb[jj]) = OF.ofamp_withdelay(nconstrain=1, 
+                                                     pulse_direction_constraint=sigpolarityconstraint, 
+                                                     windowcenter=windowcenter)
+                                
             if (lgcplotnsmb==True):
                 nPlots = 1
                 if(jj==(nPlots-1)):
@@ -1551,17 +1562,17 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
             if (chan=='sum'):
                 rq_dict[f'ofamp_b{ib:02d}_nsmb_{chan}{det}'][readout_inds] = amps_nsmb[:,ib]
         for ib in range(nb):
-            rq_dict[f'ofampBOnly_b{(ib+1):02d}_nsmb_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-            rq_dict[f'ofampBOnly_b{(ib+1):02d}_nsmb_{chan}{det}'][readout_inds] = ampsBOnly_nsmb[:,ib]
+            rq_dict[f'ofampbonly_b{(ib+1):02d}_nsmb_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f'ofampbonly_b{(ib+1):02d}_nsmb_{chan}{det}'][readout_inds] = ampsBOnly_nsmb[:,ib]
         rq_dict[f'chi2_nsmb_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'chi2_nsmb_{chan}{det}'][readout_inds] = chi2_nsmb
         rq_dict[f'chi2_nsmb_lf_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         if (chan=='sum'):
             rq_dict[f'chi2_nsmb_lf_{chan}{det}'][readout_inds] = chi2_nsmb_lf
-        rq_dict[f'chi2BOnly_nsmb_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'chi2BOnly_nsmb_{chan}{det}'][readout_inds] = chi2BOnly_nsmb
-        rq_dict[f'chi2BOnly_nsmb_lf_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'chi2BOnly_nsmb_lf_{chan}{det}'][readout_inds] = chi2BOnly_nsmb_lf
+        rq_dict[f'chi2bonly_nsmb_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2bonly_nsmb_{chan}{det}'][readout_inds] = chi2BOnly_nsmb
+        rq_dict[f'chi2bonly_nsmb_lf_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2bonly_nsmb_lf_{chan}{det}'][readout_inds] = chi2BOnly_nsmb_lf
 
         # custom window rqs
         ncwindow = len(indwindow_nsmb)-1
@@ -1607,32 +1618,7 @@ def _calc_rq(traces, channels, det, setup, readout_inds=None, relcal=None):
     
     rq_dict = {}
     
-    if setup.calcchans:
-        
-        print('inside calcchans')
-        vals = list(enumerate(zip(channels, det)))
-        
-        if setup.do_ofamp_shifted and setup.trigger is not None:
-            # change order so that trigger is processed to be able get the shifted times
-            # to be able to shift the non-trigger channels to the right time
-            vals[setup.trigger], vals[0] = vals[0], vals[setup.trigger]
-        
-        for ii, (chan, d) in vals:
-            signal = traces[readout_inds, ii, setup.indstart:setup.indstop]
-            template = setup.templates[ii]
-            psd = setup.psds[ii]
-            background_templates = setup.background_templates
-            background_templates_shifts = setup.background_templates_shifts
-            bkgpolarityconstraint = setup.bkgpolarityconstraint
-            sigpolarityconstraint = setup.sigpolarityconstraint
-            indwindow_nsmb = setup.indwindow_nsmb
-    
-            chan_dict = _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ii, d, background_templates,
-                                               background_templates_shifts, bkgpolarityconstraint, sigpolarityconstraint,
-                                               indwindow_nsmb)
 
-            rq_dict.update(chan_dict)
-            
 
             
     if setup.calcsum:
@@ -1662,12 +1648,37 @@ def _calc_rq(traces, channels, det, setup, readout_inds=None, relcal=None):
 
         rq_dict.update(sum_dict)
     
-    #print('sum_dict')
-    #t0_s_nsmb_{chan}{det} rq.t0_s_nsmb_sum
-    #print(sum_dict[f'ofamp_s_win{iwin:02d}_nsmb_{chan}{det}']
-    t0dict = sum_dict['t0_s_nsmb_sum']
-    #print('type(test)=',type(test))
-    #print('np.shape(test)=', np.shape(test))
+    # if doing 
+    if setup.do_ofamp_nsmb:
+        t_cleak = sum_dict['t0_s_nsmb_sum']
+    else:
+        t_cleak = None
+    
+    if setup.calcchans:
+
+        vals = list(enumerate(zip(channels, det)))
+
+        if setup.do_ofamp_shifted and setup.trigger is not None:
+            # change order so that trigger is processed to be able get the shifted times
+            # to be able to shift the non-trigger channels to the right time
+            vals[setup.trigger], vals[0] = vals[0], vals[setup.trigger]
+
+        for ii, (chan, d) in vals:
+            signal = traces[readout_inds, ii, setup.indstart:setup.indstop]
+            template = setup.templates[ii]
+            psd = setup.psds[ii]
+            background_templates = setup.background_templates
+            background_templates_shifts = setup.background_templates_shifts
+            bkgpolarityconstraint = setup.bkgpolarityconstraint
+            sigpolarityconstraint = setup.sigpolarityconstraint
+            indwindow_nsmb = setup.indwindow_nsmb
+
+            chan_dict = _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ii, d, background_templates,
+                                               background_templates_shifts, bkgpolarityconstraint, sigpolarityconstraint,
+                                               indwindow_nsmb, tdelay_chargeleakage=t_cleak)
+
+            rq_dict.update(chan_dict)
+            
     
     return rq_dict
 
