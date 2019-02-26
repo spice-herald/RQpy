@@ -23,12 +23,26 @@ class TrigSim(object):
     ----------
     trig : Object
         The `trigsim.Trigger` object which is used to build and run the FIR filter.
-    resolution : ndarray
-        The resolution of the FIR filter in the arbitrary units of the filter.
+    input_psds : list
+        The input power spectral density for the data, re-arranged for input into the FIR
+        filter code.
+    input_pulse_shapes : list
+        The input pulse shape to use for the FIR filter, normalized to have a height of 1,
+        and re-arranged for input into the FIR filter code.
+    fs : float
+        The digitization rate of the data in Hz.
+    lgc_can_run_trigger : bool
+        A boolean flag for whether or not the `TrigSim.trigger` method can be run.
+    which_channel : int
+        The channel that the FIR filter will be triggering. Always set to zero, should not be
+        changed.
+    of_coeffs : ndarray
+        The coefficients of the FIR filter that will be applied to the downsampled
+        data.
     
     """
     
-    def __init__(self, psd, template, fs, nsigma=5):
+    def __init__(self, psd, template, fs):
         """
         Initialization of the TrigSim class.
         
@@ -42,21 +56,20 @@ class TrigSim(object):
             height of 1.
         fs : float
             The digitization rate of the data in Hz.
-        nsigma : float, optional
-            The number of standard deviations of the energy resolution to use as the threshold 
-            for which events will be detected as a pulse in the FIR filter.
         
         """
         
         if not HAS_TRIGSIM:
             raise ImportError("Cannot run the trigger simulation because trigsim is not installed.")
         
-        input_PSDs = [psd]*12 + [np.ones(4*len(psd))]*4
-        input_pulse_shapes = [template]*12 + [np.zeros(4*template.shape[0])]*4
+        self.input_psds = [psd]*12 + [np.ones(4*len(psd))]*4
+        self.input_pulse_shapes = [template]*12 + [np.zeros(4*template.shape[0])]*4
+        self.fs = fs
+        self.lgc_can_run_trigger = False
 
         raw_LC_coeffs = np.zeros((4,16))
-        which_channel = 0
-        raw_LC_coeffs[0, which_channel] = 1 # only one phonon channel
+        self.which_channel = 0
+        raw_LC_coeffs[0, self.which_channel] = 1 # only one phonon channel
         LC_coeffs = trigsim.scale_max(raw_LC_coeffs, bits=8, axis=1)
         TrL_requires = np.zeros((8,16), dtype=bool)
         TrL_vetos = np.zeros((8,16), dtype=bool)
@@ -78,10 +91,64 @@ class TrigSim(object):
                                     TrL_requires=TrL_requires, TrL_vetos=TrL_vetos,
                                     TrL_prescales=np.ones(8, dtype='float'))
         
-        OF_coeffs = self.trig.build_OF_coeffs(input_PSDs, input_pulse_shapes)
-        self.trig.set_FIR_coeffs(OF_coeffs)
-        self.resolution = self.trig.resolution(input_PSDs, deltaT_phonon=1/fs)
-        self.trig.ThL.ThLs[which_channel].set_thresholds(np.int64(nsigma*self.resolution), 0)
+        self.of_coeffs = self.trig.build_OF_coeffs(self.input_psds, self.input_pulse_shapes)
+        self.trig.set_FIR_coeffs(self.of_coeffs)
+    
+    def resolution(self):
+        """
+        Method for calculation the resolution of the FIR filter in the arbitrary units of the filter.
+        
+        Returns
+        -------
+        resolution : ndarray
+            The resolution of the FIR filter.
+        
+        """
+        
+        return self.trig.resolution(self.input_psds, deltaT_phonon=1/self.fs)
+    
+    def set_threshold(self, threshold):
+        """
+        Method for calculation the resolution of the FIR filter in the arbitrary units of the filter.
+        
+        Parameters
+        ----------
+        threshold : float
+            The threshold to set for triggering on pulses, should be in the arbitrary units of the
+            filter.
+
+        Notes
+        -----
+        For this function, if the trigger is already known, then it is recommended that the user
+        calculate the resolution of the FIR filter using the `TrigSim.resolution` method. The output
+        of that function times the number of standard deviations desired can then be directly passed 
+        to this function.
+        
+        Examples
+        --------
+        >>> import rqpy as rp
+        
+        Load the PSD, template, and fs for passing to `TrigSim`.
+        
+        >>> psd, template, fs = my_load_function('/path/to/data/file.ext')
+        >>> TS = rp.sim.TrigSim(psd, template, fs)
+        >>> resolution = TS.resolution()
+        
+        Set the treshold to a 5-sigma threshold.
+        
+        >>> TS.set_threshold(5*resolution)
+        
+        Now the `TrigSim.trigger` method can be run on some data, where we have a 5-sigma trigger
+        threshold.
+        
+        """
+        
+        if np.isscalar(threshold):
+            threshold = (~np.all(~self.of_coeffs, axis=1)).astype(float)*threshold
+        
+        self.trig.ThL.ThLs[self.which_channel].set_thresholds(np.int64(threshold), 0)
+        
+        self.lgc_can_run_trigger = True
         
     def trigger(self, x, k=12):
         """
@@ -104,8 +171,17 @@ class TrigSim(object):
         fir_out : ndarray
             The complete, filtered trace corresponding to the inputted trace, in the arbitrary
             units of the filter.
+
+        Raises
+        ------
+        ValueError
+            If the `TrigSim.set_threshold` method was not used to set the trigger threshold,
+            then an error is thrown because the trigger is not properly set up.
         
         """
+        
+        if not self.lgc_can_run_trigger:
+            raise ValueError("The threshold was not set, please use the TrigSim.set_threhold method.")
         
         input_traces = [(x[k:] - 32768).astype('int64')] + [np.zeros(len(x[k:]),dtype='int64')]*11 + \
                        [np.zeros(4*len(x[k:]),dtype='int64')]*4
