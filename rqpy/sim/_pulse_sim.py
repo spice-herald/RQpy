@@ -98,11 +98,8 @@ def buildfakepulses(rq, cut, template1, amplitudes1, tdelay1, basepath, evtnums,
     if len(det)!=len(channels):
         raise ValueError("channels and det should have the same length.")
     
-    if template2 is not None:
-        if amplitudes2 is None:
-            raise ValueError("amplitudes2 must be defined if template2 is defined.")
-        if tdelay2 is None:
-            raise ValueError("tdelay2 must be defined if template2 is defined.")
+    if (amplitudes2 is None or tdelay2 is None) and template2 is not None:
+        raise ValueError("Both amplitudes2 and tdelay2 must be defined if template2 is defined.")
     
     if len(set(rq.seriesnumber[cut])) > 1:
         raise ValueError("There cannot be multiple series numbers included in the inputted cut.")
@@ -118,19 +115,32 @@ def buildfakepulses(rq, cut, template1, amplitudes1, tdelay1, basepath, evtnums,
     nonzerocutinds = np.flatnonzero(ctest)
 
     split_cut = np.split(nonzerocutinds[:last_dump_ind], ntraces//neventsperdump)
+    split_amplitudes1 = np.split(amplitudes1[:last_dump_ind], ntraces//neventsperdump)
+    split_tdelay1 = np.split(tdelay1[:last_dump_ind], ntraces//neventsperdump)
     
+    if template2 is not None:
+        split_amplitudes2 = np.split(amplitudes2[:last_dump_ind], ntraces//neventsperdump)
+        split_tdelay2 = np.split(tdelay2[:last_dump_ind], ntraces//neventsperdump)
+
     if last_dump is not None:
         split_cut.append(nonzerocutinds[last_dump_ind:])
+        split_amplitudes1.append(amplitudes1[last_dump_ind:])
+        split_tdelay1.append(tdelay1[last_dump_ind:])
+
+        if template2 is not None:
+            split_amplitudes2.append(amplitudes2[last_dump_ind:])
+            split_tdelay2.append(tdelay2[last_dump_ind:])
 
     for ii, c in enumerate(split_cut):
         cut_seg = np.zeros(cutlen, dtype=bool)
         cut_seg[c] = True
         
-        _buildfakepulses_seg(rq, cut_seg, template1, amplitudes1, tdelay1, basepath, evtnums, seriesnums,
-                             template2=template2, amplitudes2=amplitudes2, tdelay2=tdelay2, channels=channels,
-                             relcal=relcal, det=det, convtoamps=convtoamps, fs=fs, dumpnum=idump+1, 
-                             filetype=filetype, lgcsavefile=lgcsavefile, savefilepath=savefilepath,
-                             savefilename=savefilename)
+        _buildfakepulses_seg(rq, cut_seg, template1, split_amplitudes1[ii], split_tdelay1[ii], 
+                             basepath, evtnums, seriesnums, template2=template2, 
+                             amplitudes2=split_amplitudes2[ii], tdelay2=split_tdelay2[ii], 
+                             channels=channels, relcal=relcal, det=det, convtoamps=convtoamps, 
+                             fs=fs, dumpnum=ii+1, filetype=filetype, lgcsavefile=lgcsavefile, 
+                             savefilepath=savefilepath, savefilename=savefilename)
     
     
 def _buildfakepulses_seg(rq, cut, template1, amplitudes1, tdelay1, basepath, evtnums, seriesnums,
