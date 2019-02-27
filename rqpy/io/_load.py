@@ -131,7 +131,7 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
             arr = getRawEvents(f"{basepath}{snum_str}/", "", channelList=channels, detectorList=list(set(dets)),
                                outputFormat=3, eventNumbers=evtnums[cseries].astype(int).tolist())
         elif filetype == "npz":
-            dumpnums = np.asarray(rq.eventnumber/10000, dtype=int)
+            dumpnums = np.asarray(evtnums/10000, dtype=int)
             
             snum_str = f"{snum:010}"
             snum_str = snum_str[:6] + '_' + snum_str[6:]
