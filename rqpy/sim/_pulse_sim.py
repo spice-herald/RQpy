@@ -15,10 +15,11 @@ if HAS_SCDMSPYTOOLS:
 __all__ = ["buildfakepulses"]
 
 
-def buildfakepulses(rq, cut, template1, amplitudes1, tdelay1, basepath, evtnums, seriesnums,
-                    template2=None, amplitudes2=None, tdelay2=None, channels="PDS1",
-                    det="Z1", relcal=None, convtoamps=1, fs=625e3, neventsperdump=1000,
-                    filetype="mid.gz", lgcsavefile=False, savefilepath=None, savefilename=None):
+def buildfakepulses(rq, cut, template1, amplitudes1, tdelay1, basepath,
+                    template2=None, amplitudes2=None, tdelay2=None,
+                    channels="PDS1", det="Z1", relcal=None, convtoamps=1,
+                    fs=625e3, neventsperdump=1000, filetype="mid.gz",
+                    lgcsavefile=False, savefilepath=None, savefilename=None):
     """
     Function for building fake pulses by adding a template, scaled to certain amplitudes and
     certain time delays, to an existing trace (typically a random).
@@ -43,10 +44,6 @@ def buildfakepulses(rq, cut, template1, amplitudes1, tdelay1, basepath, evtnums,
     basepath : str
         The base path to the directory that contains the folders that the event dumps 
         are in. The folders in this directory should be the series numbers.
-    evtnums : array_like
-        An array of all event numbers for the events in all datasets.
-    seriesnums : array_like
-        An array of the corresponding series numbers for each event number in evtnums.
     template2 : ndarray, optional
         The 2nd template to be added to the traces, otherwise same as `template1`.
     amplitudes2 : ndarray, optional
@@ -136,17 +133,18 @@ def buildfakepulses(rq, cut, template1, amplitudes1, tdelay1, basepath, evtnums,
         cut_seg[c] = True
         
         _buildfakepulses_seg(rq, cut_seg, template1, split_amplitudes1[ii], split_tdelay1[ii], 
-                             basepath, evtnums, seriesnums, template2=template2, 
-                             amplitudes2=split_amplitudes2[ii], tdelay2=split_tdelay2[ii], 
-                             channels=channels, relcal=relcal, det=det, convtoamps=convtoamps, 
-                             fs=fs, dumpnum=ii+1, filetype=filetype, lgcsavefile=lgcsavefile, 
+                             basepath, template2=template2, amplitudes2=split_amplitudes2[ii],
+                             tdelay2=split_tdelay2[ii], channels=channels, relcal=relcal,
+                             det=det, convtoamps=convtoamps, fs=fs, dumpnum=ii+1,
+                             filetype=filetype, lgcsavefile=lgcsavefile,
                              savefilepath=savefilepath, savefilename=savefilename)
     
     
-def _buildfakepulses_seg(rq, cut, template1, amplitudes1, tdelay1, basepath, evtnums, seriesnums,
-                         template2=None, amplitudes2=None, tdelay2=None, channels="PDS1", relcal=None,
-                         det="Z1", convtoamps=1, fs=625e3, dumpnum=1, filetype="mid.gz",
-                         lgcsavefile=False, savefilepath=None, savefilename=None):
+def _buildfakepulses_seg(rq, cut, template1, amplitudes1, tdelay1, basepath,
+                         template2=None, amplitudes2=None, tdelay2=None,
+                         channels="PDS1", relcal=None, det="Z1", convtoamps=1,
+                         fs=625e3, dumpnum=1, filetype="mid.gz", lgcsavefile=False,
+                         savefilepath=None, savefilename=None):
     """
     Hidden helper function for building fake pulses.
               
@@ -168,10 +166,6 @@ def _buildfakepulses_seg(rq, cut, template1, amplitudes1, tdelay1, basepath, evt
     basepath : str
         The base path to the directory that contains the folders that the event dumps 
         are in. The folders in this directory should be the series numbers.
-    evtnums : array_like
-        An array of all event numbers for the events in all datasets.
-    seriesnums : array_like
-        An array of the corresponding series numbers for each event number in evtnums.
     template2 : ndarray, optional
         The 2nd template to be added to the traces, otherwise same as `template1`.
     amplitudes2 : ndarray, optional
