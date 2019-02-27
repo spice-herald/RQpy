@@ -109,28 +109,22 @@ def buildfakepulses(rq, cut, template1, amplitudes1, tdelay1, basepath, evtnums,
     
     if lgcsavefile and (savefilename is None or savefilepath is None):
         raise ValueError("In order to save the simulated data, you must specify savefilename and savefilepath.")
-    
+
     ntraces = np.sum(cut)
     cutlen = len(cut)
+
+    last_dump_ind = -(ntraces%neventsperdump) if ntraces%neventsperdump else None
+
+    nonzerocutinds = np.flatnonzero(ctest)
+
+    split_cut = np.split(nonzerocutinds[:last_dump_ind], ntraces//neventsperdump)
     
-    ndump = ntraces//neventsperdump + 1
-    
-    nonzerocutinds = np.flatnonzero(cut)
- 
-    for idump in range(ndump):
-        jstart = idump*neventsperdump
-        jstop = (idump + 1)*neventsperdump - 1
-        
-        if (jstop >= ntraces):
-            jstop = ntraces - 1
-       
-        maskindstart = nonzerocutinds[jstart]
-        maskindend = nonzerocutinds[jstop] + 1
-        
-        mask = np.zeros(cutlen, dtype=bool)
-        mask[maskindstart:maskindend] = True
-        
-        cut_seg = cut & mask
+    if last_dump is not None:
+        split_cut.append(nonzerocutinds[last_dump_ind:])
+
+    for ii, c in enumerate(split_cut):
+        cut_seg = np.zeros(cutlen, dtype=bool)
+        cut_seg[c] = True
         
         _buildfakepulses_seg(rq, cut_seg, template1, amplitudes1, tdelay1, basepath, evtnums, seriesnums,
                              template2=template2, amplitudes2=amplitudes2, tdelay2=tdelay2, channels=channels,
