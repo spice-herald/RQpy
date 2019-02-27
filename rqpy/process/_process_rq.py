@@ -1183,7 +1183,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         chi2_nonlin = np.zeros(len(signal))
     
     if setup.do_trigsim[chan_num] and setup.trigger == chan_num:
-        triggeramp_sim = np.zero(len(signal))
+        triggeramp_sim = np.zeros(len(signal))
     
     # run the OF class for each trace
     if setup.do_optimumfilters[chan_num]:
