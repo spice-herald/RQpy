@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 from scipy.io import loadmat
 import matplotlib.pyplot as plt
+from glob import glob
+
 from rqpy import HAS_SCDMSPYTOOLS
 
 if HAS_SCDMSPYTOOLS:
@@ -81,10 +83,10 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
     
     if isinstance(channels, str):
         channels = [channels]
-    
-    if type(evtnums) is not pd.core.series.Series:
+
+    if not isinstance(evtnums, pd.Series):
         evtnums = pd.Series(data=evtnums)
-    if type(seriesnums) is not pd.core.series.Series:
+    if not isinstance(seriesnums, pd.Series):
         seriesnums = pd.Series(data=seriesnums)
         
     if not isinstance(convtoamps, list):
@@ -139,8 +141,14 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
             for dumpnum in set(dumpnums[cseries]):
                 cdump = dumpnums == dumpnum
                 inds = np.mod(evtnums[cseries & cdump], 10000) - 1
+                
+                matching_files = sorted(glob(f"{basepath}/{snum_str}/{snum_str}_*_{dumpnum:04d}.npz"))
+                if len(matching_files) > 1:
+                    raise IOError(f"There are multiple files with series number {snum_str} "
+                                  f"and dump number {dumpnum:04d} at this location, making "
+                                  "it unclear which one to open.")
             
-                with np.load(f"{basepath}/{snum_str}/{snum_str}_*_{dumpnum:04d}.npz") as f:
+                with np.load(matching_files[0]) as f:
                     arr.append(f["traces"][inds])
                     
             arr = np.vstack(arr)
