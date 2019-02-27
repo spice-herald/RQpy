@@ -49,8 +49,6 @@ class SetupRQ(object):
         The index at we should truncate the end of the traces up to when calculating RQs.
     nchan : int
         The number of channels to be processed.
-    convtoamps : ndarray, NoneType
-        Array for storing the conversion from ADC bins to Amps.
     do_ofamp_nodelay : list of bool
         Boolean flag for whether or not to do the optimum filter fit with no time
         shifting. Each value in the list specifies this attribute for each channel.
@@ -289,9 +287,7 @@ class SetupRQ(object):
         self.psds = psds
         self.fs = fs
         self.nchan = len(templates)
-        
-        self.convtoamps = None
-        
+
         self.indstart = indstart
         self.indstop = indstop
         
@@ -1298,7 +1294,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
             chi2_nonlin[jj] = reducedchi2_nlin * (len(nlin.data)-nlin.dof)
         
         if setup.do_trigsim[chan_num] and setup.trigger == chan_num:
-            triggeramp_sim[jj] = setup.TS.trigger(setup.signal_full[jj]/setup.convtoamps[chan_num], 
+            triggeramp_sim[jj] = setup.TS.trigger(setup.signal_full[jj, chan_num],
                                                   k=setup.trigsim_k)[0]
     
     # save variables to dict
@@ -1544,8 +1540,7 @@ def _calc_rq(traces, channels, det, setup, readout_inds=None):
         
         for ii, (chan, d) in vals:
             signal = traces[readout_inds, ii, setup.indstart:setup.indstop]
-            if setup.do_trigsim:
-                setup.signal_full = traces[readout_inds, ii]
+            
             template = setup.templates[ii]
             psd = setup.psds[ii]
 
@@ -1625,8 +1620,9 @@ def _rq(file, channels, det, setup, convtoamps, savepath, lgcsavedumps, filetype
         raise ValueError("channels and det should have the same length")
     
     if filetype == "mid.gz":
-        traces, info_dict = io.get_traces_midgz([file], channels=channels, det=det, convtoamps=convtoamps,
-                                                lgcskip_empty=False, lgcreturndict=True)
+        # note that we don't input convtoamps here, this is in case the trigger simulation will be run
+        traces_unscaled, info_dict = io.get_traces_midgz([file], channels=channels, det=det, convtoamps=1,
+                                                         lgcskip_empty=False, lgcreturndict=True)
     elif filetype == "npz":
         traces, info_dict = io.get_traces_npz([file])
     
@@ -1639,6 +1635,17 @@ def _rq(file, channels, det, setup, convtoamps, savepath, lgcsavedumps, filetype
         for d in set(det):
             readout_inds.append(np.array(data[f'readoutstatus{d}'])==1)
         readout_inds = np.logical_and.reduce(readout_inds)
+
+        if setup.do_trigsim:
+            setup.signal_full = traces_unscaled[readout_inds]
+
+        # now we apply convtoamps and apply it to the traces array
+        if not isinstance(convtoamps, list):
+            convtoamps = [convtoamps]
+        convtoamps_arr = np.array(convtoamps)
+        convtoamps_arr = convtoamps_arr[np.newaxis,:,np.newaxis]
+
+        traces = traces_unscaled * convtoamps_arr
     elif filetype == "npz":
         readout_inds = None
     
@@ -1715,9 +1722,7 @@ def rq(filelist, channels, setup, det="Z1", savepath='', lgcsavedumps=False, npr
             convtoamps.append(io.get_trace_gain(folder, ch, d)[0])
     elif filetype == "npz":
         convtoamps = [1]*len(channels)
-    
-    setup.convtoamps = convtoamps
-    
+
     if nprocess == 1:
         results = []
         for f in filelist:
