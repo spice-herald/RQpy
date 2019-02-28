@@ -87,7 +87,7 @@ def saveevents_midgz(events, settings, savepath, savename, dumpnum):
     
     mywriter = writer.DataWriter()
     
-    filename_out = f"{savename}_S{dumpnum:04}.mid.gz"
+    filename_out = f"{savename}_F{dumpnum:04}.mid.gz"
     mywriter.open_file(filename_out, savepath)
     mywriter.write_settings_from_dict(settings)
     mywriter.write_events(events)

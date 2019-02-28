@@ -315,8 +315,8 @@ class PulseSim(object):
         val = getattr(self, attr)
         val.append(sim_data)
     
-    def run_sim(self, savefilepath, savefilename, convtoamps=None,
-                channel=None, det=None, relcal=None, neventsperdump=1000):
+    def run_sim(self, savefilepath, convtoamps=None, channel=None, det=None, 
+                relcal=None, neventsperdump=1000):
         """
         Method for running the pulse simulation after the data has been generated.
         
@@ -324,8 +324,6 @@ class PulseSim(object):
         ----------
         savefilepath : str
             The path where the simulated files should be saved.
-        savefilename : str
-            The filename to use when saving the simulated files.
         convtoamps : NoneType, float, optional
             The factor to convert the loaded data to units of Amps. If left as None,
             then the conversion factor is loaded automatically.
@@ -347,14 +345,13 @@ class PulseSim(object):
         buildfakepulses(self.rq, self.cut, self.templates, self.amplitudes, self.tdelay,
                         self.basepath, channels=channel, det=det, relcal=relcal,
                         convtoamps=convtoamps_auto, fs=self.fs, neventsperdump=neventsperdump,
-                        filetype=self.filetype, lgcsavefile=True, savefilepath=savefilepath,
-                        savefilename=savefilename)
+                        filetype=self.filetype, lgcsavefile=True, savefilepath=savefilepath)
 
 
 def buildfakepulses(rq, cut, templates, amplitudes, tdelay, basepath,
                     channels="PDS1", det="Z1", relcal=None, convtoamps=1,
                     fs=625e3, neventsperdump=1000, filetype="mid.gz",
-                    lgcsavefile=False, savefilepath=None, savefilename=None):
+                    lgcsavefile=False, savefilepath=None):
     """
     Function for building fake pulses by adding a template, scaled to certain amplitudes and
     certain time delays, to an existing trace (typically a random).
@@ -410,8 +407,6 @@ def buildfakepulses(rq, cut, templates, amplitudes, tdelay, basepath,
         A boolean flag for whether or not to save the fake data to a file.
     savefilepath : str, optional
         The string that corresponds to the file path that will be saved.
-    savefilename : str, optional
-        The string that corresponds to the file name that will be adjoined to dumpnum and saved.
         
     Returns
     -------
@@ -448,9 +443,8 @@ def buildfakepulses(rq, cut, templates, amplitudes, tdelay, basepath,
         raise ValueError("There cannot be multiple series numbers included in the "
                          "inputted cut.")
     
-    if lgcsavefile and (savefilename is None or savefilepath is None):
-        raise ValueError("In order to save the simulated data, you must specify savefilename "
-                         "and savefilepath.")
+    if lgcsavefile and savefilepath is None:
+        raise ValueError("In order to save the simulated data, you must specify savefilepath.")
 
     ntraces = np.sum(cut)
     cutlen = len(cut)
@@ -479,13 +473,13 @@ def buildfakepulses(rq, cut, templates, amplitudes, tdelay, basepath,
                              basepath, channels=channels, relcal=relcal,
                              det=det, convtoamps=convtoamps, fs=fs, dumpnum=ii+1,
                              filetype=filetype, lgcsavefile=lgcsavefile,
-                             savefilepath=savefilepath, savefilename=savefilename)
+                             savefilepath=savefilepath)
     
     
 def _buildfakepulses_seg(rq, cut, templates, amplitudes, tdelay, basepath,
                          channels="PDS1", relcal=None, det="Z1", convtoamps=1,
                          fs=625e3, dumpnum=1, filetype="mid.gz", lgcsavefile=False,
-                         savefilepath=None, savefilename=None):
+                         savefilepath=None):
     """
     Hidden helper function for building fake pulses.
               
@@ -536,8 +530,6 @@ def _buildfakepulses_seg(rq, cut, templates, amplitudes, tdelay, basepath,
         A boolean flag for whether or not to save the fake data to a file.
     savefilepath : str, optional
         The string that corresponds to the file path that will be saved.
-    savefilename : str, optional
-        The string that corresponds to the file name that will be adjoined to dumpnum and saved.
         
     Returns
     -------
@@ -577,6 +569,10 @@ def _buildfakepulses_seg(rq, cut, templates, amplitudes, tdelay, basepath,
 
     if lgcsavefile:
         if filetype=='npz':
+            savefilename = f"{seriesnumber:010}"
+            savefilename = savefilename[:6] + '_' + savefilename[6:]
+            savefilename = savefilename + "_fake_pulses"
+
             trigtypes = np.zeros((ntraces, 3), dtype=bool)
             # save the data. note that we are storing the truth
             # information in some of the inputs intended for use
@@ -593,6 +589,8 @@ def _buildfakepulses_seg(rq, cut, templates, amplitudes, tdelay, basepath,
                               dumpnum=dumpnum)
             
         elif filetype=="mid.gz":
+            savefilename = f"{seriesnumber:012}"
+            savefilename = savefilename[:8] + '_' + savefilename[8:]
             
             if np.issubdtype(type(seriesnumber), np.integer):
                 snum_str = f"{seriesnumber:012}"
