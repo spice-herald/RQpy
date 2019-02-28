@@ -30,16 +30,22 @@ def buildfakepulses(rq, cut, templates, amplitudes, tdelay, basepath,
     rq : pandas.DataFrame
         A pandas DataFrame object that contains all of the RQs for the dataset specified.
     cut : array_like
-        A boolean array for the cut that selects the traces that will be loaded from the dump files. These
-        traces serve as the underlying data to which a template is added.
+        A boolean array for the cut that selects the traces that will be loaded from the dump
+        files. These traces serve as the underlying data to which a template is added.
     templates : ndarray, list of ndarray
-        The template to be added to the traces. The template start time should be centered on the center bin.
+        The template(s) to be added to the traces, assumed to be normalized to a max height
+        of 1. The template start time should be centered on the center bin. If a list of templates,
+        then each template will be added to the traces in succession, using the corresponding
+        `amplitudes` and `tdelay`.
     amplitudes : ndarray, list of ndarray
-        The amplitudes, in Amps, by which to scale the template to add the the traces. Must be 
-        same length as cut.
+        The amplitudes, in Amps, by which to scale the template to add to the traces. Must be 
+        same length as cut. A list of ndarray can be passed, where each ndarray corresponds to
+        the amplitudes of the corresponding template in the list of templates.
     tdelay : ndarray, list of ndarray
-        The time delay offset, in seconds, by which to shift the template to add to the traces. Bin interpolation 
-        is implemented for values that are not a multiple the reciprocal of the digitization rate.
+        The time delay offset, in seconds, by which to shift the template to add to the traces.
+        Bin interpolation is implemented for values that are not a multiple the reciprocal of
+        the digitization rate. A list of ndarray can be passed, where each ndarray corresponds to
+        the tdelays of the corresponding template in the list of templates.
     basepath : str
         The base path to the directory that contains the folders that the event dumps 
         are in. The folders in this directory should be the series numbers.
@@ -93,15 +99,21 @@ def buildfakepulses(rq, cut, templates, amplitudes, tdelay, basepath,
         
     if isinstance(tdelay, np.ndarray):
         tdelay = [tdelay]
+        
+    if not len(tdelay) == len(amplitudes) == len(templates):
+        raise ValueError("The lists of tdelay, amplitudes, and templates must have the "
+                         "same number of ndarray.")
     
     if len(det)!=len(channels):
         raise ValueError("channels and det should have the same length.")
     
     if len(set(rq.seriesnumber[cut])) > 1:
-        raise ValueError("There cannot be multiple series numbers included in the inputted cut.")
+        raise ValueError("There cannot be multiple series numbers included in the "
+                         "inputted cut.")
     
     if lgcsavefile and (savefilename is None or savefilepath is None):
-        raise ValueError("In order to save the simulated data, you must specify savefilename and savefilepath.")
+        raise ValueError("In order to save the simulated data, you must specify savefilename "
+                         "and savefilepath.")
 
     ntraces = np.sum(cut)
     cutlen = len(cut)
@@ -145,26 +157,32 @@ def _buildfakepulses_seg(rq, cut, templates, amplitudes, tdelay, basepath,
     rq : pandas.DataFrame
         A pandas DataFrame object that contains all of the RQs for the dataset specified.
     cut : array_like
-        A boolean array for the cut that selects the traces that will be loaded from the dump files. These
-        traces serve as the underlying data to which a template is added.
-    templates : ndarray
-        The template to be added to the traces. The template start time should be centered on the center bin.
-    amplitudes : ndarray
-        The amplitudes, in Amps, by which to scale the template to add the the traces. Must be 
-        same length as cut.
-    tdelay : ndarray
-        The time delay offset, in seconds, by which to shift the template to add to the traces. Bin interpolation 
-        is implemented for values that are not a multiple the reciprocal of the digitization rate.
+        A boolean array for the cut that selects the traces that will be loaded from the dump
+        files. These traces serve as the underlying data to which a template is added.
+    templates : ndarray, list of ndarray
+        The template(s) to be added to the traces, assumed to be normalized to a max height
+        of 1. The template start time should be centered on the center bin. If a list of templates,
+        then each template will be added to the traces in succession, using the corresponding
+        `amplitudes` and `tdelay`.
+    amplitudes : ndarray, list of ndarray
+        The amplitudes, in Amps, by which to scale the template to add to the traces. Must be 
+        same length as cut. A list of ndarray can be passed, where each ndarray corresponds to
+        the amplitudes of the corresponding template in the list of templates.
+    tdelay : ndarray, list of ndarray
+        The time delay offset, in seconds, by which to shift the template to add to the traces.
+        Bin interpolation is implemented for values that are not a multiple the reciprocal of
+        the digitization rate. A list of ndarray can be passed, where each ndarray corresponds to
+        the tdelays of the corresponding template in the list of templates.
     basepath : str
         The base path to the directory that contains the folders that the event dumps 
         are in. The folders in this directory should be the series numbers.
     channels : str, list of str, optional
         A list of strings that contains all of the channels that should be loaded.
     det : str, list of str, optional
-        String or list of strings that specifies the detector name. Only used if filetype=='mid.gz'. 
-        If a list of strings, then should each value should directly correspond to the channel names.
-        If a string is inputted and there are multiple channels, then it is assumed that the detector
-        name is the same for each channel.
+        String or list of strings that specifies the detector name. Only used if
+        filetype=='mid.gz'. If a list of strings, then should each value should directly
+        correspond to the channel names. If a string is inputted and there are multiple
+        channels, then it is assumed that the detector name is the same for each channel.
     relcal : ndarray, optional
         An array with the amplitude scalings between channels used when making the total 
         If channels is supplied, relcal indices correspond to that list
