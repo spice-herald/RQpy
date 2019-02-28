@@ -15,10 +15,11 @@ if HAS_SCDMSPYTOOLS:
 __all__ = ["buildfakepulses"]
 
 
-def buildfakepulses(rq, cut, template1, amplitudes1, tdelay1, basepath, evtnums, seriesnums,
-                    template2=None, amplitudes2=None, tdelay2=None, channels="PDS1",
-                    det="Z1", relcal=None, convtoamps=1, fs=625e3, neventsperdump=1000,
-                    filetype="mid.gz", lgcsavefile=False, savefilepath=None, savefilename=None):
+def buildfakepulses(rq, cut, template1, amplitudes1, tdelay1, basepath,
+                    template2=None, amplitudes2=None, tdelay2=None,
+                    channels="PDS1", det="Z1", relcal=None, convtoamps=1,
+                    fs=625e3, neventsperdump=1000, filetype="mid.gz",
+                    lgcsavefile=False, savefilepath=None, savefilename=None):
     """
     Function for building fake pulses by adding a template, scaled to certain amplitudes and
     certain time delays, to an existing trace (typically a random).
@@ -43,10 +44,6 @@ def buildfakepulses(rq, cut, template1, amplitudes1, tdelay1, basepath, evtnums,
     basepath : str
         The base path to the directory that contains the folders that the event dumps 
         are in. The folders in this directory should be the series numbers.
-    evtnums : array_like
-        An array of all event numbers for the events in all datasets.
-    seriesnums : array_like
-        An array of the corresponding series numbers for each event number in evtnums.
     template2 : ndarray, optional
         The 2nd template to be added to the traces, otherwise same as `template1`.
     amplitudes2 : ndarray, optional
@@ -98,51 +95,72 @@ def buildfakepulses(rq, cut, template1, amplitudes1, tdelay1, basepath, evtnums,
     if len(det)!=len(channels):
         raise ValueError("channels and det should have the same length.")
     
-    if template2 is not None:
-        if amplitudes2 is None:
-            raise ValueError("amplitudes2 must be defined if template2 is defined.")
-        if tdelay2 is None:
-            raise ValueError("tdelay2 must be defined if template2 is defined.")
+    if (amplitudes2 is None or tdelay2 is None) and template2 is not None:
+        raise ValueError("Both amplitudes2 and tdelay2 must be defined if template2 is defined.")
     
     if len(set(rq.seriesnumber[cut])) > 1:
         raise ValueError("There cannot be multiple series numbers included in the inputted cut.")
     
     if lgcsavefile and (savefilename is None or savefilepath is None):
         raise ValueError("In order to save the simulated data, you must specify savefilename and savefilepath.")
-    
+
     ntraces = np.sum(cut)
     cutlen = len(cut)
-    
-    ndump = ntraces//neventsperdump + 1
-    
+
+    last_dump_ind = -(ntraces%neventsperdump) if ntraces%neventsperdump else None
+
     nonzerocutinds = np.flatnonzero(cut)
- 
-    for idump in range(ndump):
-        jstart = idump*neventsperdump
-        jstop = (idump + 1)*neventsperdump - 1
+    
+    split_cut = []
+    split_amplitudes1 = []
+    split_tdelay1 = []
+    
+    if template2 is not None:
+        split_amplitudes2 = []
+        split_tdelay2 = []
+
+    if ntraces//neventsperdump > 0:
+        split_cut.extend(np.split(nonzerocutinds[:last_dump_ind], ntraces//neventsperdump))
+        split_amplitudes1.extend(np.split(amplitudes1[:last_dump_ind], ntraces//neventsperdump))
+        split_tdelay1.extend(np.split(tdelay1[:last_dump_ind], ntraces//neventsperdump))
+
+        if template2 is not None:
+            split_amplitudes2.extend(np.split(amplitudes2[:last_dump_ind], ntraces//neventsperdump))
+            split_tdelay2.extend(np.split(tdelay2[:last_dump_ind], ntraces//neventsperdump))
+
+    if last_dump_ind is not None:
+        split_cut.append(nonzerocutinds[last_dump_ind:])
+        split_amplitudes1.append(amplitudes1[last_dump_ind:])
+        split_tdelay1.append(tdelay1[last_dump_ind:])
+
+        if template2 is not None:
+            split_amplitudes2.append(amplitudes2[last_dump_ind:])
+            split_tdelay2.append(tdelay2[last_dump_ind:])
+
+    for ii, c in enumerate(split_cut):
+        cut_seg = np.zeros(cutlen, dtype=bool)
+        cut_seg[c] = True
         
-        if (jstop >= ntraces):
-            jstop = ntraces - 1
-       
-        maskindstart = nonzerocutinds[jstart]
-        maskindend = nonzerocutinds[jstop] + 1
+        if template2 is None:
+            split_amplitudes2_seg = None
+            split_tdelay2_seg = None
+        else:
+            split_amplitudes2_seg = split_amplitudes2[ii]
+            split_tdelay2_seg = split_tdelay2[ii]
         
-        mask = np.zeros(cutlen, dtype=bool)
-        mask[maskindstart:maskindend] = True
-        
-        cut_seg = cut & mask
-        
-        _buildfakepulses_seg(rq, cut_seg, template1, amplitudes1, tdelay1, basepath, evtnums, seriesnums,
-                             template2=template2, amplitudes2=amplitudes2, tdelay2=tdelay2, channels=channels,
-                             relcal=relcal, det=det, convtoamps=convtoamps, fs=fs, dumpnum=idump+1, 
-                             filetype=filetype, lgcsavefile=lgcsavefile, savefilepath=savefilepath,
-                             savefilename=savefilename)
+        _buildfakepulses_seg(rq, cut_seg, template1, split_amplitudes1[ii], split_tdelay1[ii], 
+                             basepath, template2=template2, amplitudes2=split_amplitudes2_seg,
+                             tdelay2=split_tdelay2_seg, channels=channels, relcal=relcal,
+                             det=det, convtoamps=convtoamps, fs=fs, dumpnum=ii+1,
+                             filetype=filetype, lgcsavefile=lgcsavefile,
+                             savefilepath=savefilepath, savefilename=savefilename)
     
     
-def _buildfakepulses_seg(rq, cut, template1, amplitudes1, tdelay1, basepath, evtnums, seriesnums,
-                         template2=None, amplitudes2=None, tdelay2=None, channels="PDS1", relcal=None,
-                         det="Z1", convtoamps=1, fs=625e3, dumpnum=1, filetype="mid.gz",
-                         lgcsavefile=False, savefilepath=None, savefilename=None):
+def _buildfakepulses_seg(rq, cut, template1, amplitudes1, tdelay1, basepath,
+                         template2=None, amplitudes2=None, tdelay2=None,
+                         channels="PDS1", relcal=None, det="Z1", convtoamps=1,
+                         fs=625e3, dumpnum=1, filetype="mid.gz", lgcsavefile=False,
+                         savefilepath=None, savefilename=None):
     """
     Hidden helper function for building fake pulses.
               
@@ -164,10 +182,6 @@ def _buildfakepulses_seg(rq, cut, template1, amplitudes1, tdelay1, basepath, evt
     basepath : str
         The base path to the directory that contains the folders that the event dumps 
         are in. The folders in this directory should be the series numbers.
-    evtnums : array_like
-        An array of all event numbers for the events in all datasets.
-    seriesnums : array_like
-        An array of the corresponding series numbers for each event number in evtnums.
     template2 : ndarray, optional
         The 2nd template to be added to the traces, otherwise same as `template1`.
     amplitudes2 : ndarray, optional
