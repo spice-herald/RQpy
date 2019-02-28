@@ -50,7 +50,8 @@ def buildfakepulses(rq, cut, templates, amplitudes, tdelay, basepath,
         The base path to the directory that contains the folders that the event dumps 
         are in. The folders in this directory should be the series numbers.
     channels : str, list of str, optional
-        A list of strings that contains all of the channels that should be loaded.
+        A list of strings that contains all of the channels that should be loaded. Only used if
+        filetype=='mid.gz'.
     det : str, list of str, optional
         String or list of strings that specifies the detector name. Only used if filetype=='mid.gz'. 
         If a list of strings, then should each value should directly correspond to the channel names.
@@ -177,7 +178,8 @@ def _buildfakepulses_seg(rq, cut, templates, amplitudes, tdelay, basepath,
         The base path to the directory that contains the folders that the event dumps 
         are in. The folders in this directory should be the series numbers.
     channels : str, list of str, optional
-        A list of strings that contains all of the channels that should be loaded.
+        A list of strings that contains all of the channels that should be loaded. Only used if
+        filetype=='mid.gz'.
     det : str, list of str, optional
         String or list of strings that specifies the detector name. Only used if
         filetype=='mid.gz'. If a list of strings, then should each value should directly
