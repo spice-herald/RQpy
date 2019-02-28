@@ -1,7 +1,10 @@
+import os
 import numpy as np
 import pandas as pd
 from scipy.io import loadmat
 import matplotlib.pyplot as plt
+from glob import glob
+
 from rqpy import HAS_SCDMSPYTOOLS
 
 if HAS_SCDMSPYTOOLS:
@@ -80,10 +83,10 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
     
     if isinstance(channels, str):
         channels = [channels]
-    
-    if type(evtnums) is not pd.core.series.Series:
+
+    if not isinstance(evtnums, pd.Series):
         evtnums = pd.Series(data=evtnums)
-    if type(seriesnums) is not pd.core.series.Series:
+    if not isinstance(seriesnums, pd.Series):
         seriesnums = pd.Series(data=seriesnums)
         
     if not isinstance(convtoamps, list):
@@ -128,12 +131,28 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
             arr = getRawEvents(f"{basepath}{snum_str}/", "", channelList=channels, detectorList=list(set(dets)),
                                outputFormat=3, eventNumbers=evtnums[cseries].astype(int).tolist())
         elif filetype == "npz":
-            inds = np.mod(evtnums[cseries], 10000) - 1
-            # snum_alone is the sliced snum string up to the second underscore
-            snum_alone = "_".join(snum.split("_",2)[:2])
-            with np.load(f"{basepath}/{snum_alone}/{snum}.npz") as f:
-                arr = f["traces"][inds]
-    
+            dumpnums = np.asarray(evtnums/10000, dtype=int)
+            
+            snum_str = f"{snum:010}"
+            snum_str = snum_str[:6] + '_' + snum_str[6:]
+            
+            arr = list()
+            
+            for dumpnum in set(dumpnums[cseries]):
+                cdump = dumpnums == dumpnum
+                inds = np.mod(evtnums[cseries & cdump], 10000) - 1
+                
+                matching_files = sorted(glob(f"{basepath}/{snum_str}/{snum_str}_*_{dumpnum:04d}.npz"))
+                if len(matching_files) > 1:
+                    raise IOError(f"There are multiple files with series number {snum_str} "
+                                  f"and dump number {dumpnum:04d} at this location, making "
+                                  "it unclear which one to open.")
+            
+                with np.load(matching_files[0]) as f:
+                    arr.append(f["traces"][inds])
+                    
+            arr = np.vstack(arr)
+            
         arrs.append(arr)
     
     if filetype == "mid.gz":
@@ -156,7 +175,7 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
         
     elif filetype == "npz":
         x = np.vstack(arrs).astype(float)
-        chans = list(range(x.shape[1]))
+        channels = list(range(x.shape[1]))
         
     t = np.arange(x.shape[-1])/fs
     
@@ -181,10 +200,7 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
             else:
                 colors = plt.cm.viridis(np.linspace(0, 1, num=x.shape[1]), alpha=0.5)
                 for jj, chan in enumerate(channels):
-                    if filetype == "mid.gz":
-                        label = f"Channel {chan}"
-                    elif filetype == "npz":
-                        label = f"Channel {chan}"
+                    label = f"Channel {chan}"
                     
                     if indbasepre is not None:
                         baseline = np.mean(x[ii, jj, :indbasepre])
@@ -235,6 +251,10 @@ def get_trace_gain(path, chan, det, gainfactors = {'rfb': 5000, 'loopgain' : 2.4
         raise ImportError("Cannot use get_trace_gain because scdmsPyTools is not installed.")
     
     series = path.split('/')[-1]
+    
+    if os.path.splitext(path)[-1]:
+        path = os.path.dirname(path)
+    
     settings = getDetectorSettings(path, series)
     qetbias = settings[det][chan]['qetBias']
     drivergain = settings[det][chan]['driverGain']
@@ -447,8 +467,9 @@ def get_traces_npz(path):
     trigtypes = []
     
     for file in path:
-        seriesnum = file.split('/')[-1].split('.')[0]
-        dumpnum = int(seriesnum.split('_')[-1])
+        filename = file.split('/')[-1].split('.')[0]
+        seriesnum = int(str().join(filename.split('_')[:2]))
+        dumpnum = int(filename.split('_')[-1])
         
         with np.load(file) as data:
             trigtimes.append(data["trigtimes"])

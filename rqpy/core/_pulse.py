@@ -1,6 +1,7 @@
 import numpy as np
 import qetpy as qp
 from scipy import signal
+from scipy import ndimage
 
 
 __all__ = ["shift", "make_ideal_template", "downsample_truncate"]
@@ -15,9 +16,10 @@ def shift(arr, num, fill_value=0):
     ----------
     arr : array_like
         Array to shift values in.
-    num : int
+    num : float
         The number of values to shift by. If positive, values shift to the right. If negative, 
         values shift to the left.
+        If num is a non-whole number of bins, arr is linearly interpolated
     fill_value : scalar, optional
         The value to fill the bins at the head or tail of the array with.
     
@@ -29,14 +31,20 @@ def shift(arr, num, fill_value=0):
     """
     
     result = np.empty_like(arr)
-    if num > 0:
-        result[:num] = fill_value
-        result[num:] = arr[:-num]
-    elif num < 0:
-        result[num:] = fill_value
-        result[:num] = arr[-num:]
+    
+    if float(num).is_integer():
+        num = int(num) # force num to int type for slicing
+        
+        if num > 0:
+            result[:num] = fill_value
+            result[num:] = arr[:-num]
+        elif num < 0:
+            result[num:] = fill_value
+            result[:num] = arr[-num:]
+        else:
+            result[:] = arr
     else:
-        result[:] = arr
+        result = ndimage.shift(arr, num, order=1, mode='constant', cval=fill_value)
         
     return result
 
