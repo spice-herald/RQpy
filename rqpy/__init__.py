@@ -1,4 +1,4 @@
-from ._globals import HAS_SCDMSPYTOOLS
+from ._globals import HAS_SCDMSPYTOOLS, HAS_TRIGSIM
 from . import core
 from .core import *
 from . import plotting

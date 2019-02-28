@@ -8,7 +8,7 @@ import warnings
 import rqpy as rp
 from rqpy import io
 import qetpy as qp
-from rqpy import HAS_SCDMSPYTOOLS
+from rqpy import HAS_SCDMSPYTOOLS, HAS_TRIGSIM
 
 __all__ = ["SetupRQ", "rq"]
 
@@ -217,7 +217,18 @@ class SetupRQ(object):
         Boolean flag for whether or not any of the smoothed-PDS optimum filters will be calculated. 
         If only calculating non-OF-related RQs, then this will be False, and processing time will not
         be spent on initializing the OF. Each value in the list specifies this attribute for each channel.
-    
+    do_trigsim : list of bool
+        Boolean flag for whether or not the trigger simulation will be run on each channel. Should only
+        be true for the trigger channel.
+    TS : rqpy.sim.TrigSim
+        The `rqpy.sim.TrigSim` class object for running the trigger simulation.
+    trigsim_k : int
+        The bin number to start the FIR filter at. Since the filter downsamples the data
+        by a factor of 16, the starting bin has a small effect on the calculated amplitude.
+    signal_full : ndarray, NoneType
+        The untruncated traces for the channel that is being processed, only used if `do_trigsim` is 
+        True for the channel.
+
     """
     
     def __init__(self, templates, psds, fs, summed_template=None, summed_psd=None, trigger=None,
@@ -252,6 +263,12 @@ class SetupRQ(object):
             The index at we should truncate the end of the traces up to when calculating RQs. If left as 
             None, then we do not truncate the end of the trace. See `indstart`.
         
+        Raises
+        ------
+        ValueError
+            If `self.trigger` was set not be None, but is not an integer between zero and the number
+            of channels - 1 (`self.nchan - 1`).
+        
         """
         
         if not isinstance(templates, list):
@@ -270,7 +287,7 @@ class SetupRQ(object):
         self.psds = psds
         self.fs = fs
         self.nchan = len(templates)
-        
+
         self.indstart = indstart
         self.indstop = indstop
         
@@ -358,6 +375,11 @@ class SetupRQ(object):
         
         self.do_optimumfilters = [True]*self.nchan
         self.do_optimumfilters_smooth = [False]*self.nchan
+        
+        self.do_trigsim = [False]*self.nchan
+        self.TS = None
+        self.trigsim_k = 12
+        self.signal_full = None
         
     def _check_of(self):
         """
@@ -944,6 +966,50 @@ class SetupRQ(object):
         self.do_ofnonlin = lgcrun
         self.ofnonlin_positive_pulses = positive_pulses
         
+    def adjust_trigsim(self, trigger_template, trigger_psd, threshold, k=12):
+        """
+        Method for setting up the use of the trigger simulation for `mid.gz` files.
+        
+        Parameters
+        ----------
+        trigger_template : ndarray
+            The pulse template to use for the FIR filter. Should be normalized to have a
+            height of 1.
+        trigger_psd : ndarray
+            The input power spectral density to use for the FIR filter. Should be in
+            units of ADC bins.
+        threshold : float
+            The threshold in the arbitrary units of the FIR filter to use for detection of pulses.
+            Should be a known quantity before attempting to use the trigger simulation.
+        k : int, optional
+            The bin number to start the FIR filter at. Since the filter downsamples the data
+            by a factor of 16, the starting bin has a small effect on the calculated amplitude.
+        
+        Raises
+        ------
+        ImportError
+            If `rqpy.HAS_TRIGSIM` is False, i.e. the user does not have the `trigsim` package installed.
+        ValueError
+            If `self.trigger` was not set, then the trigger simulation will not know which channel to run on.
+        
+        """
+        
+        if not HAS_TRIGSIM:
+            raise ImportError("Cannot run the trigger simulation because trigsim is not installed.")
+        
+        if self.trigger is None:
+            raise ValueError("trigger was not set to specify the trigger channel in the initialization of SetupRQ.")
+        
+        lgcrun = self._check_arg_length(lgcrun=False)
+        lgcrun[self.trigger] = True
+        
+        self.do_trigsim = lgcrun
+        self.trigsim_k = k
+        
+        self.TS = rp.sim.TrigSim(trigger_psd, trigger_template, self.fs)
+        self.TS.set_threshold(threshold)
+        
+        
 def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, chan_num, det):
     """
     Helper function for calculating RQs for an array of traces corresponding to a single channel.
@@ -1112,6 +1178,9 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         t0_nonlin_err = np.zeros(len(signal))
         chi2_nonlin = np.zeros(len(signal))
     
+    if setup.do_trigsim[chan_num] and setup.trigger == chan_num:
+        triggeramp_sim = np.zeros(len(signal))
+    
     # run the OF class for each trace
     if setup.do_optimumfilters[chan_num]:
         OF = qp.OptimumFilter(signal[0], template, psd, fs)
@@ -1223,6 +1292,10 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
             t0_nonlin[jj] = params_nlin[3]
             t0_nonlin_err[jj] = errors_nlin[3]
             chi2_nonlin[jj] = reducedchi2_nlin * (len(nlin.data)-nlin.dof)
+        
+        if setup.do_trigsim[chan_num] and setup.trigger == chan_num:
+            triggeramp_sim[jj] = setup.TS.trigger(setup.signal_full[jj, chan_num],
+                                                  k=setup.trigsim_k)[0]
     
     # save variables to dict
     if setup.do_chi2_nopulse[chan_num]:
@@ -1370,6 +1443,10 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         rq_dict[f'chi2_nlin_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'chi2_nlin_{chan}{det}'][readout_inds] = chi2_nonlin
     
+    if setup.do_trigsim[chan_num] and setup.trigger == chan_num:
+        rq_dict[f'triggeramp_sim_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'triggeramp_sim_{chan}{det}'][readout_inds] = triggeramp_sim
+    
     if any(setup.do_ofamp_shifted) and setup.trigger is not None:
         # do the shifted OF on each trace
         if chan_num==setup.trigger:
@@ -1463,6 +1540,7 @@ def _calc_rq(traces, channels, det, setup, readout_inds=None):
         
         for ii, (chan, d) in vals:
             signal = traces[readout_inds, ii, setup.indstart:setup.indstop]
+            
             template = setup.templates[ii]
             psd = setup.psds[ii]
 
@@ -1518,7 +1596,11 @@ def _rq(file, channels, det, setup, convtoamps, savepath, lgcsavedumps, filetype
     
     if filetype == "mid.gz" and not HAS_SCDMSPYTOOLS:
         raise ImportError("Cannot use filetype mid.gz because scdmsPyTools is not installed.")
-        
+    
+    if filetype == "npz" and setup.do_trigsim:
+        raise ValueError("setup.do_trigsim was set to True for filetype npz. " +\
+                         "The trigger simulation is only meant for filetype mid.gz")
+    
     if filetype == "mid.gz":
         seriesnum = file.split('/')[-2]
         dump = file.split('/')[-1].split('_')[-1].split('.')[0]
@@ -1538,8 +1620,9 @@ def _rq(file, channels, det, setup, convtoamps, savepath, lgcsavedumps, filetype
         raise ValueError("channels and det should have the same length")
     
     if filetype == "mid.gz":
-        traces, info_dict = io.get_traces_midgz([file], channels=channels, det=det, convtoamps=convtoamps,
-                                                lgcskip_empty=False, lgcreturndict=True)
+        # note that we don't input convtoamps here, this is in case the trigger simulation will be run
+        traces_unscaled, info_dict = io.get_traces_midgz([file], channels=channels, det=det, convtoamps=1,
+                                                         lgcskip_empty=False, lgcreturndict=True)
     elif filetype == "npz":
         traces, info_dict = io.get_traces_npz([file])
     
@@ -1552,6 +1635,17 @@ def _rq(file, channels, det, setup, convtoamps, savepath, lgcsavedumps, filetype
         for d in set(det):
             readout_inds.append(np.array(data[f'readoutstatus{d}'])==1)
         readout_inds = np.logical_and.reduce(readout_inds)
+
+        if setup.do_trigsim:
+            setup.signal_full = traces_unscaled[readout_inds]
+
+        # now we apply convtoamps and apply it to the traces array
+        if not isinstance(convtoamps, list):
+            convtoamps = [convtoamps]
+        convtoamps_arr = np.array(convtoamps)
+        convtoamps_arr = convtoamps_arr[np.newaxis,:,np.newaxis]
+
+        traces = traces_unscaled * convtoamps_arr
     elif filetype == "npz":
         readout_inds = None
     
@@ -1628,7 +1722,7 @@ def rq(filelist, channels, setup, det="Z1", savepath='', lgcsavedumps=False, npr
             convtoamps.append(io.get_trace_gain(folder, ch, d)[0])
     elif filetype == "npz":
         convtoamps = [1]*len(channels)
-    
+
     if nprocess == 1:
         results = []
         for f in filelist:
