@@ -451,9 +451,6 @@ def get_traces_npz(path):
     if not isinstance(path, list):
         path = [path]
     
-    columns = ["eventnumber", "seriesnumber", "ttltimes", "ttlamps", "pulsetimes", "pulseamps", 
-               "randomstimes", "randomstrigger", "pulsestrigger", "ttltrigger"]
-    
     info_dict = {}
     
     traces = []
@@ -465,6 +462,8 @@ def get_traces_npz(path):
     pulseamps = []
     randomstimes = []
     trigtypes = []
+    truthamps = []
+    truthtdelay = []
     
     for file in path:
         filename = file.split('/')[-1].split('.')[0]
@@ -472,6 +471,8 @@ def get_traces_npz(path):
         dumpnum = int(filename.split('_')[-1])
         
         with np.load(file) as data:
+            has_sim_data = "truthamps" in data.keys() and "truthtdelay" in data.keys()
+            
             trigtimes.append(data["trigtimes"])
             trigamps.append(data["trigamps"])
             pulsetimes.append(data["pulsetimes"])
@@ -480,6 +481,10 @@ def get_traces_npz(path):
             trigtypes.append(data["trigtypes"])
             traces.append(data["traces"])
             nevts = len(data["traces"])
+            
+            if has_sim_data:
+                truthamps.append(data["truthamps"])
+                truthtdelay.append(data["truthtdelay"])
         
         eventnumber.append(10000*dumpnum + 1 + np.arange(nevts))
         seriesnumber.extend([seriesnum] * nevts)
@@ -498,6 +503,14 @@ def get_traces_npz(path):
     info_dict["ttltrigger"] = trigtypes[:, 2]
     
     traces = np.vstack(traces)
+    
+    if has_sim_data:
+        truthamps = np.vstack(truthamps)
+        truthtdelay = np.vstack(truthtdelay)
+        
+        for ii in truthamps.shape[-1]:
+            info_dict[f"truthamps{ii+1}"] = truthamps[:, ii]
+            info_dict[f"truthtdelay{ii+1}"] = truthtdelay[:, ii]
         
     return traces, info_dict
 

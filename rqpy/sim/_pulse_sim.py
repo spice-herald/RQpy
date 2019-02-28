@@ -572,18 +572,15 @@ def _buildfakepulses_seg(rq, cut, templates, amplitudes, tdelay, basepath,
             savefilename = f"{seriesnumber:010}"
             savefilename = savefilename[:6] + '_' + savefilename[6:]
             savefilename = savefilename + "_fake_pulses"
-
+            
+            truthamps = np.stack(amplitudes, axis=1)
+            truthtdelay = np.stack(tdelay, axis=1)
             trigtypes = np.zeros((ntraces, 3), dtype=bool)
-            # save the data. note that we are storing the truth
-            # information in some of the inputs intended for use
-            # by the continuous trigger code.
-            # TODO: save truth information in a better way
-            io.saveevents_npz(pulsetimes=tdelay[0],
-                              pulseamps=amplitudes[0],
-                              trigtimes=tdelay[1] if len(tdelay)>1 else None,
-                              trigamps=amplitudes[1] if len(amplitudes)>1 else None,
-                              traces=fakepulses,
+            
+            io.saveevents_npz(traces=fakepulses,
                               trigtypes=trigtypes,
+                              truthamps=truthamps,
+                              truthtdelay=truthtdelay,
                               savepath=savefilepath,
                               savename=savefilename,
                               dumpnum=dumpnum)
