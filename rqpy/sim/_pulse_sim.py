@@ -109,7 +109,7 @@ def buildfakepulses(rq, cut, template1, amplitudes1, tdelay1, basepath,
 
     last_dump_ind = -(ntraces%neventsperdump) if ntraces%neventsperdump else None
 
-    nonzerocutinds = np.flatnonzero(ctest)
+    nonzerocutinds = np.flatnonzero(cut)
 
     split_cut = np.split(nonzerocutinds[:last_dump_ind], ntraces//neventsperdump)
     split_amplitudes1 = np.split(amplitudes1[:last_dump_ind], ntraces//neventsperdump)
