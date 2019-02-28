@@ -508,7 +508,7 @@ def get_traces_npz(path):
         truthamps = np.vstack(truthamps)
         truthtdelay = np.vstack(truthtdelay)
         
-        for ii in truthamps.shape[-1]:
+        for ii in range(truthamps.shape[-1]):
             info_dict[f"truthamps{ii+1}"] = truthamps[:, ii]
             info_dict[f"truthtdelay{ii+1}"] = truthtdelay[:, ii]
         
