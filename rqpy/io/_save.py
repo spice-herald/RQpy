@@ -8,47 +8,89 @@ if HAS_SCDMSPYTOOLS:
 __all__ = ["saveevents_npz", "saveevents_midgz"]
 
 
+def _check_kwargs_npz(**kwargs):
+    """
+    Helper function for extracting the array length that is being saved.
+    
+    Parameters
+    ----------
+    kwargs : dict
+        The keyword arguments from `rqpy.io.saveevents_npz` that correspond to
+        the inputted ndarrays.
+        
+    Returns
+    -------
+    arr_len : int
+        The length of the arrays (assuming they all have the same length).
+    
+    """
+
+    for key in kwargs.keys():
+        if kwargs[key] is not None:
+            return len(kwargs[key])
+    
+    raise IOError("Cannot save file, all arrays appear to be None.")
+
+
 def saveevents_npz(pulsetimes=None, pulseamps=None, trigtimes=None, trigamps=None, randomstimes=None, 
-                   traces=None, trigtypes=None, savepath=None, savename=None, dumpnum=None):
+                   traces=None, trigtypes=None, truthamps=None, truthtdelay=None,
+                   savepath=None, savename=None, dumpnum=None):
     """
     Function for simple saving of events to .npz file.
     
     Parameters
     ----------
-    pulsetimes : ndarray, optional
+    pulsetimes : ndarray, NoneType, optional
         If we triggered on a pulse, the time of the pulse trigger in seconds. Otherwise this is zero.
-    pulseamps : ndarray, optional
+    pulseamps : ndarray, NoneType, optional
         If we triggered on a pulse, the optimum amplitude at the pulse trigger time. Otherwise this is zero.
-    trigtimes : ndarray, optional
+    trigtimes : ndarray, NoneType, optional
         If we triggered due to ttl, the time of the ttl trigger in seconds. Otherwise this is zero.
-    trigamps : ndarray, optional
+    trigamps : ndarray, NoneType, optional
         If we triggered due to ttl, the optimum amplitude at the ttl trigger time. Otherwise this is zero.
-    randomstimes : ndarray, optional
-        Array of the corresponding event times for each section
-    traces : ndarray, optional
+    randomstimes : ndarray, NoneType, optional
+        Array of the corresponding event times for each section, if this is a random.
+    traces : ndarray, NoneType, optional
         The corresponding trace for each detected event.
-    trigtypes: ndarray, optional
+    trigtypes : ndarray, NoneType, optional
         Array of boolean vectors each of length 3. The first value indicates if the trace is a random or not.
         The second value indicates if we had a pulse trigger. The third value indicates if we had a ttl trigger.
-    savepath : NoneType, str, optional
+    truthamps : ndarray, NoneType, optional
+        If the data being saved is simulated data, this is a 2-d ndarray of the true amplitudes for each trace,
+        where the shape is (number of traces, number of templates). Otherwise, this is zero.
+    truthtdelay : ndarray, NoneType, optional
+        If the data being saved is simulated data, this is a 2-d ndarray of the true tdelay for each trace,
+        where the shape is (number of traces, number of templates). Otherwise, this is zero.
+    savepath : str, NoneType, optional
         Path to save the events to.
-    savename : NoneType, str, optional
+    savename : str, NoneType, optional
         Filename to save the events as.
     dumpnum : int, optional
         The dump number of the current file.
         
     """
     
+    filename = f"{savepath}{savename}_{dumpnum:04d}.npz"
+    
+    arr_len = _check_kwargs_npz(pulsetimes=pulsetimes, pulseamps=pulseamps, trigtimes=trigtimes, 
+                                trigamps=trigamps, randomstimes=randomstimes, traces=traces,
+                                trigtypes=trigtypes, truthamps=truthamps, truthtdelay=truthtdelay)
+    
     if randomstimes is None:
-        randomstimes = np.zeros_like(pulsetimes)
+        randomstimes = np.zeros(arr_len)
         
     if pulsetimes is None:
-        pulsetimes = np.zeros_like(randomstimes)
-        pulseamps = np.zeros_like(randomstimes)
-        trigtimes = np.zeros_like(randomstimes)
-        trigamps = np.zeros_like(randomstimes)
+        pulsetimes = np.zeros(arr_len)
+        pulseamps = np.zeros(arr_len)
+        trigtimes = np.zeros(arr_len)
+        trigamps = np.zeros(arr_len)
     
-    filename = f"{savepath}{savename}_{dumpnum:04d}.npz"
+    if truthamps is None:
+        truthamps = np.zeros((arr_len, 1))
+    
+    if truthtdelay is None:
+        truthtdelay = np.zeros((arr_len, 1))
+    
     np.savez(filename, 
              pulsetimes=pulsetimes, 
              pulseamps=pulseamps, 
@@ -56,7 +98,10 @@ def saveevents_npz(pulsetimes=None, pulseamps=None, trigtimes=None, trigamps=Non
              trigamps=trigamps, 
              randomstimes=randomstimes, 
              traces=traces, 
-             trigtypes=trigtypes)
+             trigtypes=trigtypes,
+             truthamps=truthamps,
+             truthtdelay=truthtdelay)
+
 
 def saveevents_midgz(events, settings, savepath, savename, dumpnum):
     """
@@ -87,7 +132,7 @@ def saveevents_midgz(events, settings, savepath, savename, dumpnum):
     
     mywriter = writer.DataWriter()
     
-    filename_out = f"{savename}_S{dumpnum:04}.mid.gz"
+    filename_out = f"{savename}_F{dumpnum:04}.mid.gz"
     mywriter.open_file(filename_out, savepath)
     mywriter.write_settings_from_dict(settings)
     mywriter.write_events(events)
