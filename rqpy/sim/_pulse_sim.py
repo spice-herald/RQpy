@@ -3,6 +3,7 @@ import pandas as pd
 import os
 from glob import glob
 from math import log10, floor
+from scipy import stats
 
 import rqpy as rp
 from rqpy import io
@@ -12,7 +13,342 @@ if HAS_SCDMSPYTOOLS:
     from scdmsPyTools.BatTools.IO import getDetectorSettings
 
 
-__all__ = ["buildfakepulses"]
+__all__ = ["PulseSim", "buildfakepulses"]
+
+
+class PulseSim(object):
+    """
+    Helper class for easier use of setting up `rqpy.sim.buildfakepulses`.
+    
+    Attributes
+    ----------
+    rq : pandas.DataFrame
+        A pandas DataFrame object that contains all of the RQs for the dataset specified.
+    basepath : str
+        The base path to the directory that contains the folders that the event dumps 
+        are in. The folders in this directory should be the series numbers.
+    filetype : str
+        The string that corresponds to the file type that will be opened. Supports two 
+        types: "mid.gz" and "npz". "mid.gz" is the default.
+    templates : list
+        The list of template(s) to be added to the traces, assumed to be normalized to a max height
+        of 1. The template start time should be centered on the center bin.
+    fs : float
+        The digitization rate in Hz of the data.
+    cut : array_like of bool, NoneType
+        A boolean array for the cut that selects the traces that will be loaded from the dump
+        files. These traces serve as the underlying data to which a template is added.
+    ntraces : int
+        The number of traces included in the cut.
+    amplitudes : list
+        The list of amplitudes, in Amps, by which to scale the template to add to the traces.
+        Must be same length as cut. Each ndarray in the list corresponds to the amplitudes
+        of the corresponding template in the list of templates.
+    tdelay : int
+        The time delay offset, in seconds, by which to shift the template to add to the traces.
+        Bin interpolation is implemented for values that are not a multiple the reciprocal of
+        the digitization rate. Each ndarray in the list can be passed, where each ndarray
+        corresponds to the tdelays of the corresponding template in the list of templates.
+
+    """
+
+    def __init__(self, rq, basepath, filetype, templates, fs, cut=None):
+        """
+        Initialization of the PulseSim class.
+        
+        Parameters
+        ----------
+        rq : pandas.DataFrame
+            A pandas DataFrame object that contains all of the RQs for the dataset specified.
+        basepath : str
+            The base path to the directory that contains the folders that the event dumps 
+            are in. The folders in this directory should be the series numbers.
+        filetype : str
+            The string that corresponds to the file type that will be opened. Supports two 
+            types: "mid.gz" and "npz". "mid.gz" is the default.
+        templates : list, numpy.ndarray
+            The template(s) to be added to the traces, assumed to be normalized to a max height
+            of 1. The template start time should be centered on the center bin. If a list of
+            templates, then each template will be added to the traces in succession, using
+            the corresponding `amplitudes` and `tdelay`.
+        fs : float
+            The digitization rate in Hz of the data.
+        cut : array_like of bool, NoneType, optional
+            A boolean array for the cut that selects the traces that will be loaded from the dump
+            files. These traces serve as the underlying data to which a template is added.
+        
+        """
+
+        self.rq = rq
+        self.basepath = basepath
+        self.fs = fs
+        
+        if filetype not in ["npz", "mid.gz"]:
+            raise ValueError("Only npz and mid.gz file types are currently supported by PulseSim")
+        
+        self.filetype = filetype
+        self.cut = cut
+        
+        self.ntraces = self.cut.sum() if self.cut is not None else None
+        
+        self.amplitudes = []
+        self.tdelay = []
+        
+        if isinstance(templates, np.ndarray):
+            templates = [templates]
+
+        self.templates = templates
+
+    @staticmethod
+    def _check_valid_attr(attr):
+        """
+        Helper method for checking if an attribute is valid when generating simulated data.
+        
+        Parameters
+        ----------
+        attr : str
+            The attribute that will be checked.
+        
+        Raises
+        ------
+        ValueError
+            If `attr` is not a string.
+            If `attr` is not "amplitudes" or "tdelay"
+        
+        """
+        
+        if not isinstance(attr, str):
+            raise ValueError("The inputted attr is not a string.")
+        if attr not in ["amplitudes", "tdelay"]:
+            raise ValueError("The inputted attr is not a valid string. "
+                             "Please see the docstring for valid values.")
+            
+    def _check_if_cut_set(self):
+        """
+        Helper method for checking if the cut has been loaded.
+        
+        Raises
+        ------
+        ValueError
+            If the cut has not yet been set, but is still None.
+        
+        """
+        
+        if self.cut is None:
+            raise ValueError("The cut has not been set, consider setting it "
+                             "via the PulseSim.update_cut method.")
+    
+    def _check_sim_data(self):
+        """
+        Helper method for checking if the size of the simulated data matches
+        the number of templates.
+        
+        Raises
+        ------
+        ValueError
+            If the length of the list of amplitudes does not match the length of the list
+            of templates.
+            If the length of the list of tdelay does not match the length of the list of
+            templates.
+        
+        """
+            
+        if len(self.amplitudes) != len(self.templates):
+            raise ValueError(f"There are {len(self.templates)}, but only {len(self.amplitudes)} "
+                             "sets of amplitudes data. Consider adding more using "
+                             "PulseSim.generate_sim_data.")
+        elif len(self.tdelay) != len(self.templates):
+            raise ValueError(f"There are {len(self.templates)}, but only {len(self.tdelay)} "
+                             "sets of tdelay data. Consider adding more using "
+                             "PulseSim.generate_sim_data.")
+    
+    def _check_channel_det(self, channel, det):
+        """
+        Helper method for checking if the `channel` and `det` args are set.
+        
+        Parameters
+        ----------
+        channel : any_type
+            A channel variable to check against None for filetype "mid.gz". 
+        det : any_type
+            A det variable to check against None for filetype "mid.gz". 
+            
+        Raises
+        ------
+        ValueError
+            If filetype is "mid.gz" and either channel or det are None.
+        
+        """
+        
+        if self.filetype == "mid.gz" and (not isinstance(channel, str) or not isinstance(det, str)):
+            raise ValueError("For filetype mid.gz, the channel and det kwargs must be set and be strings.")
+    
+    def _check_convtoamps(self, convtoamps, channel, det):
+        """
+        Helper method for automatically determining the `convtoamps` variable if it hasn't been set.
+        
+        Parameters
+        ----------
+        convtoamps : float, NoneType
+            The factor that would convert the units of the data to amplitude.
+        channel : str, NoneType
+            The name the channel that should be loaded. Only used if filetype=="mid.gz"
+        det : str, NoneType
+            String that specifies the detector name. Only used if filetype=='mid.gz'.
+        
+        Returns
+        -------
+        convtoamps_auto : float
+            The convtoamps value. Same as the inputted value if it was not None, otherwise
+            it was automatically set based on filetype.
+        
+        """
+        
+        self._check_channel_det(channel, det)
+        
+        if self.filetype == "mid.gz" and convtoamps is None:
+            snum = list(set(self.rq.seriesnumber))[0]
+            snum_str = f"{snum:012}"
+            snum_str = snum_str[:8] + '_' + snum_str[8:]
+            return rp.io.get_trace_gain(f"{self.basepath}{snum_str}/", channel, det)[0]
+        
+        elif self.filetype == "npz" and convtoamps is None:
+            return 1
+        
+        return convtoamps
+    
+    def _check_data_size(self, attr):
+        """
+        Helper method for checking if the data size is less than or equal to the template size.
+        
+        Raises
+        ------
+        ValueError
+            If the attr that is being set already has the maximum length
+
+        """
+        
+        if len(getattr(self, attr)) == len(self.templates):
+            raise ValueError(f"Cannot add any more {attr}, as this would "
+                             f"result in more {attr} data than templates.")
+    
+    def _reset_sim_data(self):
+        """
+        Helper method for resetting the amplitudes and tdelay attributes to empty lists.
+        
+        """
+        
+        self.amplitudes = []
+        self.tdelay = []
+
+    def update_cut(self, cut):
+        """
+        Method for updating the inputted cut. Useful for either changing the cut or setting it,
+        if it was not set in the initialization.
+        
+        Parameters
+        ----------
+        cut : array_like of bool
+            A boolean array for the cut that selects the traces that will be loaded from the dump
+            files. These traces serve as the underlying data to which a template is added.
+        
+        """
+        
+        self.cut = cut
+        self.ntraces = len(self.cut)
+        
+        self._reset_sim_data()
+        
+    def generate_sim_data(self, attr, *args, distribution=None, value_array=None, **kwargs):
+        """
+        Method for generating simulated data and adding it to the specified attribute.
+        
+        Parameters
+        ----------
+        attr : str
+            The attribute that will be updated with the simulated data. Can be either
+            "amplitudes" or "tdelay".
+        arg1, arg2, arg3,... : array_like
+            The shape parameter(s) for the distribution (see docstring of the
+            instance object for more information).
+        distribution : NoneType, scipy.stats distribution, optional
+            The `scipy.stats` distribution to use for generating the simulated data. If left
+            as None, then the `scipy.stats.uniform` distribution is defaulted. This parameter
+            will be overridden by `value_array` if `value_array` is not None.
+        value_array : array_like, optional
+            An array of specified values to use for the data, rather than generating simulated
+            data from a probaility distribution.
+        loc : array_like, optional
+            Location parameter for `scipy.stats` distribution. Default is 0.
+        scale : array_like, optional
+            Scale parameter for `scipy.stats` continuous distribution. Default is 1.
+        random_state : NoneType, int, `numpy.random.RandomState` instance, optional
+            Definition of the random state for the generated data. If int or RandomState,
+            use it for drawing the random variates. If None, rely on `self.random_state`.
+            Default is None.
+        
+        """
+        
+        self._check_valid_attr(attr)
+        self._check_if_cut_set()
+        self._check_data_size(attr)
+        
+        if value_array is None:
+            if distribution is None:
+                distribution = stats.uniform
+
+            if "size" in kwargs.keys() and kwargs["size"]!=self.ntraces:
+                raise ValueError(f"The inputted size does not match the cut length ({self.ntraces}), "
+                                 "The size is automatically set, consider not passing it.")
+            else:
+                kwargs["size"] = self.ntraces
+
+            sim_data = distribution.rvs(*args, **kwargs)
+
+        else:
+            if len(value_array)!=self.ntraces:
+                raise ValueError("The length of the inputted value_array "
+                                 f"does not match the cut length ({self.ntraces})")
+            
+            sim_data = value_array
+        
+        val = getattr(self, attr)
+        val.append(sim_data)
+    
+    def run_sim(self, savefilepath, savefilename, convtoamps=None,
+                channel=None, det=None, relcal=None, neventsperdump=1000):
+        """
+        Method for running the pulse simulation after the data has been generated.
+        
+        Parameters
+        ----------
+        savefilepath : str
+            The path where the simulated files should be saved.
+        savefilename : str
+            The filename to use when saving the simulated files.
+        convtoamps : NoneType, float, optional
+            The factor to convert the loaded data to units of Amps. If left as None,
+            then the conversion factor is loaded automatically.
+        channel : NoneType, str, optional
+            The name the channel that should be loaded. Only used if filetype=="mid.gz"
+        det : NoneType, str, optional
+            String that specifies the detector name. Only used if filetype=='mid.gz'.
+        neventsperdump : int, optional
+            The number of events to be saved per dump file. Default is 1000. This should
+            not be made much larger than 1000 to avoid loading too much data into RAM.
+        
+        """
+        
+        self._check_if_cut_set()
+        self._check_sim_data()
+        self._check_channel_det(channel, det)
+        convtoamps_auto = self._check_convtoamps(convtoamps, channel, det)
+
+        buildfakepulses(self.rq, self.cut, self.templates, self.amplitudes, self.tdelay,
+                        self.basepath, channels=channel, det=det, relcal=relcal,
+                        convtoamps=convtoamps_auto, fs=self.fs, neventsperdump=neventsperdump,
+                        filetype=self.filetype, lgcsavefile=True, savefilepath=savefilepath,
+                        savefilename=savefilename)
 
 
 def buildfakepulses(rq, cut, templates, amplitudes, tdelay, basepath,
