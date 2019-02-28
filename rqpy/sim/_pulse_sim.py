@@ -110,16 +110,25 @@ def buildfakepulses(rq, cut, template1, amplitudes1, tdelay1, basepath,
     last_dump_ind = -(ntraces%neventsperdump) if ntraces%neventsperdump else None
 
     nonzerocutinds = np.flatnonzero(cut)
-
-    split_cut = np.split(nonzerocutinds[:last_dump_ind], ntraces//neventsperdump)
-    split_amplitudes1 = np.split(amplitudes1[:last_dump_ind], ntraces//neventsperdump)
-    split_tdelay1 = np.split(tdelay1[:last_dump_ind], ntraces//neventsperdump)
+    
+    split_cut = []
+    split_amplitudes1 = []
+    split_tdelay1 = []
     
     if template2 is not None:
-        split_amplitudes2 = np.split(amplitudes2[:last_dump_ind], ntraces//neventsperdump)
-        split_tdelay2 = np.split(tdelay2[:last_dump_ind], ntraces//neventsperdump)
+        split_amplitudes2 = []
+        split_tdelay2 = []
 
-    if last_dump is not None:
+    if ntraces//neventsperdump > 0:
+        split_cut.extend(np.split(nonzerocutinds[:last_dump_ind], ntraces//neventsperdump))
+        split_amplitudes1.extend(np.split(amplitudes1[:last_dump_ind], ntraces//neventsperdump))
+        split_tdelay1.extend(np.split(tdelay1[:last_dump_ind], ntraces//neventsperdump))
+
+        if template2 is not None:
+            split_amplitudes2.extend(np.split(amplitudes2[:last_dump_ind], ntraces//neventsperdump))
+            split_tdelay2.extend(np.split(tdelay2[:last_dump_ind], ntraces//neventsperdump))
+
+    if last_dump_ind is not None:
         split_cut.append(nonzerocutinds[last_dump_ind:])
         split_amplitudes1.append(amplitudes1[last_dump_ind:])
         split_tdelay1.append(tdelay1[last_dump_ind:])
@@ -132,9 +141,16 @@ def buildfakepulses(rq, cut, template1, amplitudes1, tdelay1, basepath,
         cut_seg = np.zeros(cutlen, dtype=bool)
         cut_seg[c] = True
         
+        if template2 is None:
+            split_amplitudes2_seg = None
+            split_tdelay2_seg = None
+        else:
+            split_amplitudes2_seg = split_amplitudes2[ii]
+            split_tdelay2_seg = split_tdelay2[ii]
+        
         _buildfakepulses_seg(rq, cut_seg, template1, split_amplitudes1[ii], split_tdelay1[ii], 
-                             basepath, template2=template2, amplitudes2=split_amplitudes2[ii],
-                             tdelay2=split_tdelay2[ii], channels=channels, relcal=relcal,
+                             basepath, template2=template2, amplitudes2=split_amplitudes2_seg,
+                             tdelay2=split_tdelay2_seg, channels=channels, relcal=relcal,
                              det=det, convtoamps=convtoamps, fs=fs, dumpnum=ii+1,
                              filetype=filetype, lgcsavefile=lgcsavefile,
                              savefilepath=savefilepath, savefilename=savefilename)
