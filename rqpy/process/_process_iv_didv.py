@@ -131,7 +131,11 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
     traces = events[detectorid]["p"]
     
     settings = getDetectorSettings(filepath, "")
-    detcodes = [settings[detectorid][ch]["channelNum"] for ch in channels]
+    if lgcHV:
+        tes_num_correction = 0
+    else:
+        tes_num_correction = 4
+    detcodes = [settings[detectorid][ch]["channelNum"] - tes_num_correction for ch in channels]
     drivergain = [2*settings[detectorid][ch]["driverGain"] for ch in channels] # extra factor of two from filters
     qetbias = [settings[detectorid][ch]["qetBias"] for ch in channels]
     fs = [1/settings[detectorid][ch]["timePerBin"] for ch in channels]
