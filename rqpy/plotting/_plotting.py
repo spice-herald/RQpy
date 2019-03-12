@@ -437,7 +437,7 @@ def passageplot(arr, cuts, basecut=None, nbins=100, lgcequaldensitybins=False, x
 
 
 def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=None, 
-                labeldict=None, lgclognorm = True, ax=None):
+                labeldict=None, lgclognorm=True, ax=None, cmap='icefire'):
     """
     Function to plot RQ data as a density plot.
     
@@ -466,6 +466,8 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
         than linear
     ax : axes.Axes object, optional
         Option to pass an existing Matplotlib Axes object to plot over, if it already exists.
+    cmap : str, optional
+        The colormap to use for plotting each cut. Default is 'icefire'.
     
     Returns
     -------
@@ -507,8 +509,13 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
     if cut is None:
         cut = np.ones(shape = xvals.shape, dtype=bool)
 
-    cax = ax.hist2d(xvals[limitcut & cut], yvals[limitcut & cut], bins = nbins, 
-              norm = colors.LogNorm(), cmap = 'icefire')
+    if lgclognorm:
+        norm = colors.LogNorm()
+    else:
+        norm = colors.Normalize()
+        
+    cax = ax.hist2d(xvals[limitcut & cut], yvals[limitcut & cut], bins=nbins, 
+                    norm=norm, cmap=cmap)
     cbar = fig.colorbar(cax[-1], label = 'Density of Data')
     cbar.ax.tick_params(direction="in")
     ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
