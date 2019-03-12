@@ -1281,7 +1281,11 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
             else:
                 flip = -1
             
-            params_nlin, errors_nlin, _, reducedchi2_nlin = nlin.fit_falltimes(flip*s, npolefit=2, lgcfullrtn=True)
+            res_nlin = nlin.fit_falltimes(flip*s, npolefit=2, lgcfullrtn=True)
+            
+            params_nlin = res_nlin[0]
+            errors_nlin = res_nlin[1]
+            reducedchi2_nlin = res_nlin[3]
             
             amp_nonlin[jj] = flip*params_nlin[0]
             amp_nonlin_err[jj] = errors_nlin[0]
