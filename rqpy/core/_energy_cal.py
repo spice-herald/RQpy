@@ -167,7 +167,7 @@ def scale_integral(vals, lgcsaturated=False, linparams=None, satparams=None):
     linparams : list, optional
         List containing the slope for the linear approximation, and 
         the error in the slope. If the error in the slope is not known, 
-        then just put 0 for linparams[0]. 
+        then just put 0 for linparams[1]. 
         linparams must be in units of [(units of vals)/(eV)]
     satparams : list, optional
         List containing the best fit parameters from the fit_saturation() 
