@@ -1506,8 +1506,8 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         t0_s_nsmb_cwindow_int = np.zeros((len(signal),ncwindow))
 
         
-        #lgcplotnsmb=True
-        lgcplotnsmb=False
+        lgcplotnsmb=True
+        #lgcplotnsmb=False
         for jj, s in enumerate(signal):
             if lgcplotnsmb==True:
                 figNum = jj
@@ -1572,7 +1572,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
 
                                 
             if (lgcplotnsmb==True):
-                nPlots = 3
+                nPlots = 100
                 if(jj==(nPlots-1)):
                     print('Warning: stopping at', nPlots, 'events to head off any memory problems')
                     break
