@@ -1603,7 +1603,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         rq_dict[f'chi2bonly_nsmb_lf_{chan}{det}'][readout_inds] = chi2bonly_nsmb_lf
         # interpolated values
         rq_dict[f'ofamp_s_nsmb_int_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'ofamp_s_nsmb_int_{chan}{det}'][readout_inds] = amps_nsmb_int
+        rq_dict[f'ofamp_s_nsmb_int_{chan}{det}'][readout_inds] = amp_s_nsmb_int
         rq_dict[f't0_s_nsmb_int_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f't0_s_nsmb_int_{chan}{det}'][readout_inds] = t0_s_nsmb_int
         rq_dict[f'chi2_nsmb_int_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
@@ -1622,7 +1622,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
             rq_dict[f'chi2_win{(iwin+1):02d}_nsmb_int_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
             rq_dict[f'chi2_win{(iwin+1):02d}_nsmb_int_{chan}{det}'] = chi2_nsmb_cwindow_int[:,iwin]
             rq_dict[f't0_s_win{(iwin+1):02d}_nsmb_int_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-            rq_dict[f't0_s_win{(iwin+1):02d}_nsmb_int_{chan}{det}'] = t0_s_nsmb_cwindow_int[:,iwin]            
+            rq_dict[f't0_s_win{(iwin+1):02d}_nsmb_int_{chan}{det}'] = t0_s_nsmb_cwindow_int[:,iwin]           
             rq_dict[f'ofamp_s_win{(iwin+1):02d}_nsmb_int_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
             rq_dict[f'ofamp_s_win{(iwin+1):02d}_nsmb_int_{chan}{det}'] = amps_sig_nsmb_cwindow_int[:,0,iwin]
 
