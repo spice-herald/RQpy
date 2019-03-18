@@ -226,8 +226,9 @@ def process_ivsweep(ivfilepath, chans, detectorid="Z1", rfb=5000, loopgain=2.4, 
     
     Parameters
     ----------
-    ivfilepath : str
-        Absolute path to the directory containing all the series in the sweep
+    ivfilepath : str, list of str
+        Absolute path to the directory containing all the series in the sweep. Can also pass a list of specific
+        paths to the parent directories of files to process.
     chans : list
         List containing strings corresponding to the names of all the channels of interest
     detectorid : str, optional
@@ -295,7 +296,10 @@ def process_ivsweep(ivfilepath, chans, detectorid="Z1", rfb=5000, loopgain=2.4, 
         raise ImportError("""Cannot use this IV processing because scdmsPyTools is not installed. 
                           More file types will be supported in future releases of RQpy.""")
     
-    files = sorted(glob(ivfilepath +'*/'))
+    if isinstance(files, str):
+        files = sorted(glob(ivfilepath +'*/'))
+    else:
+        files = ivfilepath
     
     if nprocess == 1:
         results = []
