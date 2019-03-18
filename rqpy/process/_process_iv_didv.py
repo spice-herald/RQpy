@@ -296,7 +296,7 @@ def process_ivsweep(ivfilepath, chans, detectorid="Z1", rfb=5000, loopgain=2.4, 
         raise ImportError("""Cannot use this IV processing because scdmsPyTools is not installed. 
                           More file types will be supported in future releases of RQpy.""")
     
-    if isinstance(files, str):
+    if isinstance(ivfilepath, str):
         files = sorted(glob(ivfilepath +'*/'))
     else:
         files = ivfilepath
