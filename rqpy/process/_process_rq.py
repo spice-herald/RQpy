@@ -1520,7 +1520,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                                                 background_templates_shifts = background_templates_shifts,
                                                 bkgpolarityconstraint = bkgpolarityconstraint,
                                                 sigpolarityconstraint = sigpolarityconstraint,
-                                                lgc_interp=False, lgcplot=lgcplotnsmb, lgcsaveplots=figNum)
+                                                lgcplot=lgcplotnsmb, lgcsaveplots=figNum)
                 
             if (chan=='sum'):
                 if (bkgpolarityconstraint is None) and (sigpolarityconstraint is None):
@@ -1529,7 +1529,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                                                                 iP, psddnu.T,
                                                                 fs, indwindow_nsmb, ns,nb, bitcomb, lfindex, 
                                                                 background_templates_shifts = background_templates_shifts,
-                                                                lgc_interp=False,lgcplot=lgcplotnsmb,lgcsaveplots=figNum)
+                                                                lgcplot=lgcplotnsmb,lgcsaveplots=figNum)
                 else:
                     (amps_nsmb[jj,:],t0_s_nsmb[jj], 
                      chi2_nsmb[jj],chi2_nsmb_lf[jj],
@@ -1547,7 +1547,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                                                              background_templates_shifts = background_templates_shifts,
                                                              bkgpolarityconstraint = bkgpolarityconstraint,
                                                              sigpolarityconstraint = sigpolarityconstraint,
-                                                             lgc_interp=False,lgcplot=lgcplotnsmb,lgcsaveplots=figNum)
+                                                             lgcplot=lgcplotnsmb,lgcsaveplots=figNum)
                 
                     #print('chi2_nsmb_cwindow_int=',chi2_nsmb_cwindow_int)
                     #print('chi2_nsmb_cwindow=',chi2_nsmb_cwindow)
@@ -1572,7 +1572,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
 
                                 
             if (lgcplotnsmb==True):
-                nPlots = 100
+                nPlots = 10
                 if(jj==(nPlots-1)):
                     print('Warning: stopping at', nPlots, 'events to head off any memory problems')
                     break
