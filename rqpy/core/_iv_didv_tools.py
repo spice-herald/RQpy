@@ -631,8 +631,8 @@ class IVanalysis(object):
                                        rload=self.rload, rload_err = self.rshunt_err, r0=r0, r0_err=dr0,
                                        priors = priors, invpriorscov = invpriorsCov)
 
-            didvobj.dopriorsfit()
             didvobj.dofit(poles=2)
+            didvobj.dopriorsfit()
             
             self.df.iat[int(np.flatnonzero(self.didvinds)[ind]), self.df.columns.get_loc('didvobj')] = didvobj
             self.df.iat[int(np.flatnonzero(self.noiseinds)[ind]), self.df.columns.get_loc('didvobj')] = didvobj
