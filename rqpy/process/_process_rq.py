@@ -1601,7 +1601,7 @@ def _rq(file, channels, det, setup, convtoamps, savepath, lgcsavedumps, filetype
     if filetype == "mid.gz" and not HAS_SCDMSPYTOOLS:
         raise ImportError("Cannot use filetype mid.gz because scdmsPyTools is not installed.")
     
-    if filetype == "npz" and setup.do_trigsim:
+    if filetype == "npz" and any(setup.do_trigsim):
         raise ValueError("setup.do_trigsim was set to True for filetype npz. " +\
                          "The trigger simulation is only meant for filetype mid.gz")
     
