@@ -302,10 +302,11 @@ def scatter(xvals, yvals, xlims=None, ylims=None, cuts=None, lgcrawdata=True, lg
     return fig, ax
 
 def passageplot(arr, cuts, basecut=None, nbins=100, lgcequaldensitybins=False, xlims=None, ylims=(0, 1),
-                lgceff=True, lgclegend=True, labeldict=None, ax=None, cmap="viridis"):
+                lgceff=True, lgclegend=True, labeldict=None, ax=None, cmap="viridis",
+                showerrorbar=False, nsigmaerrorbar=1):
     """
     Function to plot histogram of RQ data with multiple cuts.
-    
+
     Parameters
     ----------
     arr : array_like
@@ -342,28 +343,33 @@ def passageplot(arr, cuts, basecut=None, nbins=100, lgcequaldensitybins=False, x
         Option to pass an existing Matplotlib Axes object to plot over, if it already exists.
     cmap : str, optional
         The colormap to use for plotting each cut. Default is 'viridis'.
-    
+    showerrorbar : bool, optional
+        Boolean flag for also plotting the error bars for the passage fraction in each bin.
+        Default is False.
+    nsigmaerrorbar : float, optional
+        The number of sigma to show for the error bars if `showerrorbar` is True. Default is 1.
+
     Returns
     -------
     fig : Figure
         Matplotlib Figure object. Set to None if ax is passed as a parameter.
     ax : axes.Axes object
         Matplotlib Axes object
-        
+
     """
-    
+
     if not isinstance(cuts, list):
         cuts = [cuts]
-    
+
     labels = {'title'  : 'Passage Fraction Plot', 
               'xlabel' : 'variable', 
               'ylabel' : 'Passage Fraction'}
-    
-    
+
+
     for ii in range(len(cuts)):
-        
+
         num_str = str(ii+1)
-        
+
         if num_str[-1]=='1':
             num_str+="st"
         elif num_str[-1]=='2':
@@ -372,67 +378,94 @@ def passageplot(arr, cuts, basecut=None, nbins=100, lgcequaldensitybins=False, x
             num_str+="rd"
         else:
             num_str+="th"
-        
+
         labels[f"cut{ii}"] = num_str
-        
+
     if labeldict is not None:
         labels.update(labeldict)
-    
+
     if ax is None:
         fig, ax = plt.subplots(figsize=(9, 6))
     else:
         fig = None
-        
+
     ax.set_title(labels['title'])
     ax.set_xlabel(labels['xlabel'])
     ax.set_ylabel(labels['ylabel'])
 
     if basecut is None:
         basecut = np.ones(len(arr), dtype=bool)
-            
+
     colors = plt.cm.get_cmap(cmap)(np.linspace(0.1, 0.9, len(cuts)))
 
     ctemp = np.ones(len(arr), dtype=bool) & basecut
-    
+
     if xlims is None:
         xlimitcut = np.ones(len(arr), dtype=bool)
     else:
         xlimitcut = rp.inrange(arr, xlims[0], xlims[1])
-    
+
     for ii, cut in enumerate(cuts):
         oldsum = ctemp.sum()
-        
+
         if ii==0:
-            x_binned, passage_binned = rp.passage_fraction(arr, cut, basecut=ctemp & xlimitcut, nbins=nbins,
-                                                           lgcequaldensitybins=lgcequaldensitybins)
+            passage_output = rp.passage_fraction(arr,
+                                                 cut,
+                                                 basecut=ctemp & xlimitcut,
+                                                 nbins=nbins,
+                                                 lgcequaldensitybins=lgcequaldensitybins,
+                                                )
         else:
-            x_binned, passage_binned = rp.passage_fraction(arr, cut, basecut=ctemp & xlimitcut, nbins=x_binned)
-        
+            passage_output = rp.passage_fraction(arr,
+                                                 cut,
+                                                 basecut=ctemp & xlimitcut,
+                                                 nbins=x_binned,
+                                                )
+
+        x_binned = passage_output[0]
+        passage_binned = passage_output[1]
+
         ctemp = ctemp & cut
         newsum = ctemp.sum()
         cuteff = newsum/oldsum * 100
         label = f"Data passing {labels[f'cut{ii}']} cut"
-        
+
+        if showerrorbar:
+            label += f" $\pm$ {nsigmaerrorbar}$\sigma$"
+
         if lgceff:
             label+=f", Total Passage: {cuteff:.1f}%"
-            
+
         if xlims is None:
             xlims = (x_binned.min()*0.9, x_binned.max()*1.1)
-        
+
         bin_centers = (x_binned[1:]+x_binned[:-1])/2
-        
+
         ax.hist(bin_centers, bins=x_binned, weights=passage_binned, histtype='step', 
                 color=colors[ii], label=label, linewidth=2)
-    
+
+        if showerrorbar:
+            passage_binned_biased = passage_output[2]
+            passage_binned_err = passage_output[3]
+
+            err_top = passage_binned_biased + passage_binned_err * nsigmaerrorbar
+            err_bottom = passage_binned_biased - passage_binned_err * nsigmaerrorbar
+
+            err_top = np.pad(err_top, (0, 1), mode='constant', constant_values=(0, err_top[-1]))
+            err_bottom = np.pad(err_bottom, (0, 1), mode='constant', constant_values=(0, err_bottom[-1]))
+
+            ax.fill_between(x_binned, err_top, y2=err_bottom, step='post',
+                            linewidth=1, alpha=0.5, color=colors[ii])
+
     ax.set_xlim(xlims)
     ax.set_ylim(ylims)
     ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
     ax.tick_params(which="both", direction="in", right=True, top=True)
     ax.grid(linestyle="dashed")
-    
+
     if lgclegend:
         ax.legend(loc="best")
-    
+
     return fig, ax
 
 
