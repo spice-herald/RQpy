@@ -302,7 +302,8 @@ def scatter(xvals, yvals, xlims=None, ylims=None, cuts=None, lgcrawdata=True, lg
     return fig, ax
 
 def passageplot(arr, cuts, basecut=None, nbins=100, lgcequaldensitybins=False, xlims=None, ylims=(0, 1),
-                lgceff=True, lgclegend=True, labeldict=None, ax=None, cmap="viridis", showerrorbar=False):
+                lgceff=True, lgclegend=True, labeldict=None, ax=None, cmap="viridis",
+                showerrorbar=False, nsigmaerrorbar=1):
     """
     Function to plot histogram of RQ data with multiple cuts.
 
@@ -345,6 +346,8 @@ def passageplot(arr, cuts, basecut=None, nbins=100, lgcequaldensitybins=False, x
     showerrorbar : bool, optional
         Boolean flag for also plotting the error bars for the passage fraction in each bin.
         Default is False.
+    nsigmaerrorbar : float, optional
+        The number of sigma to show for the error bars if `showerrorbar` is True. Default is 1.
 
     Returns
     -------
@@ -427,6 +430,9 @@ def passageplot(arr, cuts, basecut=None, nbins=100, lgcequaldensitybins=False, x
         cuteff = newsum/oldsum * 100
         label = f"Data passing {labels[f'cut{ii}']} cut"
 
+        if showerrorbar:
+            label += f" $\pm$ {nsigmaerrorbar}$\sigma$"
+
         if lgceff:
             label+=f", Total Passage: {cuteff:.1f}%"
 
@@ -442,8 +448,8 @@ def passageplot(arr, cuts, basecut=None, nbins=100, lgcequaldensitybins=False, x
             passage_binned_biased = passage_output[2]
             passage_binned_err = passage_output[3]
 
-            err_top = passage_binned_biased + passage_binned_err
-            err_bottom = passage_binned_biased - passage_binned_err
+            err_top = passage_binned_biased + passage_binned_err * nsigmaerrorbar
+            err_bottom = passage_binned_biased - passage_binned_err * nsigmaerrorbar
 
             err_top = np.pad(err_top, (0, 1), mode='constant', constant_values=(0, err_top[-1]))
             err_bottom = np.pad(err_bottom, (0, 1), mode='constant', constant_values=(0, err_bottom[-1]))
