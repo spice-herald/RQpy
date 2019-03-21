@@ -531,16 +531,16 @@ def plot_gauss(x, bins, y, fitparams, errors, background, labeldict=None):
     
     Parameters
     ----------
-    x : array
+    x : array_like
         Array of x data
-    bins : array
+    bins : array_like
         Array of binned data
-    y : array
+    y : array_like
         Array of y data
     fitparams : tuple
         The best fit parameters from the fit
     errors : tuple
-        The unccertainy in the best fit parameters
+        The unccertainty in the best fit parameters
     background : float
         The average background rate
     labeldict : dict, optional
@@ -590,11 +590,11 @@ def plot_n_gauss(x, y, bins, fitparams, labeldict=None, ax=None):
     
     Parameters
     ----------
-    x : ndarray
+    x : array_like
         Array of x data
-    y : ndarray
+    y : array_like
         Array of y data
-    bins : ndarray
+    bins : array_like
         Array of binned data
     fitparams : tuple
         The best fit parameters from the fit
@@ -650,26 +650,24 @@ def plot_n_gauss(x, y, bins, fitparams, labeldict=None, ax=None):
 
 
 
-def plot_saturation_correction(x, y, yerr, popt, pcov, labeldict, ax = None):
-    
+def plot_saturation_correction(x, y, yerr, popt, pcov, labeldict, ax=None):
     """
     Helper function to plot the fit for the saturation correction
     
     Parameters
     ----------
-    x : array
+    x : array_like
         Array of x data
-    y : array
+    y : array_like
         Array of y data
-    yerr : array-like
+    yerr : array_like
         The errors in the measured energy of the spectral peaks
-    guess : array-like
+    guess : array_like
         Array of initial guess parameters (a,b) to be passed to saturation_func()
-    popt : array
+    popt : array_like
         Array of best fit parameters from fit_saturation()
-    pcov : array
+    pcov : array_like
         Covariance matrix returned by fit_saturation()
-    
     labeldict : dict, optional
         Dictionary to overwrite the labels of the plot. defaults are : 
             labels = {'title' : 'Energy Saturation Correction', 
@@ -681,13 +679,12 @@ def plot_saturation_correction(x, y, yerr, popt, pcov, labeldict, ax = None):
         
     Returns
     -------
-    fig : matrplotlib figure object
-    
-    ax : matplotlib axes object
+    fig : Figure
+        Matplotlib Figure object. Set to None if ax is passed as a parameter.
+    ax : axes.Axes object
+        Matplotlib Axes object
     
     """
-    
-    
     
     labels = {'title'  : 'Energy Saturation Correction',
               'xlabel' : 'True Energy [eV]', 
@@ -734,22 +731,22 @@ def plot_saturation_correction(x, y, yerr, popt, pcov, labeldict, ax = None):
     return fig, ax
 
 
-def _plot_fit_integral_ofamp(x, y, err, y_fit, sat_errors, linear_approx, linear_approx_errs, labeldict, ax):
-     
+def _plot_fit_integral_ofamp(x, y, err, y_fit, sat_errors, linear_approx,
+                             linear_approx_errs, labeldict, ax=None):
     """
     Helper function to plot the fit for fit_integral_ofamp()
     
     Parameters
     ----------
-    x : array
+    x : array_like
         Array of x data
-    y : array
+    y : array_like
         Array of y data
-    err : array-like
+    err : array_like
         The errors in the measured energy of the spectral peaks
-    y_fit : array
+    y_fit : array_like
         Array of y data from fit
-    sat_errors : array
+    sat_errors : array_like
         Array of errors for the fit
     linear_approx : float
         The slope of the linear approximation of the saturated function
@@ -766,10 +763,11 @@ def _plot_fit_integral_ofamp(x, y, err, y_fit, sat_errors, linear_approx, linear
         
     Returns
     -------
-    fig : matrplotlib figure object
-    
-    ax : matplotlib axes object
-    
+    fig : Figure
+        Matplotlib Figure object. Set to None if ax is passed as a parameter.
+    ax : axes.Axes object
+        Matplotlib Axes object
+
     """
     
     labels = {'title'  : 'OF Amplitude vs Integral Saturation Correction',
@@ -809,7 +807,7 @@ def _plot_fit_integral_ofamp(x, y, err, y_fit, sat_errors, linear_approx, linear
                     linear_approx*x_fit-nsigma*linear_approx_errs, color = 'r' , alpha= .5)
     ax.legend()    
 
-    
+    return fig, ax
     
     
     
@@ -832,7 +830,8 @@ def _make_iv_noiseplots(IVanalysisOBJ, lgcsave=False):
 
     """
 
-    for (noiseind, noiserow), (didvind, didvrow) in zip(IVanalysisOBJ.df[IVanalysisOBJ.noiseinds].iterrows(), IVanalysisOBJ.df[IVanalysisOBJ.didvinds].iterrows()):
+    for (noiseind, noiserow), (didvind, didvrow) in zip(IVanalysisOBJ.df[IVanalysisOBJ.noiseinds].iterrows(),
+                                                        IVanalysisOBJ.df[IVanalysisOBJ.didvinds].iterrows()):
         fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(16, 6))
 
         t = np.arange(0,len(noiserow.avgtrace))/noiserow.fs
@@ -876,22 +875,17 @@ def _plot_rload_rn_qetbias(IVanalysisOBJ, lgcsave, xlims_rl, ylims_rl, xlims_rn,
     Parameters
     ----------
     IVanalysisOBJ : rqpy.IVanalysis
-         The IV analysis object that contains the data to use for plotting.
+        The IV analysis object that contains the data to use for plotting.
     lgcsave : bool, optional
         If True, all the plots will be saved 
     xlims_rl : NoneType, tuple, optional
-        Limits to be passed to ax.set_xlim()for the 
-        rload plot
+        Limits to be passed to ax.set_xlim() for the  rload plot
     ylims_rl : NoneType, tuple, optional
-        Limits to be passed to ax.set_ylim() for the
-        rload plot
+        Limits to be passed to ax.set_ylim() for the rload plot
     xlims_rn : NoneType, tuple, optional
-        Limits to be passed to ax.set_xlim()for the 
-        rtot plot
+        Limits to be passed to ax.set_xlim() for the  rtot plot
     ylims_rn : NoneType, tuple, optional
-        Limits to be passed to ax.set_ylim() for the
-        rtot plot
-    
+        Limits to be passed to ax.set_ylim() for the rtot plot
 
     Returns
     -------
@@ -951,16 +945,16 @@ def _plot_energy_res_vs_bias(r0s,
     
     Parameters
     ----------
-    r0s : array
+    r0s : ndarray
         Array of r0 values (in Ohms)
-    energy_res : array
+    energy_res : ndarray
         Array of expected energy resolutions (in eV)
-    qets : array
+    qets : ndarray
         Array of QET bias values (in Amps)
-    taus : array
+    taus : ndarray
         Array of tau minus values (in seconds)
     xlims : NoneType, tuple, optional
-            Limits to be passed to ax.set_xlim()
+        Limits to be passed to ax.set_xlim()
     ylims : NoneType, tuple, optional
         Limits to be passed to ax.set_ylim()
     lgctau : bool, optional
@@ -1063,7 +1057,7 @@ def _plot_energy_res_vs_bias(r0s,
             ax.legend(loc='upper center', handles=[plte, plttau])
 
     if lgcsave:
-         plt.savefig(f'{figsavepath}energy_res_vs_bias.png')
+        plt.savefig(f'{figsavepath}energy_res_vs_bias.png')
         
         
         
@@ -1073,9 +1067,9 @@ def _plot_sc_noise(f, psd, noise_sim, qetbias, figsavepath, lgcsave, xlims, ylim
     
     Parameters
     ----------
-    f : array
+    f : ndarray
         Array of frequency values
-    psd : array
+    psd : ndarray
         One sided Power spectral density
     noise_sim : TESnoise object
         The noise simulation object
@@ -1124,9 +1118,9 @@ def _plot_n_noise(f, psd, noise_sim, qetbias, figsavepath, lgcsave, xlims, ylims
     
     Parameters
     ----------
-    f : array
+    f : ndarray
         Array of frequency values
-    psd : array
+    psd : ndarray
         One sided Power spectral density
     noise_sim : TESnoise object
         The noise simulation object
