@@ -564,16 +564,16 @@ def plot_gauss(x, bins, y, fitparams, errors, background, labeldict=None):
     
     Parameters
     ----------
-    x : array
+    x : array_like
         Array of x data
-    bins : array
+    bins : array_like
         Array of binned data
-    y : array
+    y : array_like
         Array of y data
     fitparams : tuple
         The best fit parameters from the fit
     errors : tuple
-        The unccertainy in the best fit parameters
+        The unccertainty in the best fit parameters
     background : float
         The average background rate
     labeldict : dict, optional
@@ -623,11 +623,11 @@ def plot_n_gauss(x, y, bins, fitparams, labeldict=None, ax=None):
     
     Parameters
     ----------
-    x : ndarray
+    x : array_like
         Array of x data
-    y : ndarray
+    y : array_like
         Array of y data
-    bins : ndarray
+    bins : array_like
         Array of binned data
     fitparams : tuple
         The best fit parameters from the fit
@@ -683,26 +683,24 @@ def plot_n_gauss(x, y, bins, fitparams, labeldict=None, ax=None):
 
 
 
-def plot_saturation_correction(x, y, yerr, popt, pcov, labeldict, ax = None):
-    
+def plot_saturation_correction(x, y, yerr, popt, pcov, labeldict, ax=None):
     """
     Helper function to plot the fit for the saturation correction
     
     Parameters
     ----------
-    x : array
+    x : array_like
         Array of x data
-    y : array
+    y : array_like
         Array of y data
-    yerr : array-like
+    yerr : array_like
         The errors in the measured energy of the spectral peaks
-    guess : array-like
+    guess : array_like
         Array of initial guess parameters (a,b) to be passed to saturation_func()
-    popt : array
+    popt : array_like
         Array of best fit parameters from fit_saturation()
-    pcov : array
+    pcov : array_like
         Covariance matrix returned by fit_saturation()
-    
     labeldict : dict, optional
         Dictionary to overwrite the labels of the plot. defaults are : 
             labels = {'title' : 'Energy Saturation Correction', 
@@ -714,13 +712,12 @@ def plot_saturation_correction(x, y, yerr, popt, pcov, labeldict, ax = None):
         
     Returns
     -------
-    fig : matrplotlib figure object
-    
-    ax : matplotlib axes object
+    fig : Figure
+        Matplotlib Figure object. Set to None if ax is passed as a parameter.
+    ax : axes.Axes object
+        Matplotlib Axes object
     
     """
-    
-    
     
     labels = {'title'  : 'Energy Saturation Correction',
               'xlabel' : 'True Energy [eV]', 
@@ -767,22 +764,22 @@ def plot_saturation_correction(x, y, yerr, popt, pcov, labeldict, ax = None):
     return fig, ax
 
 
-def _plot_fit_integral_ofamp(x, y, err, y_fit, sat_errors, linear_approx, linear_approx_errs, labeldict, ax):
-     
+def _plot_fit_integral_ofamp(x, y, err, y_fit, sat_errors, linear_approx,
+                             linear_approx_errs, labeldict, ax=None):
     """
     Helper function to plot the fit for fit_integral_ofamp()
     
     Parameters
     ----------
-    x : array
+    x : array_like
         Array of x data
-    y : array
+    y : array_like
         Array of y data
-    err : array-like
+    err : array_like
         The errors in the measured energy of the spectral peaks
-    y_fit : array
+    y_fit : array_like
         Array of y data from fit
-    sat_errors : array
+    sat_errors : array_like
         Array of errors for the fit
     linear_approx : float
         The slope of the linear approximation of the saturated function
@@ -799,10 +796,11 @@ def _plot_fit_integral_ofamp(x, y, err, y_fit, sat_errors, linear_approx, linear
         
     Returns
     -------
-    fig : matrplotlib figure object
-    
-    ax : matplotlib axes object
-    
+    fig : Figure
+        Matplotlib Figure object. Set to None if ax is passed as a parameter.
+    ax : axes.Axes object
+        Matplotlib Axes object
+
     """
     
     labels = {'title'  : 'OF Amplitude vs Integral Saturation Correction',
@@ -842,7 +840,7 @@ def _plot_fit_integral_ofamp(x, y, err, y_fit, sat_errors, linear_approx, linear
                     linear_approx*x_fit-nsigma*linear_approx_errs, color = 'r' , alpha= .5)
     ax.legend()    
 
-    
+    return fig, ax
     
     
     
@@ -865,7 +863,8 @@ def _make_iv_noiseplots(IVanalysisOBJ, lgcsave=False):
 
     """
 
-    for (noiseind, noiserow), (didvind, didvrow) in zip(IVanalysisOBJ.df[IVanalysisOBJ.noiseinds].iterrows(), IVanalysisOBJ.df[IVanalysisOBJ.didvinds].iterrows()):
+    for (noiseind, noiserow), (didvind, didvrow) in zip(IVanalysisOBJ.df[IVanalysisOBJ.noiseinds].iterrows(),
+                                                        IVanalysisOBJ.df[IVanalysisOBJ.didvinds].iterrows()):
         fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(16, 6))
 
         t = np.arange(0,len(noiserow.avgtrace))/noiserow.fs
@@ -909,22 +908,17 @@ def _plot_rload_rn_qetbias(IVanalysisOBJ, lgcsave, xlims_rl, ylims_rl, xlims_rn,
     Parameters
     ----------
     IVanalysisOBJ : rqpy.IVanalysis
-         The IV analysis object that contains the data to use for plotting.
+        The IV analysis object that contains the data to use for plotting.
     lgcsave : bool, optional
         If True, all the plots will be saved 
     xlims_rl : NoneType, tuple, optional
-        Limits to be passed to ax.set_xlim()for the 
-        rload plot
+        Limits to be passed to ax.set_xlim() for the  rload plot
     ylims_rl : NoneType, tuple, optional
-        Limits to be passed to ax.set_ylim() for the
-        rload plot
+        Limits to be passed to ax.set_ylim() for the rload plot
     xlims_rn : NoneType, tuple, optional
-        Limits to be passed to ax.set_xlim()for the 
-        rtot plot
+        Limits to be passed to ax.set_xlim() for the  rtot plot
     ylims_rn : NoneType, tuple, optional
-        Limits to be passed to ax.set_ylim() for the
-        rtot plot
-    
+        Limits to be passed to ax.set_ylim() for the rtot plot
 
     Returns
     -------
@@ -967,31 +961,51 @@ def _plot_rload_rn_qetbias(IVanalysisOBJ, lgcsave, xlims_rl, ylims_rl, xlims_rn,
         plt.savefig(IVanalysisOBJ.figsavepath + 'rload_rtot_variation.png')
             
             
-def _plot_energy_res_vs_bias(r0s, energy_res, qets, optimum_r0, figsavepath, lgcsave,
-                            xlims, ylims):
+def _plot_energy_res_vs_bias(r0s, 
+                             energy_res, 
+                             qets, 
+                             taus,
+                             xlims=None, 
+                             ylims=None, 
+                             lgctau=False, 
+                             lgcoptimum=False,
+                             figsavepath='', 
+                             lgcsave=False,
+                             energyscale=None,):
     """
     Helper function for the IVanalysis class to plot the expected energy resolution as 
     a function of QET bias and TES resistance.
     
     Parameters
     ----------
-    r0s : array
-        Array of r0 values
-    energy_res : array
-        Array of expected energy resolutions
-    qets : array
-        Array of QET bias values
-    optimum_r0 : float
-        The TES resistance corresponding to the 
-        lowest energy resolution
-    figsavepath : str
-        Directory to save the figure
-    lgcsave : bool
-        If true, the figure is saved
+    r0s : ndarray
+        Array of r0 values (in Ohms)
+    energy_res : ndarray
+        Array of expected energy resolutions (in eV)
+    qets : ndarray
+        Array of QET bias values (in Amps)
+    taus : ndarray
+        Array of tau minus values (in seconds)
     xlims : NoneType, tuple, optional
-            Limits to be passed to ax.set_xlim()
+        Limits to be passed to ax.set_xlim()
     ylims : NoneType, tuple, optional
         Limits to be passed to ax.set_ylim()
+    lgctau : bool, optional
+        If True, tau_minus is plotted as 
+        function of R0 and QETbias
+    lgcoptimum : bool, optional
+        If True, the optimum energy res
+        (and tau_minus if lgctau=True)
+    figsavepath : str, optional
+        Directory to save the figure
+    lgcsave : bool, optional
+        If true, the figure is saved
+    energyscale : char, NoneType, optional
+        The metric prefix for how the energy
+        resolution should be scaled. Defaults
+        to None, which will be base units [eV].
+        Can be: 'n->nano, u->micro, m->milla,
+        k->kilo, M-Mega, G-Giga'
         
     Returns
     -------
@@ -999,31 +1013,81 @@ def _plot_energy_res_vs_bias(r0s, energy_res, qets, optimum_r0, figsavepath, lgc
 
     """
 
+    metric_prefixes = {'n' : 1e9, 
+                       'u' : 1e6,
+                       'm' : 1e3, 
+                       'k' : 1e-3,
+                       'M' : 1e-6, 
+                       'G' : 1e-9}
+    if energyscale is None:
+        scale = 1
+        energyscale = ''
+    elif energyscale not in metric_prefixes:
+        raise ValueError(f'energyscale must be one of {metric_prefixes.keys()}')
+    else:
+        scale = metric_prefixes[energyscale]
+    if energyscale == 'u':
+        energyscale = r'$\mu$'
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(9, 6))
+
+    if xlims is None:
+        xlims = (min(r0s*1e3), max(r0s*1e3))
+    if ylims is None:
+        ylims = (min(energy_res*scale), max(energy_res*scale))
+    crangey = rp.inrange(energy_res, ylims[0], ylims[1])
+    crangex = rp.inrange(r0s*1e3, xlims[0], xlims[1])
+    
+    r0s = r0s[crangey & crangex]*1e3
+    energy_res = energy_res[crangey & crangex]*scale
+    qets = (qets[crangey & crangex]*1e6).round().astype(int)
+    taus = taus[crangey & crangex]*1e6
+        
+    ax.plot(r0s, energy_res, linestyle = ' ', marker = '.', ms = 10, c='g')
+    ax.plot(r0s, energy_res, linestyle = '-', marker = ' ', linewidth = 3, alpha = .5, c='g')
+    ax.grid(True, which = 'both', linestyle = '--')
+    ax.set_xlabel('$R_0$ [mΩ]')
+    ax.set_ylabel(r'$σ_E$'+f' [{energyscale}eV]', color='g')
+    ax.tick_params('y', colors='g')
+    ax.tick_params(which="both", direction="in", right=True, top=True)
+    
+    if lgcoptimum:
+        plte = ax.axvline(r0s[np.argmin(energy_res)], linestyle = '--', color='g', 
+                    alpha=0.5, label=r'Min $\sigma_E$: '+f'{np.min(energy_res):.3f} [{energyscale}eV]')
+    
+    ax2 = ax.twiny()
+    ax2.spines['bottom'].set_position(('outward', 36))
+    ax2.xaxis.set_ticks_position('bottom')
+    ax2.xaxis.set_label_position('bottom') 
+    ax2.set_xticks(r0s)
+    ax2.set_xticklabels(qets)
+    ax2.set_xlabel(r'QET bias [$\mu$A]')
+    
+
+
+    if lgctau:
+        ax3 = ax.twinx()
+        ax3.plot(r0s, taus, linestyle = ' ', marker = '.', ms = 10, c='b')
+        ax3.plot(r0s, taus, linestyle = '-', marker = ' ', linewidth = 3, alpha = .5, c='b')
+        ax3.tick_params(which="both", direction="in", right=True, top=True)
+        ax3.tick_params('y', colors = 'b')
+        ax3.set_ylabel(r'$\tau_{-} [μs]$', color = 'b')
+
+        if lgcoptimum:
+            plttau = ax3.axvline(r0s[np.argmin(taus)], linestyle = '--', color='b', 
+                        alpha=0.5, label=r'Min $\tau_{-}$: '+f'{np.min(taus):.3f} [μs]')
     if xlims is not None:
         ax.set_xlim(xlims)
+        ax2.set_xlim(xlims)
+        if lgctau:
+            ax3.set_xlim(xlims)
     if ylims is not None:
         ax.set_ylim(ylims)
         
-    ax.plot(r0s, energy_res, linestyle = ' ', marker = '.', ms = 10, c='g')
-    ax.plot(r0s, energy_res, linestyle = '-', marker = ' ', alpha = .3, c='g')
-    ax.grid(True, which = 'both', linestyle = '--')
-    ax.set_xlabel('$R_0$ [mΩ]')
-    ax.set_ylabel(r'$σ_E$ [eV]')
-    ax2 = ax.twiny()
-    ax2.plot(qets[::-1], energy_res, linestyle = ' ')
-    ax2.xaxis.set_ticks_position('bottom')
-    ax2.xaxis.set_label_position('bottom') 
-    ax2.spines['bottom'].set_position(('outward', 36))
-    ax2.set_xlabel('QET bias [μA]')
-    ax3 = plt.gca()
-    plt.draw()
-    ax3.get_xticklabels()
-    newlabels = [thing for thing in ax3.get_xticklabels()][::-1]
-    ax2.set_xticklabels(newlabels)
-    ax.axvline(optimum_r0, linestyle = '--', color = 'r', label = r'Optimum QET bias (minumum $σ_E$)')
     ax.set_title('Expected Energy Resolution vs QET bias and $R_0$')
-    ax.legend()
+    if lgcoptimum:
+        ax.legend()
+        if lgctau:
+            ax.legend(loc='upper center', handles=[plte, plttau])
 
     if lgcsave:
         plt.savefig(f'{figsavepath}energy_res_vs_bias.png')
@@ -1036,9 +1100,9 @@ def _plot_sc_noise(f, psd, noise_sim, qetbias, figsavepath, lgcsave, xlims, ylim
     
     Parameters
     ----------
-    f : array
+    f : ndarray
         Array of frequency values
-    psd : array
+    psd : ndarray
         One sided Power spectral density
     noise_sim : TESnoise object
         The noise simulation object
@@ -1075,10 +1139,10 @@ def _plot_sc_noise(f, psd, noise_sim, qetbias, figsavepath, lgcsave, xlims, ylim
     ax.legend()
     ax.set_xlabel('Frequency [Hz]')
     ax.set_ylabel('Input Referenced Current Noise [A/$\sqrt{\mathrm{Hz}}$]')
-    ax.set_title(f'Normal State noise for QETbias: {qetbias*1e6} $\mu$A')
-    
+    ax.set_title(f'Super Conducting State noise for QETbias: {qetbias*1e6} $\mu$A')
+    ax.tick_params(which="both", direction="in", right=True, top=True)
     if lgcsave:
-        plt.savefig(f'{figsavepath}SC_noise_qetbias{qetbias}.png')
+        plt.savefig(f'{figsavepath}SC_noise_qetbias{qetbias*1e6:.3f}muA.png')
         
         
 def _plot_n_noise(f, psd, noise_sim, qetbias, figsavepath, lgcsave, xlims, ylims):
@@ -1087,9 +1151,9 @@ def _plot_n_noise(f, psd, noise_sim, qetbias, figsavepath, lgcsave, xlims, ylims
     
     Parameters
     ----------
-    f : array
+    f : ndarray
         Array of frequency values
-    psd : array
+    psd : ndarray
         One sided Power spectral density
     noise_sim : TESnoise object
         The noise simulation object
@@ -1128,6 +1192,6 @@ def _plot_n_noise(f, psd, noise_sim, qetbias, figsavepath, lgcsave, xlims, ylims
     ax.set_xlabel('Frequency [Hz]')
     ax.set_ylabel('Input Referenced Current Noise [A/$\sqrt{\mathrm{Hz}}$]')
     ax.set_title(f'Normal State noise for QETbias: {qetbias*1e6} $\mu$A')
-    
+    ax.tick_params(which="both", direction="in", right=True, top=True)
     if lgcsave:
-        plt.savefig(f'{figsavepath}Normal_noise_qetbias{qetbias}.png')
+        plt.savefig(f'{figsavepath}Normal_noise_qetbias{qetbias*1e6:.3f}muA.png')

@@ -863,11 +863,20 @@ class IVanalysis(object):
         self.df.loc[self.didvinds, 'tau_eff'] =  tau_eff_arr
         
     
-    def find_optimum_bias(self, lgcplot=False, lgcsave=False, xlims = None, ylims = None):
+    
+    def find_optimum_bias(self, 
+                          lgcplot=False, 
+                          lgcsave=False, 
+                          xlims=None, 
+                          ylims=None, 
+                          lgctau=False, 
+                          lgcoptimum=False, 
+                          energyscale=None,
+                         ):
         """
         Function to find the QET bias with the lowest energy 
         resolution. 
-        
+
         Parameters
         ----------
         lgcplot : bool, optional
@@ -876,58 +885,70 @@ class IVanalysis(object):
             If True, the figure is saved
         xlims : NoneType, tuple, optional
             Limits to be passed to ax.set_xlim()
+            (Note: units of mOhms)
         ylims : NoneType, tuple, optional
             Limits to be passed to ax.set_ylim()   
-        
+            (Note: units of meV)
+        lgctau : bool, optional
+            If True, tau_minus is plotted as 
+            function of R0 and QETbias
+        lgcoptimum : bool, optional
+            If True, the optimum energy res
+            (and tau_minus if lgctau=True)
+        energyscale : char, NoneType, optional
+            The metric prefix for how the energy
+            resolution should be scaled. Defaults
+            to None, which will be base units [eV]
+            Can be: 'n->nano, u->micro, m->milla,
+            k->kilo, M-Mega, G-Giga'
+
         Returns
         -------
-        optimum_bias : float
+        optimum_bias_e : float
             The QET bias (in Amperes) corresponding to the 
             lowest energy resolution
-        optimum_r0 : float
+        optimum_r0_e : float
             The resistance of the TES (in Ohms) corresponding to the 
             lowest energy resolution
         optimum_e : float
             The energy resolution (in eV) at the optimum bias point
-        
+        optimum_bias_t : float
+            The QET bias (in Amperes) corresponding to the 
+            fastest tau minums
+        optimum_r0_t : float
+            The resistance of the TES (in Ohms) corresponding to the 
+            fastest tau minums
+        optimum_t : float
+            The fastest tau minus (in seconds)
         """
-        
+
         trandf = self.df.loc[self.noiseinds].iloc[self.traninds]
-        r0s = trandf.r0.values*1e3
+        r0s = trandf.r0.values
         energy_res = trandf.energy_res.values
-        qets = trandf.qetbias.values*1e6
-        qets = qets.astype(int)
+        qets = trandf.qetbias.values
+        taus = trandf.tau_eff.values
 
+        eminind = np.argmin(energy_res)
+        tauminind = np.argmin(taus)
+        optimum_bias_e = qets[eminind]
+        optimum_r0_e = r0s[eminind]
+        optimum_bias_t = qets[tauminind]
+        optimum_r0_t = r0s[tauminind]
+        optimum_e = energy_res[eminind]
+        optimum_t = energy_res[tauminind]
 
-        emin_list = []
-        r0min_list = []
-        qetmin_list = []
-
-        for ii in range(len(r0s)):
-            if (ii+2) < len(r0s):
-                x = r0s[ii:ii+3]
-                q = qets[ii:ii+3]
-                y = energy_res[ii:ii+3]
-
-                xfit = np.linspace(x[0], x[-1], 25)
-                qetfit = np.linspace(q[0], q[-1], 25)
-                poly = np.polyfit(x, y, 2)
-                yfit = np.poly1d(poly)(xfit)
-
-                eminind = np.argmin(yfit)
-                emin_list.append(yfit[eminind])
-                r0min_list.append(xfit[eminind])
-                qetmin_list.append(qetfit[eminind])
-
-        eminind = np.argmin(emin_list)
-        optimum_bias = qetmin_list[eminind]*1e-6
-        optimum_r0 = r0min_list[eminind]*1e-3
-        optimum_e = emin_list[eminind]
-        
         if lgcplot:
-            _plot_energy_res_vs_bias(r0s, energy_res, qets, optimum_r0, self.figsavepath, lgcsave, xlims, ylims)
+            _plot_energy_res_vs_bias(r0s, energy_res, qets, taus,
+                                xlims, ylims, lgcoptimum=lgcoptimum,
+                                 lgctau=lgctau, energyscale=energyscale)
+        if lgctau:
+            return optimum_bias_e, optimum_r0_e, optimum_e, optimum_bias_t, optimum_r0_t, optimum_t
+        else:
+            return optimum_bias_e, optimum_r0_e, optimum_e
+
         
-        return optimum_bias, optimum_r0, optimum_e
+
+        
 
         
     def make_noiseplots(self, lgcsave=False):
