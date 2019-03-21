@@ -1139,7 +1139,7 @@ def _plot_sc_noise(f, psd, noise_sim, qetbias, figsavepath, lgcsave, xlims, ylim
     ax.legend()
     ax.set_xlabel('Frequency [Hz]')
     ax.set_ylabel('Input Referenced Current Noise [A/$\sqrt{\mathrm{Hz}}$]')
-    ax.set_title(f'Super Conducting State noise for QETbias: {qetbias*1e6} $\mu$A')
+    ax.set_title(f'Superconducting State noise for QETbias: {qetbias*1e6} $\mu$A')
     ax.tick_params(which="both", direction="in", right=True, top=True)
     if lgcsave:
         plt.savefig(f'{figsavepath}SC_noise_qetbias{qetbias*1e6:.3f}muA.png')
