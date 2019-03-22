@@ -1,4 +1,4 @@
-from scipy import signal
+from scipy import signal, special
 import qetpy as qp
 import rqpy as rp
 import numpy as np
@@ -12,7 +12,39 @@ if HAS_TRIGSIM:
     import trigsim
 
 
-__all__ = ["TrigSim"]
+__all__ = [
+    "TrigSim",
+    "trigger_efficiency",
+]
+
+
+def trigger_efficiency(x, offset, width):
+    """
+    The expected functional form of the trigger efficiency, using an Error Function.
+
+    Parameters
+    ----------
+    x : array_like
+        The x-values at which to calculate the trigger efficiency, e.g. energy values.
+    offset : float
+        The offset of the trigger efficiency curve, such that the midpoint of the Error
+        Function occurs at this point. Should have same units as `x`.
+    width : float
+        The width of the Error Function, with the same units as `x`. This width can be
+        thought of as the width of the Gaussian distribution that, when convolved with
+        a step function placed at `offset`, gives us the resulting Error Function.
+
+    Returns
+    -------
+    trig_eff : array_like
+        The corresponding trigger efficiency (between 0 and 1) for each value of the
+        inputted `x`.
+
+    """
+
+    trig_eff = (1 - special.erf((offset - x) / (np.sqrt(2) * width))) / 2
+
+    return trig_eff
 
 
 class TrigSim(object):
