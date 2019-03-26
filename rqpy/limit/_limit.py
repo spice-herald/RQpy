@@ -100,6 +100,15 @@ def drde(q, m_dm, sig0, tm='Si'):
     based on elastic nuclear recoil", which can be found here:
         - https://doi.org/10.1016/S0927-6505(96)00047-3
 
+    The derivation by L&S is incomplete, see Eq. 22 of R. Schnee's paper "Introduction to Dark Matter
+    Experiments", which includes the correct rate for `vmin` in the range (`vesc` - `ve`, `vesc` + `ve`)
+        - https://arxiv.org/abs/1101.5205
+
+    Another citation for this correction can be found in Savage, et. al.'s paper "Compatibility of
+    DAMA/LIBRA dark matter detection with other searches", see Eq. 19. This is a different parameterization,
+    but is the same solution.
+        - https://doi.org/10.1088/1475-7516/2009/04/010
+
     """
 
     q = np.atleast_1d(q) # convert to recoil energy in keV
@@ -114,7 +123,7 @@ def drde(q, m_dm, sig0, tm='Si'):
     mtarget = a * mn # nucleon mass for tm [GeV]
     r = 4 * m_dm * mtarget / (m_dm + mtarget)**2 # unitless reduced mass parameter
     e0 = 0.5 * m_dm * (v0 / constants.c)**2 * 1e6 # kinetic energy of dark matter [keV]
-    vmin = np.sqrt(q/(e0 * r)) * v0 # DM velocity for smallest particle energy to give recoil energy q
+    vmin = np.sqrt(q / (e0 * r)) * v0 # DM velocity for smallest particle energy to give recoil energy q
 
     form_factor = helmfactor(q, tm=tm)
 
@@ -126,21 +135,21 @@ def drde(q, m_dm, sig0, tm='Si'):
     r0 = r0con * sigma * rho0 * v0 / (a * m_dm)
 
     # ratio of k0/k1 [Eq. 2.2 of L&S]
-    kratio = 1 / (special.erf(vesc / v0) - 2 / np.sqrt(np.pi) * vesc / v0 * np.exp(-(vesc / v0)**2))
+    k0_over_k1 = 1 / (special.erf(vesc / v0) - 2 / np.sqrt(np.pi) * vesc / v0 * np.exp(-(vesc / v0)**2))
 
     # rate integrated to infinity [Eq. 3.12 of L&S]
     rate_inf = r0 * np.sqrt(np.pi) * v0 / (4 * e0 * r * ve) * (special.erf((vmin + ve) / v0) - special.erf((vmin - ve) / v0))
     # rate integrated to vesc [Eq. 3.13 of L&S]
-    rate_vesc = kratio * (rate_inf - r0 / (e0 * r) * np.exp(-(vesc / v0)**2))
+    rate_vesc = k0_over_k1 * (rate_inf - r0 / (e0 * r) * np.exp(-(vesc / v0)**2))
 
-    # other rate calculation (unsure on where it comes from)
+    # rate calculation correction to L&S for `vmin` in range (`vesc` - `ve`, `vesc` + `ve`) [Eq. 22 of Schnee]
     rate_inf2 = r0 * np.sqrt(np.pi) * v0 / (4 * e0 * r * ve) * (special.erf(vesc / v0) - special.erf((vmin - ve) / v0))
-    rate_other = kratio * (rate_inf2 - r0 / (e0 * r) * (vesc + ve - vmin) / (2 * ve) * np.exp(-(vesc / v0)**2))
+    rate_high_vmin = k0_over_k1 * (rate_inf2 - r0 / (e0 * r) * (vesc + ve - vmin) / (2 * ve) * np.exp(-(vesc / v0)**2))
 
     # combine the calculations based on their regions of validity
     rate = np.zeros(q.shape)
     rate[(vmin < vesc - ve) & (vmin > 0)] = rate_vesc[(vmin < vesc - ve) & (vmin > 0)]
-    rate[(vmin > vesc - ve) & (vmin < vesc + ve)] = rate_other[(vmin > vesc - ve) & (vmin < vesc + ve)]
+    rate[(vmin > vesc - ve) & (vmin < vesc + ve)] = rate_high_vmin[(vmin > vesc - ve) & (vmin < vesc + ve)]
 
     return rate
 
@@ -148,7 +157,7 @@ def drde(q, m_dm, sig0, tm='Si'):
 def gauss_smear(x, f, res, nres=1e5, gauss_width=10):
     """
     Function for smearing an array of values by a gaussian.
-    
+
     Parameters
     ----------
     x : array_like
@@ -173,21 +182,16 @@ def gauss_smear(x, f, res, nres=1e5, gauss_width=10):
     """
 
     x2 = np.linspace(min(x), max(x), num=int(nres))
-    
     spacing = np.mean(np.diff(x2))
-    
     f2 = interpolate.interp1d(x, f)
-    
+
     xgauss = np.arange(-gauss_width*res, gauss_width*res, spacing)
-    
     gauss = stats.norm.pdf(xgauss, scale=res)
-    
+
     sce = signal.convolve(f2(x2), gauss, mode="full") * spacing
-    
     e_conv = np.arange(-gauss_width*res, gauss_width*res + x2[-1]-x2[0], spacing)
-    
     s = interpolate.interp1d(e_conv, sce)
-    
+
     return s(x)
 
 
@@ -345,13 +349,13 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
         x_vals = x_val_fcn(eventenergies[event_inds])
 
         fc = x_vals/tot_rate
-        fc[fc>1] = 1
+        fc[fc > 1] = 1
 
-        cdf_max= 1 - 1e-6
-        lgc_possiblewimp = fc <= cdf_max
-        nevt_possiblewimp = lgc_possiblewimp.sum()
-        fc = fc[lgc_possiblewimp]
-        totengs = eventenergies[event_inds][lgc_possiblewimp]
+        cdf_max = 1 - 1e-6
+        possiblewimp = fc <= cdf_max
+        nwimps = possiblewimp.sum()
+        fc = fc[possiblewimp]
+        totengs = eventenergies[event_inds][possiblewimp]
 
         ulinput_arr = np.zeros(3 + len(fc))
         ulinput_arr[0] = 1
@@ -377,7 +381,7 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
         mass_out[ii] = uloutput[1]
         if len(totengs)>0:
             interval_low[ii] = totengs[int(uloutput[3])]
-            if int(uloutput[4]) < nevt_possiblewimp:
+            if int(uloutput[4]) < nwimps:
                 interval_high[ii] = totengs[int(uloutput[4])]
             else:
                 interval_high[ii] = totengs[-1]
