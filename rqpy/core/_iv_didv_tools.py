@@ -11,7 +11,7 @@ from scipy.signal import savgol_filter
 from lmfit import Model
 
 import rqpy as rp
-from rqpy.plotting import _plot_rload_rn_qetbias, _make_iv_noiseplots, _plot_energy_res_vs_bias, _plot_n_noise, _plot_sc_noise
+from rqpy.plotting import _plot_rload_rn_qetbias, _make_iv_noiseplots, _plot_energy_res_vs_bias
 from qetpy import IV, DIDV, Noise, didvinitfromdata, autocuts
 from qetpy.sim import TESnoise, loadfromdidv, energy_res_estimate
 from qetpy.plotting import plot_noise_sim
