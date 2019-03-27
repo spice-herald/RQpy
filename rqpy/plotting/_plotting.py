@@ -8,7 +8,7 @@ from rqpy import utils
 
 __all__ = ["hist", "scatter", "densityplot", "passageplot", "plot_gauss", "plot_n_gauss", 
            "plot_saturation_correction", "_make_iv_noiseplots", "_plot_energy_res_vs_bias", 
-           "_plot_n_noise", "_plot_sc_noise", "_plot_rload_rn_qetbias", "_plot_fit_integral_ofamp"]
+            "_plot_rload_rn_qetbias", "_plot_fit_integral_ofamp"]
 
 
 def hist(arr, nbins='sqrt', xlims=None, cuts=None, lgcrawdata=True, 
