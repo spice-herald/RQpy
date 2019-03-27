@@ -8,7 +8,7 @@ from rqpy import utils
 
 __all__ = ["hist", "scatter", "densityplot", "passageplot", "plot_gauss", "plot_n_gauss", 
            "plot_saturation_correction", "_make_iv_noiseplots", "_plot_energy_res_vs_bias", 
-           "_plot_n_noise", "_plot_sc_noise", "_plot_rload_rn_qetbias", "_plot_fit_integral_ofamp"]
+            "_plot_rload_rn_qetbias", "_plot_fit_integral_ofamp"]
 
 
 def hist(arr, nbins='sqrt', xlims=None, cuts=None, lgcrawdata=True, 
@@ -1093,105 +1093,3 @@ def _plot_energy_res_vs_bias(r0s,
         plt.savefig(f'{figsavepath}energy_res_vs_bias.png')
         
         
-        
-def _plot_sc_noise(f, psd, noise_sim, qetbias, figsavepath, lgcsave, xlims, ylims):
-    """
-    Helper function to plot SC noise for IVanalysis class
-    
-    Parameters
-    ----------
-    f : ndarray
-        Array of frequency values
-    psd : ndarray
-        One sided Power spectral density
-    noise_sim : TESnoise object
-        The noise simulation object
-    qetbias : float
-        Applied QET bias
-    figsavepath : str
-        Directory to save the figure
-    lgcsave : bool
-        If true, the figure is saved
-    xlims : NoneType, tuple, optional
-        Limits to be passed to ax.set_xlim()
-    ylims : NoneType, tuple, optional
-        Limits to be passed to ax.set_ylim()
-    
-    Returns
-    -------
-    None
-
-    """
-
-    f = f[1:]
-    psd = psd[1:]
-    fig, ax = plt.subplots(1,1, figsize=(11,6))
-    if xlims is not None:
-        ax.set_xlim(xlims)
-    if ylims is not None:
-        ax.set_ylim(ylims)
-        
-    ax.grid(True, linestyle = '--')
-    ax.loglog(f, np.sqrt(psd), alpha = .5, label = 'Raw Data')
-    ax.loglog(f, np.sqrt(noise_sim.s_isquid(f)), label = 'Squid+Electronics Noise')
-    ax.loglog(f, np.sqrt(noise_sim.s_iloadsc(f)),label= 'Load Noise')
-    ax.loglog(f, np.sqrt(noise_sim.s_itotsc(f)),label= 'Total Noise')
-    ax.legend()
-    ax.set_xlabel('Frequency [Hz]')
-    ax.set_ylabel('Input Referenced Current Noise [A/$\sqrt{\mathrm{Hz}}$]')
-    ax.set_title(f'Superconducting State noise for QETbias: {qetbias*1e6} $\mu$A')
-    ax.tick_params(which="both", direction="in", right=True, top=True)
-    if lgcsave:
-        plt.savefig(f'{figsavepath}SC_noise_qetbias{qetbias*1e6:.3f}muA.png')
-        
-        
-def _plot_n_noise(f, psd, noise_sim, qetbias, figsavepath, lgcsave, xlims, ylims):
-    """
-    Helper function to plot normal state noise for IVanalysis class
-    
-    Parameters
-    ----------
-    f : ndarray
-        Array of frequency values
-    psd : ndarray
-        One sided Power spectral density
-    noise_sim : TESnoise object
-        The noise simulation object
-    qetbias : float
-        Applied QET bias
-    figsavepath : str
-        Directory to save the figure
-    lgcsave : bool
-        If true, the figure is saved
-    xlims : NoneType, tuple, optional
-        Limits to be passed to ax.set_xlim()
-    ylims : NoneType, tuple, optional
-        Limits to be passed to ax.set_ylim()    
-    
-    Returns
-    -------
-    None
-
-    """   
-
-    f = f[1:]
-    psd = psd[1:]
-    fig, ax = plt.subplots(1,1, figsize=(11,6))
-    if xlims is not None:
-        ax.set_xlim(xlims)
-    if ylims is not None:
-        ax.set_ylim(ylims)
-        
-    ax.grid(True, linestyle = '--')
-    ax.loglog(f, np.sqrt(psd), alpha = .5, label = 'Raw Data')
-    ax.loglog(f, np.sqrt(noise_sim.s_isquid(f)), label = 'Squid+Electronics Noise')
-    ax.loglog(f, np.sqrt(noise_sim.s_itesnormal(f)),label= 'TES johnson Noise')
-    ax.loglog(f, np.sqrt(noise_sim.s_iloadnormal(f)),label= 'Load Noise')
-    ax.loglog(f, np.sqrt(noise_sim.s_itotnormal(f)),label= 'Total Noise')
-    ax.legend()
-    ax.set_xlabel('Frequency [Hz]')
-    ax.set_ylabel('Input Referenced Current Noise [A/$\sqrt{\mathrm{Hz}}$]')
-    ax.set_title(f'Normal State noise for QETbias: {qetbias*1e6} $\mu$A')
-    ax.tick_params(which="both", direction="in", right=True, top=True)
-    if lgcsave:
-        plt.savefig(f'{figsavepath}Normal_noise_qetbias{qetbias*1e6:.3f}muA.png')

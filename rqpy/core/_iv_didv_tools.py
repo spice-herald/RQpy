@@ -11,7 +11,7 @@ from scipy.signal import savgol_filter
 from lmfit import Model
 
 import rqpy as rp
-from rqpy.plotting import _plot_rload_rn_qetbias, _make_iv_noiseplots, _plot_energy_res_vs_bias, _plot_n_noise, _plot_sc_noise
+from rqpy.plotting import _plot_rload_rn_qetbias, _make_iv_noiseplots, _plot_energy_res_vs_bias
 from qetpy import IV, DIDV, Noise, didvinitfromdata, autocuts
 from qetpy.sim import TESnoise, loadfromdidv, energy_res_estimate
 from qetpy.plotting import plot_noise_sim
@@ -719,7 +719,10 @@ class IVanalysis(object):
             squidn_list.append(fitvals['squidn'])
             
             if lgcplot:
-                _plot_n_noise(f, psd, noise_sim, noise_row.qetbias, self.figsavepath, lgcsave, xlims, ylims)
+                plot_noise_sim(f=f, psd=psd, noise_sim=noise_sim, 
+                               istype='normal', qetbias=noise_row.qetbias,
+                               lgcsave=lgcsave, figsavepath=self.figsavepath,
+                               xlims=xlims, ylims=ylims)
                 
             
         self.squiddc = np.mean(squiddc_list)
@@ -790,12 +793,15 @@ class IVanalysis(object):
             tload_list.append(fitvals['tload'])
             
             if lgcplot:
-                _plot_sc_noise(f, psd, noise_sim, noise_row.qetbias, self.figsavepath, lgcsave, xlims, ylims)
+                plot_noise_sim(f=f, psd=psd, noise_sim=noise_sim, 
+                               istype='sc', qetbias=noise_row.qetbias,
+                               lgcsave=lgcsave, figsavepath=self.figsavepath,
+                               xlims=xlims, ylims=ylims)
             
         self.tload = np.mean(tload_list)
         
     def model_noise(self, tau_collect=20e-6, collection_eff=1, lgcplot=False, lgcsave=False, 
-                    ylims_current = None, ylims_power = None):
+                    xlims=None, ylims_current = None, ylims_power = None):
         """
         Function to plot noise PSD with all the theoretical noise
         components (calculated from the didv fits). This function also estimates
@@ -811,6 +817,8 @@ class IVanalysis(object):
             If True, a plot of the fit is shown
         lgcsave : bool, optional
             If True, the figure is saved
+        xlims : NoneType, tuple, optional
+            Limits to be passed to ax.set_xlim()
         ylims_current : NoneType, tuple, optional
             Limits to be passed to ax.set_ylim()
             for the current nosie plots
@@ -838,15 +846,16 @@ class IVanalysis(object):
                                      squidpole=self.squidpole, squidn=self.squidn,
                                      noisetype='transition', lgcpriors = True)
             if lgcplot:
-                fig, ax = plot_noise_sim(f, psd, noise_sim, 'current')
-                if ylims_current is not None:
-                    ax.set_ylim(ylims_current)
-                fig, ax = plot_noise_sim(f, psd, noise_sim, 'power')
-                if ylims_power is not None:
-                    ax.set_ylim(ylims_power)
-                    
-                if lgcsave:
-                    plt.savefig(f'{self.figsavepath}T_noise_qetbias{noise_row.qetbias}.png')
+                plot_noise_sim(f=f, psd=psd, noise_sim=noise_sim, 
+                               istype='current', qetbias=noise_row.qetbias,
+                               lgcsave=lgcsave, figsavepath=self.figsavepath,
+                               xlims=xlims, ylims=ylims_current)
+
+                plot_noise_sim(f=f, psd=psd, noise_sim=noise_sim, 
+                               istype='power', qetbias=noise_row.qetbias,
+                               lgcsave=lgcsave, figsavepath=self.figsavepath,
+                               xlims=xlims, ylims=ylims_power)
+
                 
             res = energy_res_estimate(freqs= f, tau_collect = tau_collect,
                                       Sp = psd/(np.abs(noise_sim.dIdP(f))**2),
