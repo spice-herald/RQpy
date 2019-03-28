@@ -18,10 +18,10 @@ class SetupRQ(object):
     
     Attributes
     ----------
-    templates : list
+    templates : ndarray
         List of pulse templates corresponding to each channel. The pulse templates should
         be normalized.
-    psds : list
+    psds : ndarray
         List of PSDs coresponding to each channel. Should be two-sided PSDs, with units of A^2/Hz.
     fs : float
         The digitization rate of the data in Hz.
@@ -230,18 +230,18 @@ class SetupRQ(object):
         True for the channel.
 
     """
-    
+
     def __init__(self, templates, psds, fs, summed_template=None, summed_psd=None, trigger=None,
                  indstart=None, indstop=None):
         """
         Initialization of the SetupRQ class.
-        
+
         Parameters
         ----------
-        templates : list
+        templates : list, ndarray
             List of pulse templates corresponding to each channel. The pulse templates should
             be normalized to have a maximum height of 1.
-        psds : list
+        psds : list, ndarray
             List of PSDs coresponding to each channel. Should be two-sided PSDs, with units of A^2/Hz.
         fs : float
             The digitization rate of the data in Hz.
@@ -262,27 +262,33 @@ class SetupRQ(object):
         indstop : int, NoneType, optional
             The index at we should truncate the end of the traces up to when calculating RQs. If left as 
             None, then we do not truncate the end of the trace. See `indstart`.
-        
+
         Raises
         ------
         ValueError
             If `self.trigger` was set not be None, but is not an integer between zero and the number
             of channels - 1 (`self.nchan - 1`).
-        
+
         """
-        
-        if not isinstance(templates, list):
-            templates = [templates]
-            
-        if not isinstance(psds, list):
-            psds = [psds]
-            
+
+        if isinstance(templates, list):
+            templates = np.vstack(templates)
+
+        if isinstance(psds, list):
+            psds = np.vstack(psds)
+
+        if len(templates.shape) == 1:
+            templates = templates[np.newaxis, :]
+
+        if len(psds.shape) == 1:
+            psds = psds[np.newaxis, :]
+
         if len(templates) != len(psds):
             raise ValueError("Different numbers of templates and psds were inputted")
-        
+
         if len(templates[0]) != len(psds[0]):
             raise ValueError("templates and psds should have the same length")
-        
+
         self.templates = templates
         self.psds = psds
         self.fs = fs
@@ -290,97 +296,97 @@ class SetupRQ(object):
 
         self.indstart = indstart
         self.indstop = indstop
-        
+
         if self.indstart is not None and self.indstop is not None and (self.indstop - self.indstart != len(self.templates[0])):
             raise ValueError("The indices specified indstart and indstop will result in each "+\
                              "truncated trace having a different length than their corresponding "+\
                              "psd and template. Make sure indstart-indstop = the length of the "+\
                              "template/psd")
-        
+
         self.summed_template = summed_template
         self.summed_psd = summed_psd
-        
+
         if trigger is None or trigger in list(range(self.nchan)):
             self.trigger = trigger
         else:
             raise ValueError("trigger must be either None, or an integer"+\
                              f" from zero to the number of channels - 1 ({self.nchan-1})")
-            
+
         self.calcchans=True
-        
+
         if summed_template is None or summed_psd is None:
             self.calcsum=False
         else:
             self.calcsum=True
-        
+
         self.do_ofamp_nodelay = [True]*self.nchan
         self.do_ofamp_nodelay_smooth = [False]*self.nchan
         self.ofamp_nodelay_lowfreqchi2 = False
-        
+
         self.do_ofamp_unconstrained = [True]*self.nchan
         self.do_ofamp_unconstrained_smooth = [False]*self.nchan
         self.ofamp_unconstrained_lowfreqchi2 = False
         self.ofamp_unconstrained_pulse_constraint = [0]*self.nchan
-        
+
         self.do_ofamp_constrained = [True]*self.nchan
         self.do_ofamp_constrained_smooth = [False]*self.nchan
         self.ofamp_constrained_lowfreqchi2 = True
         self.ofamp_constrained_nconstrain = [80]*self.nchan
         self.ofamp_constrained_pulse_constraint = [0]*self.nchan
-        
+
         self.do_ofamp_pileup = [True]*self.nchan
         self.do_ofamp_pileup_smooth = [False]*self.nchan
         self.ofamp_pileup_nconstrain = [80]*self.nchan
         self.ofamp_pileup_pulse_constraint = [0]*self.nchan
-        
+
         self.do_chi2_nopulse = [True]*self.nchan
         self.do_chi2_nopulse_smooth = [False]*self.nchan
-        
+
         self.do_chi2_lowfreq = [True]*self.nchan
         self.chi2_lowfreq_fcutoff = [10000]*self.nchan
-        
+
         self.do_ofamp_baseline = [False]*self.nchan
         self.do_ofamp_baseline_smooth = [False]*self.nchan
         self.ofamp_baseline_nconstrain = [80]*self.nchan
         self.ofamp_baseline_pulse_constraint = [0]*self.nchan
-        
+
         self.do_baseline = [True]*self.nchan
         self.baseline_indbasepre = [len(self.templates[0])//3]*self.nchan
-        
+
         self.do_integral = [True]*self.nchan
         self.indstart_integral = [len(self.templates[0])//3]*self.nchan
         self.indstop_integral = [2*len(self.templates[0])//3]*self.nchan
-        
+
         self.do_energy_absorbed = [False]*self.nchan
-        
+
         self.ioffset = None
         self.qetbias = None
         self.rload = None
         self.rsh = None
         self.indstart_energy_absorbed = [len(self.templates[0])//3]*self.nchan
         self.indstop_energy_absorbed = [2*len(self.templates[0])//3]*self.nchan
-        
+
         self.do_ofamp_shifted = [False]*self.nchan
         self.do_ofamp_shifted_smooth = [False]*self.nchan
         self.which_fit = "constrained"
         self.t0_shifted = None
-        
+
         self.do_maxmin = [True]*self.nchan
         self.use_min = [False]*self.nchan
         self.indstart_maxmin = [0]*self.nchan
         self.indstop_maxmin = [len(self.templates[0])]*self.nchan
-        
+
         self.do_ofnonlin = [False]*self.nchan
         self.ofnonlin_positive_pulses = [True]*self.nchan
-        
+
         self.do_optimumfilters = [True]*self.nchan
         self.do_optimumfilters_smooth = [False]*self.nchan
-        
+
         self.do_trigsim = [False]*self.nchan
         self.TS = None
         self.trigsim_k = 12
         self.signal_full = None
-        
+
     def _check_of(self):
         """
         Helper function for checking if any of the optimum filters are going to be calculated.
