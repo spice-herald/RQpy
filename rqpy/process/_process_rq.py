@@ -966,10 +966,11 @@ class SetupRQ(object):
         self.do_ofnonlin = lgcrun
         self.ofnonlin_positive_pulses = positive_pulses
         
-    def adjust_trigsim(self, trigger_template, trigger_psd, threshold, k=12):
+    def adjust_trigsim(self, trigger_template, trigger_psd, threshold,
+                       k=12, fir_bits_out=32, fir_discard_msbs=4):
         """
         Method for setting up the use of the trigger simulation for `mid.gz` files.
-        
+
         Parameters
         ----------
         trigger_template : ndarray
@@ -984,32 +985,41 @@ class SetupRQ(object):
         k : int, optional
             The bin number to start the FIR filter at. Since the filter downsamples the data
             by a factor of 16, the starting bin has a small effect on the calculated amplitude.
-        
+        fir_bits_out : int, optional
+            The number of bits to use in the integer values of the FIR. Default is 32, corresponding
+            to 32-bit integer trigger amplitudes. This is the recommended value, smaller values
+            may result in saturation fo the trigger amplitude (where the true amplitude would be
+            larger than the largest integer).
+        fir_discard_msbs : int, optional
+            The FIR pre-truncation shift of the bits for the FIR module. Default is 4, which is the
+            recommended value.
+
         Raises
         ------
         ImportError
             If `rqpy.HAS_TRIGSIM` is False, i.e. the user does not have the `trigsim` package installed.
         ValueError
             If `self.trigger` was not set, then the trigger simulation will not know which channel to run on.
-        
+
         """
-        
+
         if not HAS_TRIGSIM:
             raise ImportError("Cannot run the trigger simulation because trigsim is not installed.")
-        
+
         if self.trigger is None:
             raise ValueError("trigger was not set to specify the trigger channel in the initialization of SetupRQ.")
-        
+
         lgcrun = self._check_arg_length(lgcrun=False)
         lgcrun[self.trigger] = True
-        
+
         self.do_trigsim = lgcrun
         self.trigsim_k = k
-        
-        self.TS = rp.sim.TrigSim(trigger_psd, trigger_template, self.fs)
+
+        self.TS = rp.sim.TrigSim(trigger_psd, trigger_template, self.fs,
+                                 fir_bits_out=fir_bits_out, fir_discard_msbs=fir_discard_msbs)
         self.TS.set_threshold(threshold)
-        
-        
+
+
 def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, chan_num, det):
     """
     Helper function for calculating RQs for an array of traces corresponding to a single channel.
@@ -1180,6 +1190,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
     
     if setup.do_trigsim[chan_num] and setup.trigger == chan_num:
         triggeramp_sim = np.zeros(len(signal))
+        triggertime_sim = np.zeros(len(signal))
     
     # run the OF class for each trace
     if setup.do_optimumfilters[chan_num]:
@@ -1298,8 +1309,9 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
             chi2_nonlin[jj] = reducedchi2_nlin * (len(nlin.data)-nlin.dof)
         
         if setup.do_trigsim[chan_num] and setup.trigger == chan_num:
-            triggeramp_sim[jj] = setup.TS.trigger(setup.signal_full[jj, chan_num],
-                                                  k=setup.trigsim_k)[0]
+            res_trigsim = setup.TS.trigger(setup.signal_full[jj, chan_num], k=setup.trigsim_k)
+            triggeramp_sim[jj] = res_trigsim[0]
+            triggertime_sim[jj] = res_trigsim[1]
     
     # save variables to dict
     if setup.do_chi2_nopulse[chan_num]:
@@ -1450,6 +1462,8 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
     if setup.do_trigsim[chan_num] and setup.trigger == chan_num:
         rq_dict[f'triggeramp_sim_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'triggeramp_sim_{chan}{det}'][readout_inds] = triggeramp_sim
+        rq_dict[f'triggertime_sim_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'triggertime_sim_{chan}{det}'][readout_inds] = triggertime_sim
     
     if any(setup.do_ofamp_shifted) and setup.trigger is not None:
         # do the shifted OF on each trace
