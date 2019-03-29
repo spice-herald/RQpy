@@ -342,8 +342,6 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
                                     fill_value=(0, exp[-1]))
 
     sigma = np.ones(len(masslist)) * np.inf
-    
-    ulinputs = []
 
     for ii, mass in enumerate(masslist):
         if verbose:
