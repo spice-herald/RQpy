@@ -1,7 +1,38 @@
 import os
 import glob
 import shutil
-from setuptools import setup, find_packages, Command
+from setuptools import find_packages, Command
+
+from numpy.distutils.core import Extension, setup
+
+
+upperlim_files = ['upperlim.pyf',
+                  'UpperLim.f',
+                  'y_vs_CLf.f',
+                  'CMaxinf.f',
+                  'ConfLev.f',
+                  'Cinf.f',
+                  'CERN_Stuff.f',
+                 ]
+
+f77_paths = []
+for fname in upperlim_files:
+    f77_paths.append(f"rqpy/limit/_upperlim/{fname}")
+    
+ext1 = Extension(name='rqpy.limit._upperlim.upperlim',
+                 sources=f77_paths,
+                )
+
+data_files = ['CMaxf.in',
+              'CMaxfLow.in',
+              'ymintable.in',
+              'y_vs_CLf.in',
+              'CLtable.txt',
+             ]
+
+data_paths = []
+for fname in data_files:
+    data_paths.append(f"rqpy/limit/_upperlim/{fname}")
 
 
 class CleanCommand(Command):
@@ -40,5 +71,7 @@ setup(
     zip_safe=False,
     cmdclass={
             'clean': CleanCommand,
-            }
-    )
+            },
+    data_files=[('rqpy/limit/_upperlim/', data_paths)],
+    ext_modules=[ext1],
+)

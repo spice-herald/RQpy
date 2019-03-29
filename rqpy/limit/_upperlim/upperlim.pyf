@@ -1,0 +1,49 @@
+!    -*- f90 -*-
+! Note: the context of this file is case sensitive.
+
+python module upperlim ! in 
+    interface  ! in :upperlim
+        function upperlim(cl,if_bn,n,fc,mub,fb,iflag) ! in :upperlim:UpperLim.f
+            real :: cl
+            integer :: if_bn
+            integer, optional,check((len(fc)-2)>=n),depend(fc) :: n=(len(fc)-2)
+            real dimension(n + 2) :: fc
+            real :: mub
+            real dimension(n + 2),depend(n) :: fb
+            integer :: iflag
+            real dimension(150001) :: f
+            integer :: n1
+            real :: cl1
+            integer :: if1
+            real :: meanmax
+            integer :: ncalls
+            integer :: istat
+            real dimension(150001) :: fc1
+            real dimension(150001) :: fb1
+            real :: mub1
+            real dimension(7) :: fmin1
+            real :: upperlim
+            common /fupcom/ f,n1,cl1,if1,meanmax,ncalls,istat,fc1,fb1,mub1,fmin1
+        end function upperlim
+        function fup(x,i) ! in :upperlim:UpperLim.f
+            real :: x
+            integer :: i
+            real dimension(150001) :: f
+            integer :: n1
+            real :: cl1
+            integer :: if1
+            real :: meanmax
+            integer :: ncalls
+            integer :: istat
+            real dimension(150001) :: fc1
+            real dimension(150001) :: fb1
+            real :: mub1
+            real dimension(7) :: fmin1
+            real :: fup
+            common /fupcom/ f,n1,cl1,if1,meanmax,ncalls,istat,fc1,fb1,mub1,fmin1
+        end function fup
+    end interface 
+end python module upperlim
+
+! This file was auto-generated with f2py (version:2).
+! See http://cens.ioc.ee/projects/f2py2e/
