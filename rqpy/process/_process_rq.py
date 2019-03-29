@@ -18,10 +18,10 @@ class SetupRQ(object):
     
     Attributes
     ----------
-    templates : list
+    templates : ndarray
         List of pulse templates corresponding to each channel. The pulse templates should
         be normalized.
-    psds : list
+    psds : ndarray
         List of PSDs coresponding to each channel. Should be two-sided PSDs, with units of A^2/Hz.
     fs : float
         The digitization rate of the data in Hz.
@@ -230,18 +230,18 @@ class SetupRQ(object):
         True for the channel.
 
     """
-    
+
     def __init__(self, templates, psds, fs, summed_template=None, summed_psd=None, trigger=None,
                  indstart=None, indstop=None):
         """
         Initialization of the SetupRQ class.
-        
+
         Parameters
         ----------
-        templates : list
+        templates : list, ndarray
             List of pulse templates corresponding to each channel. The pulse templates should
             be normalized to have a maximum height of 1.
-        psds : list
+        psds : list, ndarray
             List of PSDs coresponding to each channel. Should be two-sided PSDs, with units of A^2/Hz.
         fs : float
             The digitization rate of the data in Hz.
@@ -262,27 +262,33 @@ class SetupRQ(object):
         indstop : int, NoneType, optional
             The index at we should truncate the end of the traces up to when calculating RQs. If left as 
             None, then we do not truncate the end of the trace. See `indstart`.
-        
+
         Raises
         ------
         ValueError
             If `self.trigger` was set not be None, but is not an integer between zero and the number
             of channels - 1 (`self.nchan - 1`).
-        
+
         """
-        
-        if not isinstance(templates, list):
-            templates = [templates]
-            
-        if not isinstance(psds, list):
-            psds = [psds]
-            
+
+        if isinstance(templates, list):
+            templates = np.vstack(templates)
+
+        if isinstance(psds, list):
+            psds = np.vstack(psds)
+
+        if len(templates.shape) == 1:
+            templates = templates[np.newaxis, :]
+
+        if len(psds.shape) == 1:
+            psds = psds[np.newaxis, :]
+
         if len(templates) != len(psds):
             raise ValueError("Different numbers of templates and psds were inputted")
-        
+
         if len(templates[0]) != len(psds[0]):
             raise ValueError("templates and psds should have the same length")
-        
+
         self.templates = templates
         self.psds = psds
         self.fs = fs
@@ -290,97 +296,97 @@ class SetupRQ(object):
 
         self.indstart = indstart
         self.indstop = indstop
-        
+
         if self.indstart is not None and self.indstop is not None and (self.indstop - self.indstart != len(self.templates[0])):
             raise ValueError("The indices specified indstart and indstop will result in each "+\
                              "truncated trace having a different length than their corresponding "+\
                              "psd and template. Make sure indstart-indstop = the length of the "+\
                              "template/psd")
-        
+
         self.summed_template = summed_template
         self.summed_psd = summed_psd
-        
+
         if trigger is None or trigger in list(range(self.nchan)):
             self.trigger = trigger
         else:
             raise ValueError("trigger must be either None, or an integer"+\
                              f" from zero to the number of channels - 1 ({self.nchan-1})")
-            
+
         self.calcchans=True
-        
+
         if summed_template is None or summed_psd is None:
             self.calcsum=False
         else:
             self.calcsum=True
-        
+
         self.do_ofamp_nodelay = [True]*self.nchan
         self.do_ofamp_nodelay_smooth = [False]*self.nchan
         self.ofamp_nodelay_lowfreqchi2 = False
-        
+
         self.do_ofamp_unconstrained = [True]*self.nchan
         self.do_ofamp_unconstrained_smooth = [False]*self.nchan
         self.ofamp_unconstrained_lowfreqchi2 = False
         self.ofamp_unconstrained_pulse_constraint = [0]*self.nchan
-        
+
         self.do_ofamp_constrained = [True]*self.nchan
         self.do_ofamp_constrained_smooth = [False]*self.nchan
         self.ofamp_constrained_lowfreqchi2 = True
         self.ofamp_constrained_nconstrain = [80]*self.nchan
         self.ofamp_constrained_pulse_constraint = [0]*self.nchan
-        
+
         self.do_ofamp_pileup = [True]*self.nchan
         self.do_ofamp_pileup_smooth = [False]*self.nchan
         self.ofamp_pileup_nconstrain = [80]*self.nchan
         self.ofamp_pileup_pulse_constraint = [0]*self.nchan
-        
+
         self.do_chi2_nopulse = [True]*self.nchan
         self.do_chi2_nopulse_smooth = [False]*self.nchan
-        
+
         self.do_chi2_lowfreq = [True]*self.nchan
         self.chi2_lowfreq_fcutoff = [10000]*self.nchan
-        
+
         self.do_ofamp_baseline = [False]*self.nchan
         self.do_ofamp_baseline_smooth = [False]*self.nchan
         self.ofamp_baseline_nconstrain = [80]*self.nchan
         self.ofamp_baseline_pulse_constraint = [0]*self.nchan
-        
+
         self.do_baseline = [True]*self.nchan
         self.baseline_indbasepre = [len(self.templates[0])//3]*self.nchan
-        
+
         self.do_integral = [True]*self.nchan
         self.indstart_integral = [len(self.templates[0])//3]*self.nchan
         self.indstop_integral = [2*len(self.templates[0])//3]*self.nchan
-        
+
         self.do_energy_absorbed = [False]*self.nchan
-        
+
         self.ioffset = None
         self.qetbias = None
         self.rload = None
         self.rsh = None
         self.indstart_energy_absorbed = [len(self.templates[0])//3]*self.nchan
         self.indstop_energy_absorbed = [2*len(self.templates[0])//3]*self.nchan
-        
+
         self.do_ofamp_shifted = [False]*self.nchan
         self.do_ofamp_shifted_smooth = [False]*self.nchan
         self.which_fit = "constrained"
         self.t0_shifted = None
-        
+
         self.do_maxmin = [True]*self.nchan
         self.use_min = [False]*self.nchan
         self.indstart_maxmin = [0]*self.nchan
         self.indstop_maxmin = [len(self.templates[0])]*self.nchan
-        
+
         self.do_ofnonlin = [False]*self.nchan
         self.ofnonlin_positive_pulses = [True]*self.nchan
-        
+
         self.do_optimumfilters = [True]*self.nchan
         self.do_optimumfilters_smooth = [False]*self.nchan
-        
+
         self.do_trigsim = [False]*self.nchan
         self.TS = None
         self.trigsim_k = 12
         self.signal_full = None
-        
+
     def _check_of(self):
         """
         Helper function for checking if any of the optimum filters are going to be calculated.
@@ -966,10 +972,11 @@ class SetupRQ(object):
         self.do_ofnonlin = lgcrun
         self.ofnonlin_positive_pulses = positive_pulses
         
-    def adjust_trigsim(self, trigger_template, trigger_psd, threshold, k=12):
+    def adjust_trigsim(self, trigger_template, trigger_psd, threshold,
+                       k=12, fir_bits_out=32, fir_discard_msbs=4):
         """
         Method for setting up the use of the trigger simulation for `mid.gz` files.
-        
+
         Parameters
         ----------
         trigger_template : ndarray
@@ -984,32 +991,41 @@ class SetupRQ(object):
         k : int, optional
             The bin number to start the FIR filter at. Since the filter downsamples the data
             by a factor of 16, the starting bin has a small effect on the calculated amplitude.
-        
+        fir_bits_out : int, optional
+            The number of bits to use in the integer values of the FIR. Default is 32, corresponding
+            to 32-bit integer trigger amplitudes. This is the recommended value, smaller values
+            may result in saturation fo the trigger amplitude (where the true amplitude would be
+            larger than the largest integer).
+        fir_discard_msbs : int, optional
+            The FIR pre-truncation shift of the bits for the FIR module. Default is 4, which is the
+            recommended value.
+
         Raises
         ------
         ImportError
             If `rqpy.HAS_TRIGSIM` is False, i.e. the user does not have the `trigsim` package installed.
         ValueError
             If `self.trigger` was not set, then the trigger simulation will not know which channel to run on.
-        
+
         """
-        
+
         if not HAS_TRIGSIM:
             raise ImportError("Cannot run the trigger simulation because trigsim is not installed.")
-        
+
         if self.trigger is None:
             raise ValueError("trigger was not set to specify the trigger channel in the initialization of SetupRQ.")
-        
+
         lgcrun = self._check_arg_length(lgcrun=False)
         lgcrun[self.trigger] = True
-        
+
         self.do_trigsim = lgcrun
         self.trigsim_k = k
-        
-        self.TS = rp.sim.TrigSim(trigger_psd, trigger_template, self.fs)
+
+        self.TS = rp.sim.TrigSim(trigger_psd, trigger_template, self.fs,
+                                 fir_bits_out=fir_bits_out, fir_discard_msbs=fir_discard_msbs)
         self.TS.set_threshold(threshold)
-        
-        
+
+
 def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, chan_num, det):
     """
     Helper function for calculating RQs for an array of traces corresponding to a single channel.
@@ -1180,6 +1196,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
     
     if setup.do_trigsim[chan_num] and setup.trigger == chan_num:
         triggeramp_sim = np.zeros(len(signal))
+        triggertime_sim = np.zeros(len(signal))
     
     # run the OF class for each trace
     if setup.do_optimumfilters[chan_num]:
@@ -1298,8 +1315,9 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
             chi2_nonlin[jj] = reducedchi2_nlin * (len(nlin.data)-nlin.dof)
         
         if setup.do_trigsim[chan_num] and setup.trigger == chan_num:
-            triggeramp_sim[jj] = setup.TS.trigger(setup.signal_full[jj, chan_num],
-                                                  k=setup.trigsim_k)[0]
+            res_trigsim = setup.TS.trigger(setup.signal_full[jj, chan_num], k=setup.trigsim_k)
+            triggeramp_sim[jj] = res_trigsim[0]
+            triggertime_sim[jj] = res_trigsim[1]
     
     # save variables to dict
     if setup.do_chi2_nopulse[chan_num]:
@@ -1450,6 +1468,8 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
     if setup.do_trigsim[chan_num] and setup.trigger == chan_num:
         rq_dict[f'triggeramp_sim_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'triggeramp_sim_{chan}{det}'][readout_inds] = triggeramp_sim
+        rq_dict[f'triggertime_sim_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'triggertime_sim_{chan}{det}'][readout_inds] = triggertime_sim
     
     if any(setup.do_ofamp_shifted) and setup.trigger is not None:
         # do the shifted OF on each trace
