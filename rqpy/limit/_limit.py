@@ -2,18 +2,97 @@ import numpy as np
 from glob import glob
 import time
 import os
+from pathlib import Path
+import contextlib
 from scipy import stats, signal, interpolate, constants, special
 
 import rqpy as rp
+from rqpy.limit import _upperlim
 import mendeleev
 
 
 __all__ = ["optimuminterval",
+           "optimuminterval2",
            "gauss_smear",
            "drde",
            "helmfactor",
+           "upperlim",
           ]
 
+
+@contextlib.contextmanager
+def _working_directory(path):
+    """
+    Changes working directory and returns to previous on exit.
+    
+    Parameters
+    ----------
+    path : str
+        The directory that the current working directory will temporarily be switched to.
+    
+    """
+
+    prev_cwd = Path.cwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(prev_cwd)
+
+def upperlim(fc, cl=0.9, if_bn=1, mub=0, fb=None):
+    """
+    Fortran wrapper function for Steve Yellin's Optimum Interval code.
+
+    Parameters
+    ----------
+    fc : array_like
+        Given the foreground distribution whose shape is known, but whose normalization is
+        to have its upper limit total expected number of events determined, fc(0) to fc(N+1),
+        with fc(0)=0, fc(N+1)=1, and with  fc(i) the increasing ordered set of cumulative
+        probabilities for the foreground distribution for event i, i=1 to N.
+    cl : float, optional
+        The confidence level desired for the upper limit. Default is 0.9.
+    if_bn : int, optional
+        Say which minimum fraction of the cumulative probability is allowed for seeking the
+        optimum interval. `if_bn`=1, 2, 3, 4, 5, 6, 7 corresponds to minimum cumulative probability
+        interval = .00, .01, .02, .05, .10, .20, .50. Default is 1.
+    mub : int, optional
+        The total expected number of events from known background. Default is zero.
+    fb : array_like, NoneType, optional
+         Equivalent to `fc` but assuming the distribution shape from known background. The default
+         behavior is to simply pass `fc` as `fb` to the UpperLimit algorithm, which is done assuming
+         `mub` is zero.
+
+    Returns
+    -------
+    ulout : float
+        The output of the UpperLim Fortran code, corresponding to the upper limit expected number of
+        events. To convert to cross section, the output should be divided by the total rate of the signal
+        and multiplied by the expected cross section for that rate.
+
+    Notes
+    -----
+    This is a wrapper around Steve Yellin's Optimum Interval Fortran code, which was compiled via f2py to
+    be callable by Python. Because the Fortran code expects look-up tables in the current working directory,
+    we need to use a context manager to switch directories to where the look-up tables are when running the
+    algorithm.
+
+    Read more about Steve Yellin's Optimum Interval code here:
+        - http://titus.stanford.edu/Upperlimit/
+        - https://arxiv.org/abs/physics/0203002
+        - https://arxiv.org/abs/0709.2701
+
+    """
+
+    file_path = os.path.dirname(os.path.realpath(__file__))
+
+    if fb is None:
+        fb = fc
+
+    with _working_directory(f"{file_path}/_upperlim/"):
+        ulout = _upperlim.upperlim(cl, if_bn, fc, mub, fb, 0)
+
+    return ulout
 
 def helmfactor(er, tm='Si'):
     """
@@ -387,3 +466,116 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
                 interval_high[ii] = totengs[-1]
 
     return mass_out, sigsi, interval_low, interval_high
+
+def optimuminterval2(eventenergies, effenergies, effs, masslist, exposure,
+                     tm="Si", res=None, verbose=False):
+    """
+    Function for running Steve Yellin's Optimum Interval code on an inputted spectrum and efficiency curve.
+
+    Parameters
+    ----------
+    eventenergies : ndarray
+        Array of all of the event energies (in keV) to use for calculating the sensitivity.
+    effenergies : ndarray 
+        Array of the energy values (in keV) of the efficiency curve.
+    effs : ndarray
+        Array of the efficiencies (unitless) corresponding to `effenergies`.
+    masslist : ndarray
+        List of candidate DM masses (in GeV/c^2) to calculate sensitivity at.
+    exposure : float
+        The total exposure of the detector (kg*days).
+    tm : str, int, optional
+        The target material of the detector. Can be passed as either the atomic symbol, the
+        atomic number, or the full name of the element. Default is 'Si'.
+    res : float, optional
+        The detector resolution in units of keV. If passed, then the differential scattering
+        rate of the dark matter is convoluted by a gaussian with width `res`, which results
+        in a smeared spectrum. If left as None, no smearing is performed.
+    verbose : bool, optional
+        If True, then the algorithm prints out the number of mass that it is currently calculating
+        the limit for. If False, no information is printed. Default is False.
+
+    Returns
+    -------
+    sigma : ndarray
+        The corresponding cross sections of the sensitivity curve (in cm^2).
+
+    Notes
+    -----
+    This function is a wrapper for Steve Yellin's Optimum Interval code. His code can be found
+    here: titus.stanford.edu/Upperlimit/
+
+    Read more about the Optimum Interval code in these two papers:
+        - https://arxiv.org/abs/physics/0203002
+        - https://arxiv.org/abs/0709.2701
+
+    """
+
+    if np.isscalar(masslist):
+        masslist = [masslist]
+
+    elow = max(0.001, min(effenergies))
+    ehigh = max(effenergies)
+
+    en_interp = np.logspace(np.log10(0.9*elow), np.log10(1.1*ehigh), 1e5)
+
+    delta_e = np.concatenate(([(en_interp[1] - en_interp[0])/2],
+                              (en_interp[2:] - en_interp[:-2])/2,
+                              [(en_interp[-1] - en_interp[-2])/2]))
+
+    sigma0 = 1e-41
+
+    event_inds = rp.inrange(eventenergies, elow, ehigh)
+    inlim = rp.inrange(en_interp, elow, ehigh)
+
+    exp = effs * exposure
+
+    curr_exp = interpolate.interp1d(effenergies, exp,
+                                    kind="linear",
+                                    bounds_error=False,
+                                    fill_value=(0, exp[-1]))
+
+    sigma = np.ones(len(masslist)) * np.inf
+    
+    ulinputs = []
+
+    for ii, mass in enumerate(masslist):
+        if verbose:
+            print(f"On mass {ii+1} of {len(masslist)}.")
+
+        init_rate = drde(en_interp, mass, sigma0, tm=tm)
+
+        if res is not None:
+            init_rate = gauss_smear(en_interp, init_rate, res)
+
+        rate = init_rate * curr_exp(en_interp)
+
+        integ_rate = np.cumsum(rate * delta_e * inlim)
+
+        integ_rate[0] = 0
+        tot_rate = integ_rate[-1]
+
+        x_val_fcn = interpolate.interp1d(en_interp, integ_rate,
+                                         kind="linear",
+                                         bounds_error=True)
+
+        x_vals = x_val_fcn(eventenergies[event_inds])
+
+        if tot_rate != 0:
+            fc = x_vals/tot_rate
+            fc[fc > 1] = 1
+
+            cdf_max = 1 - 1e-6
+            possiblewimp = fc <= cdf_max
+            nwimps = possiblewimp.sum()
+            fc = fc[possiblewimp]
+
+            cl = 0.9
+            if_bn = 1
+            mub = 0
+            iflag = 0
+
+            uloutput = upperlim(fc)
+            sigma[ii] = (sigma0 / tot_rate) * uloutput
+
+    return sigma
