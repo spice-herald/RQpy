@@ -473,7 +473,7 @@ class OptimumFilt(object):
         
 
 def acquire_randoms(filelist, n, l, datashape=None, iotype="stanford", savepath=None, 
-                    savename=None, dumpnum=1, maxevts=1000):
+                    savename=None, dumpnum=1, maxevts=1000, convtoamps=1/1024):
     """
     Function for acquiring random traces from a list of files and saving the results
     to a .npz file for later processing.
@@ -506,6 +506,9 @@ def acquire_randoms(filelist, n, l, datashape=None, iotype="stanford", savepath=
     maxevts : int, optional
         The maximum number of events that should be stored in each dump when saving. Default
         is 1000.
+    convtoamps : float, optional
+        Correction factor to convert the data to Amps. The traces are multiplied by this
+        factor, as is the TTL channel (if it exists). Default is 1/1024.
                 
         
     """
@@ -545,7 +548,7 @@ def acquire_randoms(filelist, n, l, datashape=None, iotype="stanford", savepath=
     for key in counts.keys():
 
         if iotype=="stanford":
-            traces, t, fs, _ = io.loadstanfordfile(filelist[key])
+            traces, t, fs, _ = io.loadstanfordfile(filelist[key], convtoamps=convtoamps)
         else:
             raise ValueError("Unrecognized iotype inputted.")
             
@@ -617,7 +620,7 @@ def acquire_randoms(filelist, n, l, datashape=None, iotype="stanford", savepath=
     
 def acquire_pulses(filelist, template, noisepsd, tracelength, thresh, nchan=2, trigtemplate=None, 
                    trigthresh=None, positivepulses=True, iotype="stanford", savepath=None, 
-                   savename=None, dumpnum=1, maxevts=1000, lgcoverlap=True):
+                   savename=None, dumpnum=1, maxevts=1000, lgcoverlap=True, convtoamps=1/1024):
     """
     Function for running the continuous trigger on many different files and saving the events 
     to .npz files for later processing.
@@ -663,6 +666,9 @@ def acquire_pulses(filelist, template, noisepsd, tracelength, thresh, nchan=2, t
         is 1000.
     lgcoverlap : bool, optional
             If False, in eventtrigger skip events that overlap, based on tracelength, with the previous event.
+    convtoamps : float, optional
+        Correction factor to convert the data to Amps. The traces are multiplied by this
+        factor, as is the TTL channel (if it exists). Default is 1/1024.
             
     """
     
@@ -691,7 +697,7 @@ def acquire_pulses(filelist, template, noisepsd, tracelength, thresh, nchan=2, t
     for f in filelist:
         
         if iotype=="stanford":
-            traces, times, fs, trig = io.loadstanfordfile(f)
+            traces, times, fs, trig = io.loadstanfordfile(f, convtoamps=convtoamps)
             if trigtemplate is None:
                 trig = None
         else:
