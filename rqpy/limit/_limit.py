@@ -374,6 +374,9 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
             nwimps = possiblewimp.sum()
             fc = fc[possiblewimp]
 
+            if len(fc) == 0:
+                fc = np.asarray([0, 1])
+
             cl = 0.9
             if_bn = 1
             mub = 0
