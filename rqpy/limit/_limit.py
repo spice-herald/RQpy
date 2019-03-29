@@ -12,7 +12,6 @@ import mendeleev
 
 
 __all__ = ["optimuminterval",
-           "optimuminterval2",
            "gauss_smear",
            "drde",
            "helmfactor",
@@ -274,201 +273,8 @@ def gauss_smear(x, f, res, nres=1e5, gauss_width=10):
     return s(x)
 
 
-def _get_fileid(oi_path):
-    """
-    Helper function for determining an unused or old file number when running the Optimum Interval code.
-    
-    Parameters
-    ----------
-    oi_path : str
-        The path to the compiled Fortran code for the Optimum Interval algorithm.
-
-    Returns
-    -------
-    fileid : int
-        A number from 0 to 99 to use as the number to append to ULinput/ULoutput. Allows running of OI
-        code in parallel. This chooses a file ID that corresponds to the oldest ULoutput file.
-
-    """
-
-    filelist = glob(f"{oi_path}ULoutput[0-9]")
-    filelist.extend(glob(f"{oi_path}ULoutput[0-9][0-9]"))
-
-    mtimes = []
-    fileids = []
-
-    for f in filelist:
-        mtimes.append(os.path.getmtime(f))
-        fileids.append(int(f.split('ULoutput')[-1]))
-
-    if len(filelist) == 0:
-        fileid = 0
-    elif len(mtimes) == 100:
-        fileid = fileids[np.argmin(mtimes)]
-    else:
-        fileid = np.random.choice([ii for ii in range(100) if ii not in fileids])
-
-    return fileid
-
-
 def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
-                    tm="Si", res=None, verbose=False, oi_path=None):
-    """
-    Function for running Steve Yellin's Optimum Interval code on an inputted spectrum and efficiency curve.
-
-    Parameters
-    ----------
-    eventenergies : ndarray
-        Array of all of the event energies (in keV) to use for calculating the sensitivity.
-    effenergies : ndarray 
-        Array of the energy values (in keV) of the efficiency curve.
-    effs : ndarray
-        Array of the efficiencies (unitless) corresponding to `effenergies`.
-    masslist : ndarray
-        List of candidate DM masses (in GeV/c^2) to calculate sensitivity at.
-    exposure : float
-        The total exposure of the detector (kg*days).
-    tm : str, int, optional
-        The target material of the detector. Can be passed as either the atomic symbol, the
-        atomic number, or the full name of the element. Default is 'Si'.
-    res : float, optional
-        The detector resolution in units of keV. If passed, then the differential scattering
-        rate of the dark matter is convoluted by a gaussian with width `res`, which results
-        in a smeared spectrum. If left as None, no smearing is performed.
-    verbose : bool, optional
-        If True, then the algorithm prints out the number of mass that it is currently calculating
-        the limit for. If False, no information is printed. Default is False.
-    oi_path : str, optional
-        The path to the compiled Fortran code for the Optimum Interval. Since this function is a wrapper
-        for the `CalcOptLim3_VarNm` Fortran program, the path to that compiled program must be passed. If
-        this is left as None, an error will be raised.
-
-    Returns
-    -------
-    m : ndarray
-        The masses (in GeV/c^2) at which the sensitvity curve was calculated.
-    sig : ndarray
-        The corresponding cross sections of the sensitivity curve (in cm^2).
-    interval_low : ndarray
-        The lower energy bound of the interval found via the Optimum Interval algorithm (in keV).
-    interval_high : ndarray
-        The uppper energy bound of the interval found via the Optimum Interval algorithm (in keV).
-
-    Raises
-    ------
-    ValueError
-        If `oi_path` was left as None
-        If `os.name` is not 'posix'
-
-    Notes
-    -----
-    This function is a wrapper for Steve Yellin's Optimum Interval code. His code can be found
-    here: titus.stanford.edu/Upperlimit/
-
-    Read more about the Optimum Interval code in these two papers:
-        - https://arxiv.org/abs/physics/0203002
-        - https://arxiv.org/abs/0709.2701
-
-    """
-
-    if oi_path is None:
-        raise ValueError("Please specify oi_path to point to the directory of CalcOptLim3_VarNm.")
-
-    if np.isscalar(masslist):
-        masslist = [masslist]
-
-    elow = max(0.001, min(effenergies))
-    ehigh = max(effenergies)
-
-    en_interp = np.logspace(np.log10(0.9*elow), np.log10(1.1*ehigh), 1e5)
-
-    delta_e = np.concatenate(([(en_interp[1] - en_interp[0])/2],
-                              (en_interp[2:] - en_interp[:-2])/2,
-                              [(en_interp[-1] - en_interp[-2])/2]))
-
-    sigma0 = 1e-41
-
-    event_inds = rp.inrange(eventenergies, elow, ehigh)
-    inlim = rp.inrange(en_interp, elow, ehigh)
-
-    exp = effs * exposure
-
-    curr_exp = interpolate.interp1d(effenergies, exp,
-                                    kind="linear",
-                                    bounds_error=False,
-                                    fill_value=(0, exp[-1]))
-
-    sigsi = np.zeros(len(masslist))
-    mass_out = np.zeros(len(masslist))
-    interval_low = np.zeros(len(masslist))
-    interval_high = np.zeros(len(masslist))
-
-    fileid = _get_fileid(oi_path)
-
-    for ii, mass in enumerate(masslist):
-        if verbose:
-            print(f"On mass {ii+1} of {len(masslist)}.")
-
-        init_rate = drde(en_interp, mass, sigma0, tm=tm)
-
-        if res is not None:
-            init_rate = gauss_smear(en_interp, init_rate, res)
-
-        rate = init_rate * curr_exp(en_interp)
-
-        integ_rate = np.cumsum(rate * delta_e * inlim)
-
-        integ_rate[0] = 0
-        tot_rate = integ_rate[-1]
-
-        x_val_fcn = interpolate.interp1d(en_interp, integ_rate,
-                                         kind="linear",
-                                         bounds_error=True)
-
-        x_vals = x_val_fcn(eventenergies[event_inds])
-
-        fc = x_vals/tot_rate
-        fc[fc > 1] = 1
-
-        cdf_max = 1 - 1e-6
-        possiblewimp = fc <= cdf_max
-        nwimps = possiblewimp.sum()
-        fc = fc[possiblewimp]
-        totengs = eventenergies[event_inds][possiblewimp]
-
-        ulinput_arr = np.zeros(3 + len(fc))
-        ulinput_arr[0] = 1
-        ulinput_arr[1] = mass
-        ulinput_arr[2] = tot_rate
-
-        if len(ulinput_arr) > 3:
-            ulinput_arr[3:] = fc
-
-        np.savetxt(f"{oi_path}ULinput{fileid}", ulinput_arr[np.newaxis,:], newline='',
-                   fmt='%10.6e\n' + '%10.6f\n' + '%10.6e\n' * len(fc) + '%10.6e')
-
-        if os.name == 'posix':
-            if os.path.exists(f"{oi_path}ULoutput{fileid}"):
-                os.remove(f"{oi_path}ULoutput{fileid}")
-            os.system(f"(cd {oi_path} && ./CalcOptLim3_VarNm ULinput{fileid} ULoutput{fileid})")
-        else:
-            raise ValueError("Only Linux is currently supported by optimuminterval.")
-
-        uloutput = np.loadtxt(f"{oi_path}ULoutput{fileid}")
-
-        sigsi[ii] = uloutput[0] * sigma0
-        mass_out[ii] = uloutput[1]
-        if len(totengs)>0:
-            interval_low[ii] = totengs[int(uloutput[3])]
-            if int(uloutput[4]) < nwimps:
-                interval_high[ii] = totengs[int(uloutput[4])]
-            else:
-                interval_high[ii] = totengs[-1]
-
-    return mass_out, sigsi, interval_low, interval_high
-
-def optimuminterval2(eventenergies, effenergies, effs, masslist, exposure,
-                     tm="Si", res=None, verbose=False):
+                    tm="Si", res=None, verbose=False):
     """
     Function for running Steve Yellin's Optimum Interval code on an inputted spectrum and efficiency curve.
 
@@ -517,7 +323,7 @@ def optimuminterval2(eventenergies, effenergies, effs, masslist, exposure,
     elow = max(0.001, min(effenergies))
     ehigh = max(effenergies)
 
-    en_interp = np.logspace(np.log10(0.9*elow), np.log10(1.1*ehigh), 1e5)
+    en_interp = np.logspace(np.log10(0.9 * elow), np.log10(1.1 * ehigh), 1e5)
 
     delta_e = np.concatenate(([(en_interp[1] - en_interp[0])/2],
                               (en_interp[2:] - en_interp[:-2])/2,
