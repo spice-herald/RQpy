@@ -572,13 +572,18 @@ class RQpyPlot(object):
 
     """
 
-    def __init__(self):
+    def __init__(self, figsize=(10, 6)):
         """
         Initialization of the RQpyPlot base class.
 
+        Parameters
+        ----------
+        figsize : tuple, optional
+            Width and height of the figure in inches. Default is (10, 6).
+
         """
 
-        self.fig, self.ax = plt.subplots(figsize=(10, 6))
+        self.fig, self.ax = plt.subplots(figsize=figsize)
 
         self.ax.grid()
         self.ax.grid(which="minor", axis="both", linestyle="dotted")
@@ -607,7 +612,7 @@ class RatePlot(RQpyPlot):
 
     """
 
-    def __init__(self, energy_range, spectrum_cmap="inferno", drde_cmap="viridis"):
+    def __init__(self, energy_range, spectrum_cmap="inferno", drde_cmap="viridis", figsize=(10, 6)):
         """
         Initialization of the RatePlot class for plotting dark matter spectra.
 
@@ -620,6 +625,8 @@ class RatePlot(RQpyPlot):
         drde_cmap : str, optional
             The colormap to use for plotting each theoretical drde curve using the WIMP
             model. Default is "viridis".
+        figsize : tuple, optional
+            Width and height of the figure in inches. Default is (10, 6).
 
         Returns
         -------
@@ -631,7 +638,7 @@ class RatePlot(RQpyPlot):
         self._spectrum_cmap = spectrum_cmap
         self._drde_cmap = drde_cmap
 
-        super().__init__()
+        super().__init__(figsize=figsize)
 
         self.ax.set_yscale('log')
         self.ax.set_xlim(self._energy_range)
@@ -748,6 +755,11 @@ class RatePlot(RQpyPlot):
         Returns
         -------
         None
+
+        Raises
+        ------
+        ValueError
+            If `masses` and `sigmas` are not the same length.
 
         """
 
