@@ -2,7 +2,7 @@ from ._globals import HAS_SCDMSPYTOOLS, HAS_TRIGSIM
 from . import core
 from .core import *
 from . import plotting
-from .plotting._core import *
+from .plotting._core_plotting import *
 from . import process
 from . import io
 from . import sim
