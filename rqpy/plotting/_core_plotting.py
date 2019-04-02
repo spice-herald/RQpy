@@ -763,9 +763,9 @@ class RatePlot(RQpyPlot):
 
         """
 
-        if not isinstance(masses, list):
+        if np.isscalar(masses):
             masses = [masses]
-        if not isinstance(sigmas, list):
+        if np.isscalar(sigmas):
             sigmas = [sigmas]
         if len(masses) != len(sigmas):
             raise ValueError("masses and sigmas must be the same length.")
