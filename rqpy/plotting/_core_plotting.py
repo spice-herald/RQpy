@@ -589,8 +589,6 @@ class RQpyPlot(object):
         self.ax.grid(which="minor", axis="both", linestyle="dotted")
         self.ax.tick_params(which="both", direction="in", right=True, top=True)
 
-        self.fig.tight_layout()
-
 
 class RatePlot(RQpyPlot):
     """
