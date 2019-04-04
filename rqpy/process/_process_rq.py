@@ -1198,126 +1198,127 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         triggeramp_sim = np.zeros(len(signal))
         triggertime_sim = np.zeros(len(signal))
     
-    # run the OF class for each trace
-    if setup.do_optimumfilters[chan_num]:
-        OF = qp.OptimumFilter(signal[0], template, psd, fs)
-    if setup.do_optimumfilters_smooth[chan_num]:
-        psd_smooth = qp.smooth_psd(psd)
-        OF_smooth = qp.OptimumFilter(signal[0], template, psd_smooth, fs)
-        
-    if setup.do_ofnonlin[chan_num]:
-        nlin = qp.OFnonlin(psd, fs, template=template)
-    
-    for jj, s in enumerate(signal):
-        if jj!=0:
-            if setup.do_optimumfilters[chan_num]:
-                OF.update_signal(s)
-            if setup.do_optimumfilters_smooth[chan_num]:
-                OF_smooth.update_signal(s)
-        
-        if setup.do_chi2_nopulse[chan_num]:
-            chi0[jj] = OF.chi2_nopulse()
-            
-        if setup.do_chi2_nopulse_smooth[chan_num]:
-            chi0_smooth[jj] = OF_smooth.chi2_nopulse()
-        
-        if setup.do_ofamp_nodelay[chan_num]:
-            amp_nodelay[jj], chi2_nodelay[jj] = OF.ofamp_nodelay()
-            
-        if setup.do_ofamp_nodelay_smooth[chan_num]:
-            amp_nodelay_smooth[jj], chi2_nodelay_smooth[jj] = OF_smooth.ofamp_nodelay()
-        
-        if setup.ofamp_nodelay_lowfreqchi2 and setup.do_chi2_lowfreq[chan_num]:
-            chi2low_nodelay[jj] = OF.chi2_lowfreq(amp_nodelay[jj], 0, 
-                                          fcutoff=setup.chi2_lowfreq_fcutoff[chan_num])
-        
-        if setup.do_ofamp_unconstrained[chan_num]:
-            amp_noconstrain[jj], t0_noconstrain[jj], chi2_noconstrain[jj] = OF.ofamp_withdelay()
-            if setup.ofamp_unconstrained_pulse_constraint[chan_num]!=0:
-                amp_noconstrain_pcon[jj], t0_noconstrain_pcon[jj], chi2_noconstrain_pcon[jj] = OF.ofamp_withdelay(
-                                        pulse_direction_constraint=setup.ofamp_unconstrained_pulse_constraint[chan_num])
-            
-        if setup.do_ofamp_unconstrained_smooth[chan_num]:
-            amp_noconstrain_smooth[jj], t0_noconstrain_smooth[jj], chi2_noconstrain_smooth[jj] = OF_smooth.ofamp_withdelay()
-        
-        if setup.ofamp_unconstrained_lowfreqchi2 and setup.do_chi2_lowfreq[chan_num]:
-            chi2low_unconstrain[jj] = OF.chi2_lowfreq(amp_noconstrain[jj], t0_noconstrain[jj], 
-                                                      fcutoff=setup.chi2_lowfreq_fcutoff[chan_num])
-            if setup.ofamp_unconstrained_pulse_constraint[chan_num]!=0:
-                chi2low_unconstrain_pcon[jj] = OF.chi2_lowfreq(amp_noconstrain_pcon[jj], t0_noconstrain_pcon[jj], 
-                                                               fcutoff=setup.chi2_lowfreq_fcutoff[chan_num])
+    if any(readout_inds):
+        # run the OF class for each trace
+        if setup.do_optimumfilters[chan_num]:
+            OF = qp.OptimumFilter(signal[0], template, psd, fs)
+        if setup.do_optimumfilters_smooth[chan_num]:
+            psd_smooth = qp.smooth_psd(psd)
+            OF_smooth = qp.OptimumFilter(signal[0], template, psd_smooth, fs)
 
-        if setup.do_ofamp_constrained[chan_num]:
-            amp_constrain[jj], t0_constrain[jj], chi2_constrain[jj] = OF.ofamp_withdelay(
-                                                                      nconstrain=setup.ofamp_constrained_nconstrain[chan_num])
-            if setup.ofamp_constrained_pulse_constraint[chan_num]!=0:
-                amp_constrain_pcon[jj], t0_constrain_pcon[jj], chi2_constrain_pcon[jj] = OF.ofamp_withdelay(
-                                                             nconstrain=setup.ofamp_constrained_nconstrain[chan_num],
-                                        pulse_direction_constraint=setup.ofamp_constrained_pulse_constraint[chan_num])
-            
-        if setup.do_ofamp_constrained_smooth[chan_num]:
-            amp_constrain_smooth[jj], t0_constrain_smooth[jj], chi2_constrain_smooth[jj] = OF_smooth.ofamp_withdelay(
-                                                                      nconstrain=setup.ofamp_constrained_nconstrain[chan_num])
-        
-        if setup.ofamp_constrained_lowfreqchi2 and setup.do_chi2_lowfreq[chan_num]:
-            chi2low_constrain[jj] = OF.chi2_lowfreq(amp_constrain[jj], t0_constrain[jj], 
-                                                    fcutoff=setup.chi2_lowfreq_fcutoff[chan_num])
-            if setup.ofamp_constrained_pulse_constraint[chan_num]!=0:
-                chi2low_constrain_pcon[jj] = OF.chi2_lowfreq(amp_constrain_pcon[jj], t0_constrain_pcon[jj], 
-                                                            fcutoff=setup.chi2_lowfreq_fcutoff[chan_num])
-        
-        if setup.do_ofamp_pileup[chan_num]:
-            amp_pileup[jj], t0_pileup[jj], chi2_pileup[jj] = OF.ofamp_pileup_iterative(amp_constrain[jj], t0_constrain[jj],
-                                                               nconstrain=setup.ofamp_pileup_nconstrain[chan_num])
-            if setup.ofamp_pileup_pulse_constraint[chan_num]!=0:
-                amp_pileup_pcon[jj], t0_pileup_pcon[jj], chi2_pileup_pcon[jj] = OF.ofamp_pileup_iterative(amp_constrain[jj], 
-                                                             t0_constrain[jj],
-                                                             nconstrain=setup.ofamp_pileup_nconstrain[chan_num],
-                                        pulse_direction_constraint=setup.ofamp_pileup_pulse_constraint[chan_num])
-            
-        if setup.do_ofamp_pileup_smooth[chan_num]:
-            amp_pileup_smooth[jj], t0_pileup_smooth[jj], chi2_pileup_smooth[jj] = OF_smooth.ofamp_pileup_iterative(
-                                                               amp_constrain_smooth[jj], t0_constrain_smooth[jj],
-                                                               nconstrain=setup.ofamp_pileup_nconstrain[chan_num])
-        
-        if setup.do_ofamp_baseline[chan_num]:
-            amp_baseline[jj], t0_baseline[jj], chi2_baseline[jj] = OF.ofamp_baseline(
-                                                                   nconstrain=setup.ofamp_baseline_nconstrain[chan_num])
-            if setup.ofamp_baseline_pulse_constraint[chan_num]!=0:
-                amp_baseline_pcon[jj], t0_baseline_pcon[jj], chi2_baseline_pcon[jj] = OF.ofamp_baseline(
-                                                             nconstrain=setup.ofamp_baseline_nconstrain[chan_num],
-                                        pulse_direction_constraint=setup.ofamp_baseline_pulse_constraint[chan_num])
-            
-        if setup.do_ofamp_baseline_smooth[chan_num]:
-            amp_baseline_smooth[jj], t0_baseline_smooth[jj], chi2_baseline_smooth[jj] = OF_smooth.ofamp_baseline(
-                                                                   nconstrain=setup.ofamp_baseline_nconstrain[chan_num])
-        
         if setup.do_ofnonlin[chan_num]:
-            if setup.ofnonlin_positive_pulses[chan_num]:
-                flip = 1
-            else:
-                flip = -1
-            
-            res_nlin = nlin.fit_falltimes(flip*s, npolefit=2, lgcfullrtn=True)
-            
-            params_nlin = res_nlin[0]
-            errors_nlin = res_nlin[1]
-            reducedchi2_nlin = res_nlin[3]
-            
-            amp_nonlin[jj] = flip*params_nlin[0]
-            amp_nonlin_err[jj] = errors_nlin[0]
-            taurise_nonlin[jj] = params_nlin[1]
-            taurise_nonlin_err[jj] = errors_nlin[1]
-            taufall_nonlin[jj] = params_nlin[2]
-            taufall_nonlin_err[jj] = errors_nlin[2]
-            t0_nonlin[jj] = params_nlin[3]
-            t0_nonlin_err[jj] = errors_nlin[3]
-            chi2_nonlin[jj] = reducedchi2_nlin * (len(nlin.data)-nlin.dof)
-        
-        if setup.do_trigsim[chan_num] and setup.trigger == chan_num:
-            res_trigsim = setup.TS.trigger(setup.signal_full[jj, chan_num], k=setup.trigsim_k)
-            triggeramp_sim[jj] = res_trigsim[0]
-            triggertime_sim[jj] = res_trigsim[1]
+            nlin = qp.OFnonlin(psd, fs, template=template)
+
+        for jj, s in enumerate(signal):
+            if jj!=0:
+                if setup.do_optimumfilters[chan_num]:
+                    OF.update_signal(s)
+                if setup.do_optimumfilters_smooth[chan_num]:
+                    OF_smooth.update_signal(s)
+
+            if setup.do_chi2_nopulse[chan_num]:
+                chi0[jj] = OF.chi2_nopulse()
+
+            if setup.do_chi2_nopulse_smooth[chan_num]:
+                chi0_smooth[jj] = OF_smooth.chi2_nopulse()
+
+            if setup.do_ofamp_nodelay[chan_num]:
+                amp_nodelay[jj], chi2_nodelay[jj] = OF.ofamp_nodelay()
+
+            if setup.do_ofamp_nodelay_smooth[chan_num]:
+                amp_nodelay_smooth[jj], chi2_nodelay_smooth[jj] = OF_smooth.ofamp_nodelay()
+
+            if setup.ofamp_nodelay_lowfreqchi2 and setup.do_chi2_lowfreq[chan_num]:
+                chi2low_nodelay[jj] = OF.chi2_lowfreq(amp_nodelay[jj], 0, 
+                                              fcutoff=setup.chi2_lowfreq_fcutoff[chan_num])
+
+            if setup.do_ofamp_unconstrained[chan_num]:
+                amp_noconstrain[jj], t0_noconstrain[jj], chi2_noconstrain[jj] = OF.ofamp_withdelay()
+                if setup.ofamp_unconstrained_pulse_constraint[chan_num]!=0:
+                    amp_noconstrain_pcon[jj], t0_noconstrain_pcon[jj], chi2_noconstrain_pcon[jj] = OF.ofamp_withdelay(
+                                            pulse_direction_constraint=setup.ofamp_unconstrained_pulse_constraint[chan_num])
+
+            if setup.do_ofamp_unconstrained_smooth[chan_num]:
+                amp_noconstrain_smooth[jj], t0_noconstrain_smooth[jj], chi2_noconstrain_smooth[jj] = OF_smooth.ofamp_withdelay()
+
+            if setup.ofamp_unconstrained_lowfreqchi2 and setup.do_chi2_lowfreq[chan_num]:
+                chi2low_unconstrain[jj] = OF.chi2_lowfreq(amp_noconstrain[jj], t0_noconstrain[jj], 
+                                                          fcutoff=setup.chi2_lowfreq_fcutoff[chan_num])
+                if setup.ofamp_unconstrained_pulse_constraint[chan_num]!=0:
+                    chi2low_unconstrain_pcon[jj] = OF.chi2_lowfreq(amp_noconstrain_pcon[jj], t0_noconstrain_pcon[jj], 
+                                                                   fcutoff=setup.chi2_lowfreq_fcutoff[chan_num])
+
+            if setup.do_ofamp_constrained[chan_num]:
+                amp_constrain[jj], t0_constrain[jj], chi2_constrain[jj] = OF.ofamp_withdelay(
+                                                                          nconstrain=setup.ofamp_constrained_nconstrain[chan_num])
+                if setup.ofamp_constrained_pulse_constraint[chan_num]!=0:
+                    amp_constrain_pcon[jj], t0_constrain_pcon[jj], chi2_constrain_pcon[jj] = OF.ofamp_withdelay(
+                                                                 nconstrain=setup.ofamp_constrained_nconstrain[chan_num],
+                                            pulse_direction_constraint=setup.ofamp_constrained_pulse_constraint[chan_num])
+
+            if setup.do_ofamp_constrained_smooth[chan_num]:
+                amp_constrain_smooth[jj], t0_constrain_smooth[jj], chi2_constrain_smooth[jj] = OF_smooth.ofamp_withdelay(
+                                                                          nconstrain=setup.ofamp_constrained_nconstrain[chan_num])
+
+            if setup.ofamp_constrained_lowfreqchi2 and setup.do_chi2_lowfreq[chan_num]:
+                chi2low_constrain[jj] = OF.chi2_lowfreq(amp_constrain[jj], t0_constrain[jj], 
+                                                        fcutoff=setup.chi2_lowfreq_fcutoff[chan_num])
+                if setup.ofamp_constrained_pulse_constraint[chan_num]!=0:
+                    chi2low_constrain_pcon[jj] = OF.chi2_lowfreq(amp_constrain_pcon[jj], t0_constrain_pcon[jj], 
+                                                                fcutoff=setup.chi2_lowfreq_fcutoff[chan_num])
+
+            if setup.do_ofamp_pileup[chan_num]:
+                amp_pileup[jj], t0_pileup[jj], chi2_pileup[jj] = OF.ofamp_pileup_iterative(amp_constrain[jj], t0_constrain[jj],
+                                                                   nconstrain=setup.ofamp_pileup_nconstrain[chan_num])
+                if setup.ofamp_pileup_pulse_constraint[chan_num]!=0:
+                    amp_pileup_pcon[jj], t0_pileup_pcon[jj], chi2_pileup_pcon[jj] = OF.ofamp_pileup_iterative(amp_constrain[jj], 
+                                                                 t0_constrain[jj],
+                                                                 nconstrain=setup.ofamp_pileup_nconstrain[chan_num],
+                                            pulse_direction_constraint=setup.ofamp_pileup_pulse_constraint[chan_num])
+
+            if setup.do_ofamp_pileup_smooth[chan_num]:
+                amp_pileup_smooth[jj], t0_pileup_smooth[jj], chi2_pileup_smooth[jj] = OF_smooth.ofamp_pileup_iterative(
+                                                                   amp_constrain_smooth[jj], t0_constrain_smooth[jj],
+                                                                   nconstrain=setup.ofamp_pileup_nconstrain[chan_num])
+
+            if setup.do_ofamp_baseline[chan_num]:
+                amp_baseline[jj], t0_baseline[jj], chi2_baseline[jj] = OF.ofamp_baseline(
+                                                                       nconstrain=setup.ofamp_baseline_nconstrain[chan_num])
+                if setup.ofamp_baseline_pulse_constraint[chan_num]!=0:
+                    amp_baseline_pcon[jj], t0_baseline_pcon[jj], chi2_baseline_pcon[jj] = OF.ofamp_baseline(
+                                                                 nconstrain=setup.ofamp_baseline_nconstrain[chan_num],
+                                            pulse_direction_constraint=setup.ofamp_baseline_pulse_constraint[chan_num])
+
+            if setup.do_ofamp_baseline_smooth[chan_num]:
+                amp_baseline_smooth[jj], t0_baseline_smooth[jj], chi2_baseline_smooth[jj] = OF_smooth.ofamp_baseline(
+                                                                       nconstrain=setup.ofamp_baseline_nconstrain[chan_num])
+
+            if setup.do_ofnonlin[chan_num]:
+                if setup.ofnonlin_positive_pulses[chan_num]:
+                    flip = 1
+                else:
+                    flip = -1
+
+                res_nlin = nlin.fit_falltimes(flip*s, npolefit=2, lgcfullrtn=True)
+
+                params_nlin = res_nlin[0]
+                errors_nlin = res_nlin[1]
+                reducedchi2_nlin = res_nlin[3]
+
+                amp_nonlin[jj] = flip*params_nlin[0]
+                amp_nonlin_err[jj] = errors_nlin[0]
+                taurise_nonlin[jj] = params_nlin[1]
+                taurise_nonlin_err[jj] = errors_nlin[1]
+                taufall_nonlin[jj] = params_nlin[2]
+                taufall_nonlin_err[jj] = errors_nlin[2]
+                t0_nonlin[jj] = params_nlin[3]
+                t0_nonlin_err[jj] = errors_nlin[3]
+                chi2_nonlin[jj] = reducedchi2_nlin * (len(nlin.data)-nlin.dof)
+
+            if setup.do_trigsim[chan_num] and setup.trigger == chan_num:
+                res_trigsim = setup.TS.trigger(setup.signal_full[jj, chan_num], k=setup.trigsim_k)
+                triggeramp_sim[jj] = res_trigsim[0]
+                triggertime_sim[jj] = res_trigsim[1]
     
     # save variables to dict
     if setup.do_chi2_nopulse[chan_num]:
