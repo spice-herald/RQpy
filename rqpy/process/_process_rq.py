@@ -1193,6 +1193,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         t0_nonlin = np.zeros(len(signal))
         t0_nonlin_err = np.zeros(len(signal))
         chi2_nonlin = np.zeros(len(signal))
+        success_nonlin = np.zeros(len(signal))
     
     if setup.do_trigsim[chan_num] and setup.trigger == chan_num:
         triggeramp_sim = np.zeros(len(signal))
@@ -1314,6 +1315,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                 t0_nonlin[jj] = params_nlin[3]
                 t0_nonlin_err[jj] = errors_nlin[3]
                 chi2_nonlin[jj] = reducedchi2_nlin * (len(nlin.data)-nlin.dof)
+                success_nonlin[jj] = res_nlin[4]
 
             if setup.do_trigsim[chan_num] and setup.trigger == chan_num:
                 res_trigsim = setup.TS.trigger(setup.signal_full[jj, chan_num], k=setup.trigsim_k)
@@ -1465,6 +1467,8 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         rq_dict[f't0_nlin_err_{chan}{det}'][readout_inds] = t0_nonlin_err
         rq_dict[f'chi2_nlin_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'chi2_nlin_{chan}{det}'][readout_inds] = chi2_nonlin
+        rq_dict[f'success_nlin_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'success_nlin_{chan}{det}'][readout_inds] = success_nonlin
     
     if setup.do_trigsim[chan_num] and setup.trigger == chan_num:
         rq_dict[f'triggeramp_sim_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
