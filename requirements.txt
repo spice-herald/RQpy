@@ -1,0 +1,9 @@
+pandas>=0.23.0
+numpy>=1.14.3
+setuptools>=39.1.0
+scipy>=1.1.0
+scikit_image>=0.13.1
+matplotlib>=2.2.2
+lmfit>=0.9.13
+mendeleev>=0.4.5
+qetpy>=1.1.0
