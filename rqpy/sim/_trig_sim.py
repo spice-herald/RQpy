@@ -76,6 +76,8 @@ class TrigSim(object):
     threshold : int
         The threshold to set for triggering on pulses, should be in the arbitrary units of the
         filter.
+    convtoadcbins : float
+        The conversion factor for expressing FIR filter amplitudes in units of ADC bins.
 
     """
 
@@ -139,6 +141,52 @@ class TrigSim(object):
         
         self.of_coeffs = self._Trigger.build_OF_coeffs(self.input_psds, self.input_pulse_shapes)
         self._Trigger.set_FIR_coeffs(self.of_coeffs)
+        self.convtoadcbins = self._convtoadcbins(fir_bits_out, fir_discard_msbs)
+
+    def _convtoadcbins(self, fir_bits_out, fir_discard_msbs):
+        """
+        Hidden function for calculating the conversion factor from FPGA amplitude to ADC bins.
+
+        Parameters
+        ----------
+        fir_bits_out : int
+            The number of bits to use in the integer values of the FIR.
+        fir_discard_msbs : int
+            The FIR pre-truncation shift of the bits for the FIR module.
+
+        Returns
+        -------
+        scale_factor : float
+            The conversion factor for expressing FIR filter amplitudes in units of ADC bins.
+
+        """
+
+        fir_pulse_shapes = self._Trigger.compute_FIR_pulse_shapes(self.input_pulse_shapes)
+        fir_length = fir_pulse_shapes.shape[1]
+        fir_psds = self._Trigger.compute_FIR_PSDs(self.input_psds, fir_length)
+        fir_psds[fir_psds == 0] = np.inf
+
+        pulses_freq = np.fft.fft(fir_pulse_shapes, axis=1)
+        ofs = np.nan_to_num(pulses_freq.conj() / fir_psds)
+
+        of_norms = np.sum(np.abs(ofs * pulses_freq), axis=1, keepdims=True)
+        of_norms[of_norms==0] = 1
+        ofs /= of_norms
+        ofs[:,0] = 0 # Kill the DC component
+
+        of_coeffs = np.real(np.fft.ifft(ofs, axis=1))
+        fir_coeff_bits = self._Trigger.FIR.modules[0].bits_coeff
+
+        num = np.max(np.abs(of_coeffs))
+        denom = 2**(fir_coeff_bits) - 1
+
+        if num == np.abs(np.max(of_coeffs)):
+            denom -= 1
+
+        scale_factor = num/denom
+        scale_factor *= 2 * fir_length * 2**(self._Trigger.FIR.modules[0].bits_sum - fir_bits_out - fir_discard_msbs)
+
+        return scale_factor
 
     def resolution(self):
         """
