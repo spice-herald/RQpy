@@ -249,7 +249,7 @@ class TrigSim(object):
 
         bins_to_keep = (len(x) - k)//16 - 1024
 
-        if any(fir_out[0, -bins_to_keep:] > self.threshold):
+        if any(fir_out[0, -bins_to_keep:] >= self.threshold):
             triggeramp = fir_out[0, -bins_to_keep:].max()
             triggertime = (np.argmax(fir_out[0, -bins_to_keep:]) + 512 + k / 16) / (self.fs / 16)
 
