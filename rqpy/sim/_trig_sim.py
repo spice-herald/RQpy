@@ -247,10 +247,12 @@ class TrigSim(object):
 
         fir_out = pipe.send(input_traces)
 
-        if any(fir_out[0, 1024:] >= self.threshold):
-            triggeramp = fir_out[0, 1024:].max()
-            triggertime = (np.argmax(fir_out[0, 1024:]) + 512 + k / 16) / (self.fs / 16)
+        bins_to_keep = (len(x) - k)//16 - 1024
 
-            return triggeramp, triggertime, fir_out
+        if any(fir_out[0, -bins_to_keep:] > self.threshold):
+            triggeramp = fir_out[0, -bins_to_keep:].max()
+            triggertime = (np.argmax(fir_out[0, -bins_to_keep:]) + 512 + k / 16) / (self.fs / 16)
+
+            return triggeramp, triggertime, fir_out[0, -bins_to_keep:]
         else:
-            return 0, 0, fir_out
+            return 0, 0, fir_out[0, -bins_to_keep:]
