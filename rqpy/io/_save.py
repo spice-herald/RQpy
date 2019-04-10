@@ -1,11 +1,14 @@
 import numpy as np
+import h5py
+from rqpy.io import get_trace_gain
 from rqpy import HAS_SCDMSPYTOOLS
 
 if HAS_SCDMSPYTOOLS:
     from scdmsPyTools.BatTools import rawdata_writer as writer
+    from scdmsPyTools.BatTools.IO import getRawEvents
 
 
-__all__ = ["saveevents_npz", "saveevents_midgz"]
+__all__ = ["saveevents_npz", "saveevents_midgz", "convert_midgz_to_h5"]
 
 
 def _check_kwargs_npz(**kwargs):
@@ -136,5 +139,94 @@ def saveevents_midgz(events, settings, savepath, savename, dumpnum):
     mywriter.open_file(filename_out, savepath)
     mywriter.write_settings_from_dict(settings)
     mywriter.write_events(events)
-    mywriter.close_file()
+    mywriter.close_file()  
+
+
+def convert_midgz_to_h5(path, savepath, channels, det, lgcskip_empty=True):
+    """
+    Function to convert raw traces and event numbers for a single dump from mid.gz to HDF5.
+    
+    Saves the ndarray of traces, converted to units of TES current, and saves a corresponding
+    array of event numbers. Note, since event numbers are not unique, the series number is
+    appended to the front of the event number, ie. seriesnumber_eventnumber (as an integer
+    withough the underscore) 
+    
+    Parameters
+    ----------
+    path : str, list of str
+        Absolute path, or list of paths, to the dump to open. 
+    savepath : str
+        Absolute path to where the dump should be saved
+    channels : str, list of str
+        Channel name(s), i.e. 'PDS1'. If a list of channels, the outputted traces will be sorted to match the order
+        the getRawEvents reports in events[det]['pChan'], which can cause slow downs. It is recommended to match
+        this order if opening many or large files.
+    det : str, list of str
+        Detector name, i.e. 'Z1'. If a list of strings, then should each value should directly correspond to 
+        the channel names. If a string is inputted and there are multiple channels, then it 
+        is assumed that the detector name is the same for each channel.
+    lgcskip_empty : bool, optional
+        Boolean flag on whether or not to skip empty events. Should be set to false if user only wants the traces.
+        If the user also wants to pull extra timing information (primarily for live time calculations), then set
+        to True. Default is True.
+    
+    Returns
+    -------
+    None
+    
+    """
+    
+    
+    if not HAS_SCDMSPYTOOLS:
+        raise ImportError("Cannot use convert_midgz_to_h5 because scdmsPyTools is not installed.")
+    
+    if not isinstance(path, list):
+        path = [path]
+        
+    savename = []
+    for p in path:
+        savename.append(p.split('/')[-1].split('.')[0])
+    
+    if not isinstance(channels, list):
+        channels = [channels]
+        
+    if isinstance(det, str):
+        det = [det]*len(channels)
+
+    if len(det) != len(channels):
+        raise ValueError("channels and det should have the same length")
+    dets = [int("".join(filter(str.isdigit, d))) for d in det]
+  
+    conv_per_path = []
+    for p in path:
+        convtoamps = []
+        for ii in range(len(channels)):
+            conv, _, _ = get_trace_gain(path=p, chan=channels[ii], det=det[ii])
+            convtoamps.append(conv)
+        convtoamps_arr = np.array(convtoamps)
+        convtoamps_arr = convtoamps_arr[np.newaxis,:,np.newaxis]
+        conv_per_path.append(convtoamps_arr)
+    for jj, p in enumerate(path):
+        events = getRawEvents(filepath='',files_series=[p], channelList=channels, 
+                              detectorList=dets, skipEmptyEvents=lgcskip_empty, outputFormat=3)
+
+        if len(set(dets))==1:
+            if channels != events[det[0]]["pChan"]:
+                chans = [events[det[0]]["pChan"].index(ch) for ch in channels]
+                x = events[det[0]]["p"][:, chans].astype(float)
+            else:
+                x = events[det[0]]["p"].astype(float)
+        else:
+            chans = [events[d]["pChan"].index(ch) for d, ch in zip(det, channels)]
+            x = [events[d]["p"][:, ch].astype(float) for d, ch in zip(det, chans)]
+            x = np.stack(x, axis=1)
+        x*=conv_per_path[jj]
+
+        ev_num = np.zeros(len(x), dtype=int)
+        for ii, ev in enumerate(events['event']):
+            ev_num[ii]=f"{ev['SeriesNumber']}_{ev['EventNumber']}"
+        with h5py.File(f'{savepath}{savename[jj]}.h5', 'w') as hf:
+            dset = hf.create_dataset('traces', data=x)
+            dset = hf.create_dataset('ev_num', data=ev_num)
+    
 

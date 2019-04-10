@@ -4,6 +4,7 @@ import pandas as pd
 from scipy.io import loadmat
 import matplotlib.pyplot as plt
 from glob import glob
+import h5py
 
 from rqpy import HAS_SCDMSPYTOOLS
 
@@ -11,7 +12,8 @@ if HAS_SCDMSPYTOOLS:
     from scdmsPyTools.BatTools.IO import getRawEvents, getDetectorSettings
 
 
-__all__ = ["getrandevents", "get_trace_gain", "get_traces_midgz", "get_traces_npz", "loadstanfordfile"]
+__all__ = ["getrandevents", "get_trace_gain", "get_traces_midgz", "get_traces_npz", "loadstanfordfile",
+           "load_h5_dump"]
 
 
 def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], det="Z1", sumchans=False, 
@@ -262,7 +264,7 @@ def get_trace_gain(path, chan, det, gainfactors = {'rfb': 5000, 'loopgain' : 2.4
     
     return convtoamps, drivergain, qetbias
 
-def get_traces_midgz(path, channels, det, convtoamps=1, lgcskip_empty=True, lgcreturndict=False):
+def get_traces_midgz(path, channels, det, convtoamps=None, lgcskip_empty=True, lgcreturndict=False):
     """
     Function to return raw traces and event information for a single channel for mid.gz files.
     
@@ -278,9 +280,10 @@ def get_traces_midgz(path, channels, det, convtoamps=1, lgcskip_empty=True, lgcr
         Detector name, i.e. 'Z1'. If a list of strings, then should each value should directly correspond to 
         the channel names. If a string is inputted and there are multiple channels, then it 
         is assumed that the detector name is the same for each channel.
-    convtoamps : float, list of floats, optional
-        Conversion factor from ADC bins to TES current in Amps (units are [Amps]/[ADC bins]). Default is to 
-        keep in units of ADC bins (i.e. the traces are left in units of ADC bins)
+    convtoamps : float, list of floats, Nonetype, optional
+        Conversion factor from ADC bins to TES current in Amps (units are [Amps]/[ADC bins]). If units of ADC bins 
+        are desired, convtoamps should be set to 1. Default is None, which will call get_trace_gain() to get the
+        conversion to amps
     lgcskip_empty : bool, optional
         Boolean flag on whether or not to skip empty events. Should be set to false if user only wants the traces.
         If the user also wants to pull extra timing information (primarily for live time calculations), then set
@@ -513,6 +516,29 @@ def get_traces_npz(path):
             info_dict[f"truthtdelay{ii+1}"] = truthtdelay[:, ii]
         
     return traces, info_dict
+
+def load_h5_dump(path):
+    """
+    Function to load HDF5 dumps
+    
+    Parameters
+    ----------
+    path : str
+        Absolute path to dump of traces
+        
+    Returns
+    -------
+    traces : ndarray
+        Array of traces of shape (#traces, #channels, #bins per trace)
+    event_nums : array
+        Array of seriesnumber_eventnumbers
+    """
+
+    with h5py.File(path, "r") as hf:
+        traces = hf.get("traces").value
+        event_nums = hf.get('ev_num').value
+        
+    return traces, event_nums
 
 
 def loadstanfordfile(f, convtoamps=1/1024, lgcfullrtn=False):
