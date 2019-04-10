@@ -178,7 +178,7 @@ class TrigSim(object):
         fir_coeff_bits = self._Trigger.FIR.modules[0].bits_coeff
 
         num = np.max(np.abs(of_coeffs))
-        denom = 2**(fir_coeff_bits) - 1
+        denom = 2**(fir_coeff_bits)
 
         if num == np.abs(np.max(of_coeffs)):
             denom -= 1
