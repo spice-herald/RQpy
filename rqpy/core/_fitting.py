@@ -143,7 +143,7 @@ def fit_gauss(arr, xrange=None, nbins='sqrt', noiserange=None, lgcplot=False, la
         if noiserange[0][0] >= xrange[0]:
             clowl = noiserange[0][0]
         else:
-            clow = xrange[0]
+            clowl = xrange[0]
             
         clowh = noiserange[0][1]
         chighl = noiserange[1][0]
