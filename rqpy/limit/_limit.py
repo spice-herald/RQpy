@@ -58,9 +58,9 @@ def upperlim(fc, cl=0.9, if_bn=1, mub=0, fb=None):
     mub : int, optional
         The total expected number of events from known background. Default is zero.
     fb : array_like, NoneType, optional
-         Equivalent to `fc` but assuming the distribution shape from known background. The default
-         behavior is to simply pass `fc` as `fb` to the UpperLimit algorithm, which is done assuming
-         `mub` is zero.
+        Equivalent to `fc` but assuming the distribution shape from known background. The default
+        behavior is to simply pass `fc` as `fb` to the UpperLimit algorithm, which is done assuming
+        `mub` is zero.
 
     Returns
     -------
@@ -319,6 +319,8 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
 
     if np.isscalar(masslist):
         masslist = [masslist]
+
+    eventenergies = np.sort(eventenergies)
 
     elow = max(0.001, min(effenergies))
     ehigh = max(effenergies)
