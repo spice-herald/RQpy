@@ -142,7 +142,7 @@ def saveevents_midgz(events, settings, savepath, savename, dumpnum):
     mywriter.close_file()  
 
 
-def convert_midgz_to_h5(path, savepath, channels, det, lgcskip_empty=True):
+def convert_midgz_to_h5(path, savepath, channels, det, lgcskip_empty=False):
     """
     Function to convert raw traces and event numbers for a single dump from mid.gz to HDF5.
     
@@ -168,7 +168,7 @@ def convert_midgz_to_h5(path, savepath, channels, det, lgcskip_empty=True):
     lgcskip_empty : bool, optional
         Boolean flag on whether or not to skip empty events. Should be set to false if user only wants the traces.
         If the user also wants to pull extra timing information (primarily for live time calculations), then set
-        to True. Default is True.
+        to True. Default is False.
     
     Returns
     -------
@@ -178,13 +178,13 @@ def convert_midgz_to_h5(path, savepath, channels, det, lgcskip_empty=True):
     
     if not isinstance(path, list):
         path = [path]
-        
+
     savename = []
     for p in path:
         savename.append(p.split('/')[-1].split('.')[0])
-    
+
     for jj, p in enumerate(path):
-        x, info_dict = get_traces_midgz(p, channels, det, lgcreturndict=True)
+        x, info_dict = get_traces_midgz(p, channels, det, lgcskip_empty=False, lgcreturndict=True)
         for key in info_dict:
             info_dict[key] = np.asarray(info_dict[key])
         info_dict['traces'] = x

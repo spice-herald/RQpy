@@ -523,7 +523,7 @@ def get_traces_npz(path):
         
     return traces, info_dict
 
-def load_h5_dump(path, lgcreturndict=False):
+def load_h5_dump(path, lgcskip_empty=True, lgcreturndict=False):
     """
     Function to load HDF5 dumps
     
@@ -531,6 +531,10 @@ def load_h5_dump(path, lgcreturndict=False):
     ----------
     path : str
         Absolute path to dump of traces
+    lgcskip_empty : bool, optional
+        Boolean flag on whether or not to skip empty events. Should be set to false if user only wants the traces.
+        If the user also wants to pull extra timing information (primarily for live time calculations), then set
+        to True. Default is True.
     lgcreturndict : bool, optional
         Boolean flag on whether or not to return the info_dict that has extra information on every event.
         By default, this is False
@@ -556,6 +560,12 @@ def load_h5_dump(path, lgcreturndict=False):
     
     info_dict = dd.io.load(path)
     traces = info_dict.pop('traces')
+    if lgcskip_empty:
+        cchans = ~np.all(traces[:,:,:] == 0, axis=-1)
+        cut = np.all(cchans, axis = -1)
+        traces = traces[cut]
+        for key in info_dict:
+            info_dict[key] = info_dict[key][cut]
     if lgcreturndict:
         return traces, info_dict
     return traces
