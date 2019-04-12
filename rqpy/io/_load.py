@@ -4,6 +4,7 @@ import pandas as pd
 from scipy.io import loadmat
 import matplotlib.pyplot as plt
 from glob import glob
+import deepdish as dd
 
 from rqpy import HAS_SCDMSPYTOOLS
 
@@ -11,7 +12,8 @@ if HAS_SCDMSPYTOOLS:
     from scdmsPyTools.BatTools.IO import getRawEvents, getDetectorSettings
 
 
-__all__ = ["getrandevents", "get_trace_gain", "get_traces_midgz", "get_traces_npz", "loadstanfordfile"]
+__all__ = ["getrandevents", "get_trace_gain", "get_traces_midgz", "get_traces_npz", "loadstanfordfile",
+           "load_h5_dump"]
 
 
 def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], det="Z1", sumchans=False, 
@@ -262,7 +264,7 @@ def get_trace_gain(path, chan, det, gainfactors = {'rfb': 5000, 'loopgain' : 2.4
     
     return convtoamps, drivergain, qetbias
 
-def get_traces_midgz(path, channels, det, convtoamps=1, lgcskip_empty=True, lgcreturndict=False):
+def get_traces_midgz(path, channels, det, convtoamps=None, lgcskip_empty=True, lgcreturndict=False):
     """
     Function to return raw traces and event information for a single channel for mid.gz files.
     
@@ -278,16 +280,17 @@ def get_traces_midgz(path, channels, det, convtoamps=1, lgcskip_empty=True, lgcr
         Detector name, i.e. 'Z1'. If a list of strings, then should each value should directly correspond to 
         the channel names. If a string is inputted and there are multiple channels, then it 
         is assumed that the detector name is the same for each channel.
-    convtoamps : float, list of floats, optional
-        Conversion factor from ADC bins to TES current in Amps (units are [Amps]/[ADC bins]). Default is to 
-        keep in units of ADC bins (i.e. the traces are left in units of ADC bins)
+    convtoamps : float, list of floats, Nonetype, optional
+        Conversion factor from ADC bins to TES current in Amps (units are [Amps]/[ADC bins]). If units of ADC bins 
+        are desired, convtoamps should be set to 1. Default is None, which will call get_trace_gain() to get the
+        conversion to amps
     lgcskip_empty : bool, optional
-        Boolean flag on whether or not to skip empty events. Should be set to false if user only wants the traces.
+        Boolean flag on whether or not to skip empty events. Should be set to True if user only wants the traces.
         If the user also wants to pull extra timing information (primarily for live time calculations), then set
-        to True. Default is True.
+        to False. Default is True.
     lgcreturndict : bool, optional
         Boolean flag on whether or not to return the info_dict that has extra information on every event.
-        By default, this is True, but the user may wish to set this to False for faster I/O.
+        By default, this is False
     
     Returns
     -------
@@ -327,7 +330,13 @@ def get_traces_midgz(path, channels, det, convtoamps=1, lgcskip_empty=True, lgcr
 
     if len(det) != len(channels):
         raise ValueError("channels and det should have the same length")
-
+    
+    if convtoamps is None:
+        convtoamps = []
+        for ii in range(len(channels)):
+            conv, _, _ = get_trace_gain(path=path[0], chan=channels[ii], det=det[ii])
+            convtoamps.append(conv)
+            
     if not isinstance(convtoamps, list):
         convtoamps = [convtoamps]
     convtoamps_arr = np.array(convtoamps)
@@ -513,6 +522,53 @@ def get_traces_npz(path):
             info_dict[f"truthtdelay{ii+1}"] = truthtdelay[:, ii]
         
     return traces, info_dict
+
+def load_h5_dump(path, lgcskip_empty=True, lgcreturndict=False):
+    """
+    Function to load HDF5 dumps
+    
+    Parameters
+    ----------
+    path : str
+        Absolute path to dump of traces
+    lgcskip_empty : bool, optional
+        Boolean flag on whether or not to skip empty events. Should be set to True if user only wants the traces.
+        If the user also wants to pull extra timing information (primarily for live time calculations), then set
+        to False. Default is True.
+    lgcreturndict : bool, optional
+        Boolean flag on whether or not to return the info_dict that has extra information on every event.
+        By default, this is False
+        
+    Returns
+    -------
+    traces : ndarray
+        Array of traces in the specified dump. Dimensions are (number of traces, number of channels, bins in each trace)
+    info_dict : dict, optional
+        Dictionary that contains extra information on each event. Includes timing and trigger information.
+        The keys in the dictionary are as follows.
+            'eventnumber' : The event number for each event
+            'seriesnumber' : The corresponding series number for each event
+            'ttltimes' : If we triggered due to ttl, the time of the ttl trigger in seconds. Otherwise this is zero.
+            'ttlamps' : If we triggered due to ttl, the optimum amplitude at the ttl trigger time. Otherwise this is zero.
+            'pulsetimes' : If we triggered on a pulse, the time of the pulse trigger in seconds. Otherwise this is zero.
+            'pulseamps' : If we triggered on a pulse, the optimum amplitude at the pulse trigger time. Otherwise this is zero.
+            'randomstimes' : Array of the corresponding event times for each section
+            'randomstrigger' : If we triggered due to randoms, this is True. Otherwise, False.
+            'pulsestrigger' : If we triggered on a pulse, this is True. Otherwise, False.
+            'ttltrigger' : If we triggered due to ttl, this is True. Otherwise, False.
+    """
+    
+    info_dict = dd.io.load(path)
+    traces = info_dict.pop('traces')
+    if lgcskip_empty:
+        cchans = ~np.all(traces[:,:,:] == 0, axis=-1)
+        cut = np.all(cchans, axis = -1)
+        traces = traces[cut]
+        for key in info_dict:
+            info_dict[key] = info_dict[key][cut]
+    if lgcreturndict:
+        return traces, info_dict
+    return traces
 
 
 def loadstanfordfile(f, convtoamps=1/1024, lgcfullrtn=False):
