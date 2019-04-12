@@ -4,7 +4,7 @@ import pandas as pd
 from scipy.io import loadmat
 import matplotlib.pyplot as plt
 from glob import glob
-import h5py
+import deepdish as dd
 
 from rqpy import HAS_SCDMSPYTOOLS
 
@@ -290,7 +290,7 @@ def get_traces_midgz(path, channels, det, convtoamps=None, lgcskip_empty=True, l
         to True. Default is True.
     lgcreturndict : bool, optional
         Boolean flag on whether or not to return the info_dict that has extra information on every event.
-        By default, this is True, but the user may wish to set this to False for faster I/O.
+        By default, this is False
     
     Returns
     -------
@@ -330,7 +330,13 @@ def get_traces_midgz(path, channels, det, convtoamps=None, lgcskip_empty=True, l
 
     if len(det) != len(channels):
         raise ValueError("channels and det should have the same length")
-
+    
+    if convtoamps is None:
+        convtoamps = []
+        for ii in range(len(channels)):
+            conv, _, _ = get_trace_gain(path=path[0], chan=channels[ii], det=det[ii])
+            convtoamps.append(conv)
+            
     if not isinstance(convtoamps, list):
         convtoamps = [convtoamps]
     convtoamps_arr = np.array(convtoamps)
@@ -517,7 +523,7 @@ def get_traces_npz(path):
         
     return traces, info_dict
 
-def load_h5_dump(path):
+def load_h5_dump(path, lgcreturndict=False):
     """
     Function to load HDF5 dumps
     
@@ -525,20 +531,34 @@ def load_h5_dump(path):
     ----------
     path : str
         Absolute path to dump of traces
+    lgcreturndict : bool, optional
+        Boolean flag on whether or not to return the info_dict that has extra information on every event.
+        By default, this is False
         
     Returns
     -------
     traces : ndarray
-        Array of traces of shape (#traces, #channels, #bins per trace)
-    event_nums : array
-        Array of seriesnumber_eventnumbers
+        Array of traces in the specified dump. Dimensions are (number of traces, number of channels, bins in each trace)
+    info_dict : dict
+        Dictionary that contains extra information on each event. Includes timing and trigger information.
+        The keys in the dictionary are as follows.
+            'eventnumber' : The event number for each event
+            'seriesnumber' : The corresponding series number for each event
+            'ttltimes' : If we triggered due to ttl, the time of the ttl trigger in seconds. Otherwise this is zero.
+            'ttlamps' : If we triggered due to ttl, the optimum amplitude at the ttl trigger time. Otherwise this is zero.
+            'pulsetimes' : If we triggered on a pulse, the time of the pulse trigger in seconds. Otherwise this is zero.
+            'pulseamps' : If we triggered on a pulse, the optimum amplitude at the pulse trigger time. Otherwise this is zero.
+            'randomstimes' : Array of the corresponding event times for each section
+            'randomstrigger' : If we triggered due to randoms, this is True. Otherwise, False.
+            'pulsestrigger' : If we triggered on a pulse, this is True. Otherwise, False.
+            'ttltrigger' : If we triggered due to ttl, this is True. Otherwise, False.
     """
-
-    with h5py.File(path, "r") as hf:
-        traces = hf.get("traces").value
-        event_nums = hf.get('ev_num').value
-        
-    return traces, event_nums
+    
+    info_dict = dd.io.load(path)
+    traces = info_dict.pop('traces')
+    if lgcreturndict:
+        return traces, info_dict
+    return traces
 
 
 def loadstanfordfile(f, convtoamps=1/1024, lgcfullrtn=False):

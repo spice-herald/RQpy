@@ -1,7 +1,7 @@
 import numpy as np
-import h5py
-from rqpy.io import get_trace_gain
+from rqpy.io import get_traces_midgz
 from rqpy import HAS_SCDMSPYTOOLS
+import deepdish as dd
 
 if HAS_SCDMSPYTOOLS:
     from scdmsPyTools.BatTools import rawdata_writer as writer
@@ -176,10 +176,6 @@ def convert_midgz_to_h5(path, savepath, channels, det, lgcskip_empty=True):
     
     """
     
-    
-    if not HAS_SCDMSPYTOOLS:
-        raise ImportError("Cannot use convert_midgz_to_h5 because scdmsPyTools is not installed.")
-    
     if not isinstance(path, list):
         path = [path]
         
@@ -187,46 +183,13 @@ def convert_midgz_to_h5(path, savepath, channels, det, lgcskip_empty=True):
     for p in path:
         savename.append(p.split('/')[-1].split('.')[0])
     
-    if not isinstance(channels, list):
-        channels = [channels]
-        
-    if isinstance(det, str):
-        det = [det]*len(channels)
-
-    if len(det) != len(channels):
-        raise ValueError("channels and det should have the same length")
-    dets = [int("".join(filter(str.isdigit, d))) for d in det]
-  
-    conv_per_path = []
-    for p in path:
-        convtoamps = []
-        for ii in range(len(channels)):
-            conv, _, _ = get_trace_gain(path=p, chan=channels[ii], det=det[ii])
-            convtoamps.append(conv)
-        convtoamps_arr = np.array(convtoamps)
-        convtoamps_arr = convtoamps_arr[np.newaxis,:,np.newaxis]
-        conv_per_path.append(convtoamps_arr)
     for jj, p in enumerate(path):
-        events = getRawEvents(filepath='',files_series=[p], channelList=channels, 
-                              detectorList=dets, skipEmptyEvents=lgcskip_empty, outputFormat=3)
-
-        if len(set(dets))==1:
-            if channels != events[det[0]]["pChan"]:
-                chans = [events[det[0]]["pChan"].index(ch) for ch in channels]
-                x = events[det[0]]["p"][:, chans].astype(float)
-            else:
-                x = events[det[0]]["p"].astype(float)
-        else:
-            chans = [events[d]["pChan"].index(ch) for d, ch in zip(det, channels)]
-            x = [events[d]["p"][:, ch].astype(float) for d, ch in zip(det, chans)]
-            x = np.stack(x, axis=1)
-        x*=conv_per_path[jj]
-
-        ev_num = np.zeros(len(x), dtype=int)
-        for ii, ev in enumerate(events['event']):
-            ev_num[ii]=f"{ev['SeriesNumber']}_{ev['EventNumber']}"
-        with h5py.File(f'{savepath}{savename[jj]}.h5', 'w') as hf:
-            dset = hf.create_dataset('traces', data=x)
-            dset = hf.create_dataset('ev_num', data=ev_num)
+        x, info_dict = get_traces_midgz(p, channels, det, lgcreturndict=True)
+        for key in info_dict:
+            info_dict[key] = np.asarray(info_dict[key])
+        info_dict['traces'] = x
+        dd.io.save(f'{savepath}{savename[jj]}.h5', info_dict)
+        
+        
     
 
