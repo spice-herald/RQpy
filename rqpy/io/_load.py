@@ -285,9 +285,9 @@ def get_traces_midgz(path, channels, det, convtoamps=None, lgcskip_empty=True, l
         are desired, convtoamps should be set to 1. Default is None, which will call get_trace_gain() to get the
         conversion to amps
     lgcskip_empty : bool, optional
-        Boolean flag on whether or not to skip empty events. Should be set to false if user only wants the traces.
+        Boolean flag on whether or not to skip empty events. Should be set to True if user only wants the traces.
         If the user also wants to pull extra timing information (primarily for live time calculations), then set
-        to True. Default is True.
+        to False. Default is True.
     lgcreturndict : bool, optional
         Boolean flag on whether or not to return the info_dict that has extra information on every event.
         By default, this is False
@@ -532,9 +532,9 @@ def load_h5_dump(path, lgcskip_empty=True, lgcreturndict=False):
     path : str
         Absolute path to dump of traces
     lgcskip_empty : bool, optional
-        Boolean flag on whether or not to skip empty events. Should be set to false if user only wants the traces.
+        Boolean flag on whether or not to skip empty events. Should be set to True if user only wants the traces.
         If the user also wants to pull extra timing information (primarily for live time calculations), then set
-        to True. Default is True.
+        to False. Default is True.
     lgcreturndict : bool, optional
         Boolean flag on whether or not to return the info_dict that has extra information on every event.
         By default, this is False

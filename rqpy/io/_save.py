@@ -166,9 +166,9 @@ def convert_midgz_to_h5(path, savepath, channels, det, lgcskip_empty=False):
         the channel names. If a string is inputted and there are multiple channels, then it 
         is assumed that the detector name is the same for each channel.
     lgcskip_empty : bool, optional
-        Boolean flag on whether or not to skip empty events. Should be set to false if user only wants the traces.
+        Boolean flag on whether or not to skip empty events. Should be set to True if user only wants the traces.
         If the user also wants to pull extra timing information (primarily for live time calculations), then set
-        to True. Default is False.
+        to False. Default is False.
     
     Returns
     -------
@@ -184,7 +184,7 @@ def convert_midgz_to_h5(path, savepath, channels, det, lgcskip_empty=False):
         savename.append(p.split('/')[-1].split('.')[0])
 
     for jj, p in enumerate(path):
-        x, info_dict = get_traces_midgz(p, channels, det, lgcskip_empty=False, lgcreturndict=True)
+        x, info_dict = get_traces_midgz(p, channels, det, lgcskip_empty=lgcskip_empty, lgcreturndict=True)
         for key in info_dict:
             info_dict[key] = np.asarray(info_dict[key])
         info_dict['traces'] = x
