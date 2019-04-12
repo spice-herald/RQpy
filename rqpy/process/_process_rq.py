@@ -1103,7 +1103,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
     if setup.do_integral[chan_num]:
         if setup.do_baseline[chan_num]:
             integral_subtract = np.concatenate((signal[:, :setup.indbasepre_integral],
-                                                signal[:, setup.indbasepost_integral]),
+                                                signal[:, setup.indbasepost_integral:]),
                                                axis=-1).mean(axis=-1)[:, np.newaxis]
 
             integral = np.trapz(signal[:, setup.indstart_integral[chan_num]:setup.indstop_integral[chan_num]]\
