@@ -7,3 +7,4 @@ matplotlib>=2.2.2
 lmfit>=0.9.13
 mendeleev>=0.4.5
 qetpy>=1.1.0
+deepdish>=0.3.6
