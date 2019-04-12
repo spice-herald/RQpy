@@ -543,7 +543,7 @@ def load_h5_dump(path, lgcskip_empty=True, lgcreturndict=False):
     -------
     traces : ndarray
         Array of traces in the specified dump. Dimensions are (number of traces, number of channels, bins in each trace)
-    info_dict : dict
+    info_dict : dict, optional
         Dictionary that contains extra information on each event. Includes timing and trigger information.
         The keys in the dictionary are as follows.
             'eventnumber' : The event number for each event
