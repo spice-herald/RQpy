@@ -161,6 +161,16 @@ class SetupRQ(object):
         The index at which the integral should be calculated up to in order to reduce noise by 
         truncating the rest of the trace. Default is 2/3 of the trace length. Each value in the list
         specifies this attribute for each channel.
+    indbasepre_integral : list of int
+        The number of indices up to which the beginning of a trace should be averaged when determining
+        the baseline to subtract off of the trace when calculating the integral. This will be combined
+        with indbasepost_integral to create the best estimate of the integral. Each value in the list
+        specifies this attribute for each channel. Default is one-third of the trace length.
+    indbasepost_integral : list of int
+        The starting index determining what part of the end of a trace should be averaged when determining
+        the baseline to subtract off of the trace when calculating the integral. This will be combined
+        with indbasepre_integral to create the best estimate of the integral. Each value in the list
+        specifies this attribute for each channel. Default is the two-thirds index of the trace length.
     do_energy_absorbed : list of bool
         Boolean flag for whether or not to calculate the energy absorbed for each trace. Each value
         in the list specifies this attribute for each channel.
@@ -356,6 +366,8 @@ class SetupRQ(object):
         self.do_integral = [True]*self.nchan
         self.indstart_integral = [len(self.templates[0])//3]*self.nchan
         self.indstop_integral = [2*len(self.templates[0])//3]*self.nchan
+        self.indbasepre_integral = [len(self.templates[0])//3]*self.nchan
+        self.indbasepost_integral = [2*len(self.templates[0])//3]*self.nchan
 
         self.do_energy_absorbed = [False]*self.nchan
 
@@ -775,7 +787,7 @@ class SetupRQ(object):
         self.do_baseline = lgcrun
         self.baseline_indbasepre = indbasepre
         
-    def adjust_integral(self, lgcrun=True, indstart=None, indstop=None):
+    def adjust_integral(self, lgcrun=True, indstart=None, indstop=None, indbasepre=None, indbasepost=None):
         """
         Method for adjusting the calculation of the integral.
         
@@ -786,26 +798,46 @@ class SetupRQ(object):
             is True, then the baseline is subtracted from the integral. If self.do_baseline is False,
             then the baseline is not subtracted. It is recommended that the baseline should be subtracted.
         indstart : int, list of int, optional
-            The index at which the integral should start being calculated from in order to reduce noise by 
+            The index at which the integral should start being calculated from in order to reduce noise by
             truncating the beginning of the trace. Default is one-third of the trace length.
         indstop : int, list of int, optional
-            The index at which the integral should be calculated up to in order to reduce noise by 
+            The index at which the integral should be calculated up to in order to reduce noise by
             truncating the rest of the trace. Default is two-thirds of the trace length.
+        indbasepre : int, list of int, optional
+            The number of indices up to which the beginning of a trace should be averaged when determining
+            the baseline to subtract off of the trace when calculating the integral. This will be combined
+            with indbasepost to create the best estimate of the integral. Can be set to a list of values,
+            if indbasepre should be different for each channel. The length of the list should be the same
+            length as the number of channels. Default is one-third of the trace length.
+        indbasepost : int, list of int, optional
+            The starting index determining what part of the end of a trace should be averaged when determining
+            the baseline to subtract off of the trace when calculating the integral. This will be combined
+            with indbasepre to create the best estimate of the integral.  Can be set to a list of values,
+            if indbasepost should be different for each channel. The length of the list should be the same
+            length as the number of channels. Default is the two-thirds index of the trace length.
             
         """
-        
+
         if indstart is None:
             indstart = len(self.templates[0])//3
-            
+
         if indstop is None:
             indstop = 2*len(self.templates[0])//3
-        
+
+        if indbasepre is None:
+            indbasepre = len(self.templates[0])//3
+
+        if indbasepost is None:
+            indbasepost = 2*len(self.templates[0])//3
+
         lgcrun, indstart, indstop = self._check_arg_length(lgcrun=lgcrun, indstart=indstart, indstop=indstop)
-        
+
         self.do_integral = lgcrun
         self.indstart_integral = indstart
         self.indstop_integral = indstop
-        
+        self.indbasepre_integral = indbasepre
+        self.indbasepost_integral = indbasepost
+
     def adjust_energy_absorbed(self, ioffset, qetbias, rload, rsh, lgcrun=True, indstart=None, indstop=None):
         """
         Method for calculating the energy absorbed by the TES, in the limit of infinite loop gain.
@@ -1067,16 +1099,18 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         baseline = np.mean(signal[:, :setup.baseline_indbasepre[chan_num]], axis=-1)
         rq_dict[f'baseline_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'baseline_{chan}{det}'][readout_inds] = baseline
-    
+
     if setup.do_integral[chan_num]:
         if setup.do_baseline[chan_num]:
+            integral_subtract = np.concatenate((signal[:, :setup.indbasepre_integral],
+                                                signal[:, setup.indbasepost_integral:]),
+                                               axis=-1).mean(axis=-1)[:, np.newaxis]
+
             integral = np.trapz(signal[:, setup.indstart_integral[chan_num]:setup.indstop_integral[chan_num]]\
-                                - baseline[:, np.newaxis], axis=-1)/fs
-        else:
-            integral = np.trapz(signal[:, setup.indstart_integral[chan_num]:setup.indstop_integral[chan_num]], axis=-1)/fs
+                                - integral_subtract, axis=-1)/fs
         rq_dict[f'integral_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'integral_{chan}{det}'][readout_inds] = integral
-        
+
     if setup.do_energy_absorbed[chan_num]:
         if setup.do_baseline[chan_num]:
             energy_absorbed = qp.utils.energy_absorbed(
