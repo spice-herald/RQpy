@@ -44,11 +44,21 @@ class PulseSim(object):
         The list of amplitudes, in Amps, by which to scale the template to add to the traces.
         Must be same length as cut. Each ndarray in the list corresponds to the amplitudes
         of the corresponding template in the list of templates.
-    tdelay : int
+    tdelay : list
         The time delay offset, in seconds, by which to shift the template to add to the traces.
         Bin interpolation is implemented for values that are not a multiple the reciprocal of
         the digitization rate. Each ndarray in the list can be passed, where each ndarray
         corresponds to the tdelays of the corresponding template in the list of templates.
+    taurises : list, NoneType
+        The rise times to use for each simulated pulse in seconds. Each ndarray in the list can
+        be passed, where each ndarray corresponds to the taurises of the corresponding pulse.
+        This will supersede the `templates` attribute if used. `taufalls` must also be
+        specified to use this.
+    taufalls : list, NoneType
+        The fall times to use for each simulated pulse in seconds. Each ndarray in the list can
+        be passed, where each ndarray corresponds to the taurises of the corresponding pulse.
+        This will supersede the `templates` attribute if used. `taurises` must also be
+        specified to use this.
 
     """
 
@@ -93,6 +103,8 @@ class PulseSim(object):
 
         self.amplitudes = []
         self.tdelay = []
+        self.taurises = None
+        self.taufalls = None
 
         if isinstance(templates, np.ndarray):
             templates = [templates]
@@ -113,13 +125,13 @@ class PulseSim(object):
         ------
         ValueError
             If `attr` is not a string.
-            If `attr` is not "amplitudes" or "tdelay".
+            If `attr` is not "amplitudes", "tdelay", "taurises", or "taufalls".
 
         """
 
         if not isinstance(attr, str):
             raise ValueError("The inputted attr is not a string.")
-        if attr not in ["amplitudes", "tdelay"]:
+        if attr not in ["amplitudes", "tdelay", "taurises", "taufalls"]:
             raise ValueError("The inputted attr is not a valid option. "
                              "Please see the docstring for valid values.")
 
@@ -154,13 +166,21 @@ class PulseSim(object):
         """
 
         if len(self.amplitudes) != len(self.templates):
-            raise ValueError(f"There are {len(self.templates)}, but only {len(self.amplitudes)} "
-                             "sets of amplitudes data. Consider adding more using "
-                             "PulseSim.generate_sim_data.")
+            raise ValueError(f"There are {len(self.templates)} templates, but only "
+                             f"{len(self.amplitudes)} sets of amplitudes data. Consider "
+                             "adding more using PulseSim.generate_sim_data.")
         elif len(self.tdelay) != len(self.templates):
-            raise ValueError(f"There are {len(self.templates)}, but only {len(self.tdelay)} "
-                             "sets of tdelay data. Consider adding more using "
-                             "PulseSim.generate_sim_data.")
+            raise ValueError(f"There are {len(self.templates)} templates, but only "
+                             f"{len(self.tdelay)} sets of tdelay data. Consider adding "
+                             "more using PulseSim.generate_sim_data.")
+        elif self.taurises is not None and len(self.taurises) != len(self.templates):
+            raise ValueError(f"There are {len(self.templates)} pulses specified, but only "
+                             f"{len(self.taurises)} sets of taurises data. Consider adding "
+                             "more using PulseSim.generate_sim_data.")
+        elif self.taufalls is not None and len(self.taufalls) != len(self.templates):
+            raise ValueError(f"There are {len(self.templates)} pulses specified, but only "
+                             f"{len(self.taufalls)} sets of taufalls data. Consider adding "
+                             "more using PulseSim.generate_sim_data.")
 
     def _check_channel_det(self, channel, det):
         """
@@ -234,12 +254,30 @@ class PulseSim(object):
 
     def _reset_sim_data(self):
         """
-        Helper method for resetting the amplitudes and tdelay attributes to empty lists.
+        Helper method for resetting the `amplitudes` and `tdelay` attributes to empty lists,
+        as well as the `taurises` and `taufalls` attributes to None.
 
         """
 
         self.amplitudes = []
         self.tdelay = []
+        self.taurises = None
+        self.taufalls = None
+
+    def _check_taus_set(self, attr):
+        """
+        Helper method for checking if `taurises` or `taufalls` are being set.
+
+        """
+
+        valid_attrs = ["taurises", "taufalls"]
+
+        if attr in valid_attrs and getattr(self, attr) is None:
+            if all(getattr(self, a) is None for a in valid_attrs):
+                print(f"{attr} was specified, superceding the specified template "
+                      "shape in the pulse simulation using the values in taurises "
+                      "and taufalls.")
+            setattr(self, attr, list())
 
     def update_cut(self, cut):
         """
@@ -259,7 +297,7 @@ class PulseSim(object):
 
         self._reset_sim_data()
 
-    def generate_sim_data(self, attr, *args, distribution=None, value_array=None, **kwargs):
+    def generate_sim_data(self, attr, *args, distribution=None, values=None, **kwargs):
         """
         Method for generating simulated data and adding it to the specified attribute.
 
@@ -267,17 +305,17 @@ class PulseSim(object):
         ----------
         attr : str
             The attribute that will be updated with the simulated data. Can be either
-            "amplitudes" or "tdelay".
+            "amplitudes", "tdelay", "taurises", or "taufalls".
         arg1, arg2, arg3,... : array_like
             The shape parameter(s) for the distribution (see docstring of the
             instance object for more information).
         distribution : NoneType, scipy.stats distribution, optional
             The `scipy.stats` distribution to use for generating the simulated data. If left
             as None, then the `scipy.stats.uniform` distribution is defaulted. This parameter
-            will be overridden by `value_array` if `value_array` is not None.
-        value_array : array_like, optional
+            will be overridden by `values` if `values` is not None.
+        values : array_like, float, optional
             An array of specified values to use for the data, rather than generating simulated
-            data from a probaility distribution.
+            data from a probaility distribution. Can also pass a single value.
         loc : array_like, optional
             Location parameter for `scipy.stats` distribution. Default is 0.
         scale : array_like, optional
@@ -291,9 +329,10 @@ class PulseSim(object):
 
         self._check_valid_attr(attr)
         self._check_if_cut_set()
+        self._check_taus_set(attr)
         self._check_data_size(attr)
 
-        if value_array is None:
+        if values is None:
             if distribution is None:
                 distribution = stats.uniform
 
@@ -304,13 +343,13 @@ class PulseSim(object):
                 kwargs["size"] = self.ntraces
 
             sim_data = distribution.rvs(*args, **kwargs)
-
+        elif np.isscalar(values):
+            sim_data = np.ones(self.ntraces) * values
         else:
-            if len(value_array)!=self.ntraces:
-                raise ValueError("The length of the inputted value_array "
+            if len(values)!=self.ntraces:
+                raise ValueError("The length of the inputted values argument "
                                  f"does not match the cut length ({self.ntraces})")
-
-            sim_data = value_array
+            sim_data = values
 
         val = getattr(self, attr)
         val.append(sim_data)
