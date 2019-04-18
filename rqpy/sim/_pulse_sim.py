@@ -32,8 +32,10 @@ class PulseSim(object):
         The string that corresponds to the file type that will be opened. Supports two
         types: "mid.gz" and "npz". "mid.gz" is the default.
     templates : list
-        The list of template(s) to be added to the traces, assumed to be normalized to a max height
-        of 1. The template start time should be centered on the center bin.
+        The list of template(s) to be added to the traces, assumed to be normalized to a max
+        height of 1. The template start time should be centered on the center bin. If `taufalls`
+        and `taurises` are set, then the `templates` are only used to determine how many pulses
+        there are.
     fs : float
         The digitization rate in Hz of the data.
     cut : array_like of bool, NoneType
@@ -81,7 +83,8 @@ class PulseSim(object):
             The template(s) to be added to the traces, assumed to be normalized to a max height
             of 1. The template start time should be centered on the center bin. If a list of
             templates, then each template will be added to the traces in succession, using
-            the corresponding `amplitudes` and `tdelay`.
+            the corresponding `amplitudes` and `tdelay`. If `taufalls` and `taurises` are set,
+            then the `templates` are only used to determine how many pulses there are.
         fs : float
             The digitization rate in Hz of the data.
         cut : array_like of bool, NoneType, optional
@@ -274,10 +277,6 @@ class PulseSim(object):
         valid_attrs = ["taurises", "taufalls"]
 
         if attr in valid_attrs and getattr(self, attr) is None:
-            if all(getattr(self, a) is None for a in valid_attrs):
-                print(f"{attr} was specified, superceding the specified template "
-                      "shape in the pulse simulation using the values in taurises "
-                      "and taufalls.")
             setattr(self, attr, list())
 
     def update_cut(self, cut):
@@ -457,7 +456,7 @@ def buildfakepulses(rq, cut, templates, amplitudes, tdelay, basepath, taurises=N
     lgcsavefile : bool, optional
         A boolean flag for whether or not to save the fake data to a file.
     savefilepath : str, optional
-        The string that corresponds to the file path that will be saved.
+        The string that corresponds to the file path where the data will be saved.
 
     Returns
     -------
@@ -753,9 +752,31 @@ def _save_truth_info(savefilepath, **kwargs):
     Parameters
     ----------
     savefilepath : str
-    
-    kwargs : dict
-        The dictionary containing the different truth information that will be saved.
+        The string that corresponds to the file path where the data will be saved.
+    kwargs
+        The kwargs are used as a dictionary containing the different truth information
+        that will be saved.
+
+    Notes
+    -----
+    The expected kwargs are:
+        savefilepath
+        basepath
+        seriesnumber
+        eventnumber
+        templates
+        amplitudes
+        tdelay
+        taurises
+        taufalls
+        channels
+        relcal
+        det
+        convtoamps
+        fs
+        filetype
+
+    See `rqpy.buildfakepulses` for more information on these values.
 
     """
 
