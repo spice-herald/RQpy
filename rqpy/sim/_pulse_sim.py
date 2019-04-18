@@ -387,6 +387,8 @@ class PulseSim(object):
                         self.amplitudes,
                         self.tdelay,
                         self.basepath,
+                        taurises=self.taurises,
+                        taufalls=self.taufalls,
                         channels=channel,
                         det=det,
                         relcal=relcal,
