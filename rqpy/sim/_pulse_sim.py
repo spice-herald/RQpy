@@ -5,6 +5,7 @@ from glob import glob
 from math import log10, floor
 from scipy import stats
 
+import deepdish as dd
 import rqpy as rp
 from rqpy import io
 from rqpy import HAS_SCDMSPYTOOLS
@@ -381,10 +382,22 @@ class PulseSim(object):
         self._check_channel_det(channel, det)
         convtoamps_auto = self._check_convtoamps(convtoamps, channel, det)
 
-        buildfakepulses(self.rq, self.cut, self.templates, self.amplitudes, self.tdelay,
-                        self.basepath, channels=channel, det=det, relcal=relcal,
-                        convtoamps=convtoamps_auto, fs=self.fs, neventsperdump=neventsperdump,
-                        filetype=self.filetype, lgcsavefile=True, savefilepath=savefilepath)
+        buildfakepulses(self.rq,
+                        self.cut,
+                        self.templates,
+                        self.amplitudes,
+                        self.tdelay,
+                        self.basepath,
+                        channels=channel,
+                        det=det,
+                        relcal=relcal,
+                        convtoamps=convtoamps_auto,
+                        fs=self.fs,
+                        neventsperdump=neventsperdump,
+                        filetype=self.filetype,
+                        lgcsavefile=True,
+                        savefilepath=savefilepath,
+                       )
 
 
 def buildfakepulses(rq, cut, templates, amplitudes, tdelay, basepath, taurises=None, taufalls=None,
@@ -526,12 +539,42 @@ def buildfakepulses(rq, cut, templates, amplitudes, tdelay, basepath, taurises=N
             split_taurises = None
             split_taufalls = None
 
-        _buildfakepulses_seg(rq, cut_seg, templates, split_amplitudes, split_tdelay,
-                             basepath, taurises=split_taurises, taufalls=split_taufalls,
-                             channels=channels, relcal=relcal,det=det, convtoamps=convtoamps,
-                             fs=fs, dumpnum=ii + 1,filetype=filetype, lgcsavefile=lgcsavefile,
+        _buildfakepulses_seg(rq,
+                             cut_seg,
+                             templates,
+                             split_amplitudes,
+                             split_tdelay,
+                             basepath,
+                             taurises=split_taurises,
+                             taufalls=split_taufalls,
+                             channels=channels,
+                             relcal=relcal,
+                             det=det,
+                             convtoamps=convtoamps,
+                             fs=fs,
+                             dumpnum=ii + 1,
+                             filetype=filetype,
+                             lgcsavefile=lgcsavefile,
                              savefilepath=savefilepath,
                             )
+
+    if lgcsavefile:
+        _save_truth_info(savefilepath,
+                         basepath=basepath,
+                         seriesnumber=rq.seriesnumber[cut],
+                         eventnumber=rq.eventnumber[cut],
+                         templates=templates,
+                         amplitudes=amplitudes,
+                         tdelay=tdelay,
+                         taurises=taurises,
+                         taufalls=taufalls,
+                         channels=channels,
+                         relcal=relcal,
+                         det=det,
+                         convtoamps=convtoamps,
+                         fs=fs,
+                         filetype=filetype,
+                        )
 
 
 def _buildfakepulses_seg(rq, cut, templates, amplitudes, tdelay, basepath, taurises=None, taufalls=None,
@@ -603,9 +646,17 @@ def _buildfakepulses_seg(rq, cut, templates, amplitudes, tdelay, basepath, tauri
     seriesnumber = list(set(rq.seriesnumber[cut]))[0]
 
     ntraces = np.sum(cut)
-    t, traces, _ = io.getrandevents(basepath, rq.eventnumber, rq.seriesnumber, cut=cut, 
-                                    channels=channels, det=det, convtoamps=convtoamps, fs=fs, 
-                                    ntraces=ntraces, filetype=filetype)
+    t, traces, _ = io.getrandevents(basepath,
+                                    rq.eventnumber,
+                                    rq.seriesnumber,
+                                    cut=cut, 
+                                    channels=channels,
+                                    det=det,
+                                    convtoamps=convtoamps,
+                                    fs=fs, 
+                                    ntraces=ntraces,
+                                    filetype=filetype,
+                                   )
 
     nchan = traces.shape[1]
     nbins = traces.shape[-1]
@@ -652,7 +703,8 @@ def _buildfakepulses_seg(rq, cut, templates, amplitudes, tdelay, basepath, tauri
                               truthtdelay=truthtdelay,
                               savepath=savefilepath,
                               savename=savefilename,
-                              dumpnum=dumpnum)
+                              dumpnum=dumpnum,
+                             )
 
         elif filetype=="mid.gz":
             savefilename = f"{seriesnumber:012}"
@@ -674,13 +726,49 @@ def _buildfakepulses_seg(rq, cut, templates, amplitudes, tdelay, basepath, tauri
                 settings_dict[d]["phononPreTriggerLength"] = settings_dict[d]["phononTraceLength"]//2
                 settings_dict[d]["phononSampleRate"] = int(1/settings_dict[d][ch]["timePerBin"])
 
-            events_list = _create_events_list(tdelay[0], amplitudes[0], fakepulses, channels, 
-                                              det, convtoamps, seriesnumber, dumpnum)
+            events_list = _create_events_list(tdelay[0],
+                                              amplitudes[0],
+                                              fakepulses,
+                                              channels, 
+                                              det,
+                                              convtoamps,
+                                              seriesnumber,
+                                              dumpnum,
+                                             )
 
-            io.saveevents_midgz(events=events_list, settings=settings_dict, 
-                                savepath=savefilepath, savename=savefilename, dumpnum=dumpnum)
+            io.saveevents_midgz(events=events_list,
+                                settings=settings_dict, 
+                                savepath=savefilepath,
+                                savename=savefilename,
+                                dumpnum=dumpnum,
+                               )
         else:
             raise ValueError('Inputted filetype is not supported.')
+
+
+def _save_truth_info(savefilepath, **kwargs):
+    """
+    Function for saving the truth information for the pulse simulation to an HDF5 file.
+
+    Parameters
+    ----------
+    savefilepath : str
+    
+    kwargs : dict
+        The dictionary containing the different truth information that will be saved.
+
+    """
+
+    seriesnumber = list(set(kwargs["seriesnumber"]))[0]
+
+    if kwargs['filetype']=="npz":
+        savefilename = f"{seriesnumber:010}"
+        savefilename = savefilename[:6] + '_' + savefilename[6:]
+    elif kwargs['filetype']=="mid.gz":
+        savefilename = f"{seriesnumber:012}"
+        savefilename = savefilename[:8] + '_' + savefilename[8:]
+
+    dd.io.save(f"{savefilepath}{savefilename}_truth_info.h5", kwargs)
 
 
 def _round_sig(x, sig=2):
