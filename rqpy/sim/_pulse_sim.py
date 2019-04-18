@@ -293,7 +293,7 @@ class PulseSim(object):
         """
 
         self.cut = cut
-        self.ntraces = len(self.cut)
+        self.ntraces = np.sum(self.cut)
 
         self._reset_sim_data()
 
