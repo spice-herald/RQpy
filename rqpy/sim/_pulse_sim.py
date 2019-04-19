@@ -13,6 +13,7 @@ from rqpy import HAS_SCDMSPYTOOLS
 if HAS_SCDMSPYTOOLS:
     from scdmsPyTools.BatTools.IO import getDetectorSettings
 
+pd.io.pytables._tables()
 
 __all__ = ["PulseSim", "buildfakepulses"]
 
