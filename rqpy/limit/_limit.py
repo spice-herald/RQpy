@@ -274,7 +274,7 @@ def gauss_smear(x, f, res, nres=1e5, gauss_width=10):
 
 
 def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
-                    tm="Si", res=None, verbose=False):
+                    tm="Si", res=None, gauss_width=10, verbose=False):
     """
     Function for running Steve Yellin's Optimum Interval code on an inputted spectrum and efficiency curve.
 
@@ -293,10 +293,13 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
     tm : str, int, optional
         The target material of the detector. Can be passed as either the atomic symbol, the
         atomic number, or the full name of the element. Default is 'Si'.
-    res : float, optional
+    res : float, NoneType, optional
         The detector resolution in units of keV. If passed, then the differential scattering
         rate of the dark matter is convoluted by a gaussian with width `res`, which results
         in a smeared spectrum. If left as None, no smearing is performed.
+    gauss_width : float, optional
+        If `res` is not None, this is the number of standard deviations of the Gaussian
+        distribution that the smearing will go out to. Default is 10.
     verbose : bool, optional
         If True, then the algorithm prints out the number of mass that it is currently calculating
         the limit for. If False, no information is printed. Default is False.
@@ -352,7 +355,7 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
         init_rate = drde(en_interp, mass, sigma0, tm=tm)
 
         if res is not None:
-            init_rate = gauss_smear(en_interp, init_rate, res)
+            init_rate = gauss_smear(en_interp, init_rate, res, gauss_width=gauss_width)
 
         rate = init_rate * curr_exp(en_interp)
 
