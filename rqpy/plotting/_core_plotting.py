@@ -730,9 +730,10 @@ class RatePlot(RQpyPlot):
         self.ax.step(bin_cen, rate, where='mid', label=label, linestyle='-', **kwargs)
         self._update_colors("-")
         
-    def add_drde(self, masses, sigmas, tm="Si", npoints=1000, **kwargs):
+    def add_drde(self, masses, sigmas, tm="Si", npoints=1000, smear_res=None, gauss_width=10, **kwargs):
         """
-        Method for plotting a single spectrum in evts/keV/kg/day from inputted data.
+        Method for plotting the expected dark matter spectrum for specified masses and
+        cross sections in evts/keV/kg/day.
 
         Parameters
         ----------
@@ -747,6 +748,13 @@ class RatePlot(RQpyPlot):
             atomic number, or the full name of the element. Default is 'Si'.
         npoints : int, optional
             The number of points to use in the dR/dE plot. Default is 1000.
+        smear_res : float, NoneType, optional
+            The width of the gaussian (1 standard deviation) to be used to smear differential
+            scatter rate in the plot. Should have units of keV. None by default, in which no
+            smearing is done.
+        gauss_width : float, optional
+            If `smear_res` is not None, this is the number of standard deviations of the Gaussian
+            distribution that the smearing will go out to. Default is 10.
         kwargs
             The keyword arguments to pass to `matplotlib.pyplot.plot`.
 
@@ -771,7 +779,11 @@ class RatePlot(RQpyPlot):
         xvals = np.linspace(self._energy_range[0], self._energy_range[1], npoints)
 
         for m, sig in zip(masses, sigmas):
-            self.ax.plot(xvals, rp.limit.drde(xvals, m, sig, tm=tm), linestyle='--',
+            drde = rp.limit.drde(xvals, m, sig, tm=tm)
+            if smear_res is not None:
+                drde = rp.limit.gauss_smear(xvals, drde, smear_res, gauss_width=gauss_width)
+
+            self.ax.plot(xvals, drde, linestyle='--',
                          label=f"DM Mass = {m:.2f} GeV, σ = {sig:.2e} cm$^2$",
                          **kwargs,
                         )
