@@ -780,11 +780,15 @@ class RatePlot(RQpyPlot):
 
         for m, sig in zip(masses, sigmas):
             drde = rp.limit.drde(xvals, m, sig, tm=tm)
+            label = f"DM Mass = {m:.2f} GeV, σ = {sig:.2e} cm$^2$"
             if res is not None:
                 drde = rp.limit.gauss_smear(xvals, drde, res, gauss_width=gauss_width)
+                label += f"\nWith {gauss_width}$\sigma_E$ Smearing"
 
-            self.ax.plot(xvals, drde, linestyle='--',
-                         label=f"DM Mass = {m:.2f} GeV, σ = {sig:.2e} cm$^2$",
+            self.ax.plot(xvals,
+                         drde,
+                         linestyle='--',
+                         label=label,
                          **kwargs,
                         )
 
