@@ -266,7 +266,7 @@ def gauss_smear(x, f, res, nres=1e5, gauss_width=10):
     xgauss = np.arange(-gauss_width*res, gauss_width*res, spacing)
     gauss = stats.norm.pdf(xgauss, scale=res)
 
-    sce = signal.convolve(f2(x2), gauss, mode="full") * spacing
+    sce = signal.convolve(f2(x2), gauss, mode="full", method="direct") * spacing
     e_conv = np.arange(-gauss_width*res, gauss_width*res + x2[-1]-x2[0], spacing)
     s = interpolate.interp1d(e_conv, sce)
 
