@@ -98,7 +98,7 @@ def fit_multi_gauss(arr, guess, ngauss, xrange=None, nbins='sqrt', lgcplot=True,
         return peaks, amps, stds, background_fit
 
 
-def fit_gauss(arr, xrange=None, nbins='sqrt', noiserange=None, lgcplot=False, labeldict=None):
+def fit_gauss(arr, xrange=None, nbins='sqrt', noiserange=None, lgcplot=False, labeldict=None, lgcasymbkg=False):
     """
     Function to fit Gaussian distribution with background to peak in spectrum. 
     Errors are assumed to be poissonian. 
@@ -114,13 +114,15 @@ def fit_gauss(arr, xrange=None, nbins='sqrt', noiserange=None, lgcplot=False, la
     noiserange : tuple, optional
         nested 2-tuple. should contain the range before 
         and after the peak to be used for subtracting the 
-        background
+        background. Only used when lgcasymbkg is False 
     lgcplot : bool, optional
         If True, the fit and spectrum will be plotted 
     labeldict : dict, optional
         Dictionary to overwrite the labels of the plot. defaults are : 
             labels = {'title' : 'Histogram', 'xlabel' : 'variable', 'ylabel' : 'Count'}
         Ex: to change just the title, pass: labeldict = {'title' : 'new title'}, to fit_gauss()
+    lgcasymbkg : bool, optional
+        If True, fit different background amplitudes on either side of Gaussian peak
             
     Returns
     -------
@@ -139,7 +141,7 @@ def fit_gauss(arr, xrange=None, nbins='sqrt', noiserange=None, lgcplot=False, la
     yerr = np.sqrt(y)
     yerr[yerr == 0] = 1 # make errors 1 if bins are empty
     
-    if noiserange is not None:
+    if (noiserange is not None) and (lgcasymbkg is False):
         if noiserange[0][0] >= xrange[0]:
             clowl = noiserange[0][0]
         else:
@@ -167,16 +169,28 @@ def fit_gauss(arr, xrange=None, nbins='sqrt', noiserange=None, lgcplot=False, la
     A0 = np.max(y_noback)
     mu0 = x[np.argmax(y_noback)]
     sig0 = np.abs(mu0 - x[np.abs(y_noback - np.max(y_noback)/2).argmin()])
-    p0 = (A0, mu0, sig0, background)
     
-    #do fit
-    fitparams, cov = curve_fit(utils.gaussian_background, x, y, p0, sigma=yerr, absolute_sigma=True)
-    errors = np.sqrt(np.diag(cov))    
+    
+    if lgcasymbkg:
+        b10=0
+        b20=0
+        p0 = (A0, mu0, sig0, b10, b20)
+        #do fit
+        fitparams, cov = curve_fit(utils.gaussian_asym_background, x, y, p0, sigma=yerr, absolute_sigma=True)
+    else:
+        p0 = (A0, mu0, sig0, background)
+        #do fit
+        fitparams, cov = curve_fit(utils.gaussian_background, x, y, p0, sigma=yerr, absolute_sigma=True)
+        
+    errors = np.sqrt(np.diag(cov))
     peakloc = fitparams[1]
     peakerr = np.sqrt((fitparams[2]/np.sqrt(fitparams[0]))**2)
     
     if lgcplot:
-        plotting.plot_gauss(x, bins, y, fitparams, errors, background, labeldict)
+        if lgcasymbkg:
+            plotting.plot_gauss_asymbkg(x, bins, y, fitparams, errors, labeldict)
+        else:
+            plotting.plot_gauss(x, bins, y, fitparams, errors, background, labeldict)
     
     return peakloc, peakerr, fitparams, errors
 
