@@ -1,9 +1,11 @@
 import numpy as np
+from scipy.special import erf
 
 
-__all__ = ["bindata", "gaussian", "n_gauss", "gaussian_background", "saturation_func", 
-           "sat_func_expansion", "prop_sat_err", "prop_sat_err_lin", "invert_saturation_func", 
-           "prop_invert_sat_err"]
+
+__all__ = ["bindata", "gaussian", "n_gauss", "gaussian_background", "gaussian_asym_background",
+           "saturation_func", "sat_func_expansion", "prop_sat_err", "prop_sat_err_lin", 
+           "invert_saturation_func", "prop_invert_sat_err"]
 
 
 def bindata(arr, xrange=None, bins='sqrt'):
@@ -133,6 +135,45 @@ def gaussian_background(x, amp, mean, sd, background):
     """
     
     gauss_background = gaussian(x, amp, mean, sd) + background
+    
+    return gauss_background
+
+def gaussian_asym_background(x, amp, mean, sd, background1, background2):
+    """
+    Functional form for Gaussian distribution plus two background offsets
+    of different amplitudes, with one on either side of the Gaussian 
+    
+    Parameters
+    ----------
+    x : ndarray
+        Array corresponding to x data
+    amp : float
+        Normilization factor (or amplitude) for function
+    mean : float
+        The first moment of the distribution
+    sd : float
+        The second moment of the distribution
+    background1 : float
+        The offset (in the y-direction) left of Gaussian peak
+    background2 : float
+        The offset (in the y-direction) right of Gaussian peak
+        
+    Returns
+    -------
+    gauss_background : ndarray
+        Array y values corresponding to the given x values
+        
+    """
+    
+    gauss_background = gaussian(x, amp, mean, sd)
+    
+    erfarg = (x-mean)/(np.sqrt(2)*sd)
+    # background to left of error function
+    b1 = background1*(1-(1/2)*(1+erf(erfarg)))
+    # background to right of error function
+    b2 = background2*((1/2)*(1+erf(erfarg)))
+    
+    gauss_background = gauss_background + b1 + b2
     
     return gauss_background
 
