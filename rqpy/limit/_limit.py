@@ -15,6 +15,7 @@ import mendeleev
 __all__ = ["optimuminterval",
            "gauss_smear",
            "drde",
+           "drde_max_q",
            "helmfactor",
            "upperlim",
           ]
@@ -232,6 +233,36 @@ def drde(q, m_dm, sig0, tm='Si'):
 
     return rate
 
+def drde_max_q(m_dm, tm='Si'):
+    """
+    Function for calculating the energy corresponding to the largest nonzero value of the differential rate,
+    i.e. `rqpy.limit.drde`.
+
+    Parameters
+    ----------
+    m_dm : float, ndarray
+        The dark matter mass at which to calculate the expected differential
+        scattering rate. Expected units are GeV.
+    tm : str, int, optional
+        The target material of the detector. Can be passed as either the atomic symbol, the
+        atomic number, or the full name of the element. Default is 'Si'.
+
+    Returns
+    -------
+    qmax : float, ndarray
+        The energy corresponding to the largest nonzero value of the differential rate, where recoil energies
+        above this value will have a differential rate of zero.
+
+    """
+
+    a = mendeleev.element(tm).atomic_weight
+    mn = constants.atomic_mass * constants.c**2 / constants.e * 1e-9 # nucleon mass (1 amu) [GeV]
+    mtarget = a * mn # nucleon mass for tm [GeV]
+    r = 4 * m_dm * mtarget / (m_dm + mtarget)**2 # unitless reduced mass parameter
+    e0 = 0.5 * m_dm * (constants.v0_sun / constants.c)**2 * 1e6 # kinetic energy of dark matter [keV]
+    qmax = e0 * r * ((constants.vesc_galactic + constants.ve_orbital) / constants.v0_sun)**2
+
+    return qmax
 
 def gauss_smear(x, f, res, nres=1e5, gauss_width=10):
     """
