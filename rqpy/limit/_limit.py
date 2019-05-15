@@ -19,6 +19,7 @@ __all__ = ["optimuminterval",
            "helmfactor",
            "upperlim",
            "drde_gauss_smear2d",
+           "optimuminterval_2dsmear",
           ]
 
 
@@ -505,7 +506,7 @@ def _largest_et(x, e0, cov_inv, nsig):
 
     return et_max
 
-def drde_gauss_smear2d(x, cov, delta, m_dm, sig0, nsig=3):
+def drde_gauss_smear2d(x, cov, delta, m_dm, sig0, nsig=3, tm="Si"):
     """
     Function for smearing the differential rate for DM, given that we have a covariance matrix
     for two energy estimators, where we have set a trigger threshold on one and a measured energy
@@ -528,6 +529,9 @@ def drde_gauss_smear2d(x, cov, delta, m_dm, sig0, nsig=3):
     nsig : float, optional
         The number of sigma outside of which the PDF will be set to zero. This defines
         an elliptical confidence region, whose shape comes from the covariance matrix.
+    tm : str, int, optional
+        The target material of the detector. Can be passed as either the atomic symbol, the
+        atomic number, or the full name of the element. Default is 'Si'.
 
     Returns
     -------
@@ -556,7 +560,7 @@ def drde_gauss_smear2d(x, cov, delta, m_dm, sig0, nsig=3):
             et,
             cov,
             nsig,
-        ) * drde(e0, m_dm, sig0)
+        ) * drde(e0, m_dm, sig0, tm=tm)
 
         y = np.linspace(0.0, drde_max_q(m_dm), num=100)
         d2 = np.diff(y).mean()
@@ -578,3 +582,120 @@ def drde_gauss_smear2d(x, cov, delta, m_dm, sig0, nsig=3):
             out[ii] = np.sum(Z) * d1 * d2
 
     return out
+def optimuminterval_2dsmear(eventenergies, masslist, exposure, cov, delta,
+                            tm="Si", nsig=3, verbose=False):
+    """
+    Function for running Steve Yellin's Optimum Interval code on an inputted spectrum, using the
+    two-dimensional normal distribution defined by the inputted covariance matrix to model the
+    trigger efficiency. This is a more complicated version of `rqpy.limit.optimuminterval`.
+
+    Parameters
+    ----------
+    eventenergies : ndarray
+        Array of all of the event energies (in keV) to use for calculating the sensitivity.
+    masslist : ndarray
+        List of candidate DM masses (in GeV/c^2) to calculate sensitivity at.
+    exposure : float
+        The total exposure of the detector (kg*days).
+    cov : ndarray
+        The covariance matrix relating the measured/reconstructed energy and the trigger energy.
+    delta : float
+        The threshold value (in keV) for the trigger energy.
+    tm : str, int, optional
+        The target material of the detector. Can be passed as either the atomic symbol, the
+        atomic number, or the full name of the element. Default is 'Si'.
+    nsig : float
+        The number of sigma outside of which the two-dimensional normal PDF defined by the
+        inputted covariance matrix will be set to zero. This defines an elliptical confidence
+        region. This is used to restrict the amount of smearing that is appiled to the DM spectrum
+        to avoid calculate artificially low upper limits.
+    verbose : bool, optional
+        If True, then the algorithm prints out the number of mass that it is currently calculating
+        the limit for. If False, no information is printed. Default is False.
+
+    Returns
+    -------
+    sigma : ndarray
+        The corresponding cross sections of the sensitivity curve (in cm^2).
+
+    Notes
+    -----
+    This function is a wrapper for Steve Yellin's Optimum Interval code. His code can be found
+    here: titus.stanford.edu/Upperlimit/
+
+    Read more about the Optimum Interval code in these two papers:
+        - https://arxiv.org/abs/physics/0203002
+        - https://arxiv.org/abs/0709.2701
+
+    """
+
+    if np.isscalar(masslist):
+        masslist = [masslist]
+
+    eventenergies = np.sort(eventenergies)
+
+    elow = max(0.001, min(effenergies))
+    ehigh = max(effenergies)
+
+    en_interp = np.logspace(np.log10(0.9 * elow), np.log10(1.1 * ehigh), 1e5)
+
+    delta_e = np.concatenate(([(en_interp[1] - en_interp[0])/2],
+                              (en_interp[2:] - en_interp[:-2])/2,
+                              [(en_interp[-1] - en_interp[-2])/2]))
+
+    sigma0 = 1e-41
+
+    event_inds = rp.inrange(eventenergies, elow, ehigh)
+    inlim = rp.inrange(en_interp, elow, ehigh)
+
+    sigma = np.ones(len(masslist)) * np.inf
+
+    for ii, mass in enumerate(masslist):
+        if verbose:
+            print(f"On mass {ii+1} of {len(masslist)}.")
+
+        init_rate = drde_gauss_smear2d(
+            en_interp,
+            cov,
+            delta,
+            mass,
+            sigma0,
+            nsig=nsig,
+            tm=tm,
+        )
+
+        rate = init_rate * exposure
+
+        integ_rate = np.cumsum(rate * delta_e * inlim)
+
+        integ_rate[0] = 0
+        tot_rate = integ_rate[-1]
+
+        x_val_fcn = interpolate.interp1d(en_interp,
+                                         integ_rate,
+                                         kind="linear",
+                                         bounds_error=True)
+
+        x_vals = x_val_fcn(eventenergies[event_inds])
+
+        if tot_rate != 0:
+            fc = x_vals/tot_rate
+            fc[fc > 1] = 1
+
+            cdf_max = 1 - 1e-6
+            possiblewimp = fc <= cdf_max
+            nwimps = possiblewimp.sum()
+            fc = fc[possiblewimp]
+
+            if len(fc) == 0:
+                fc = np.asarray([0, 1])
+
+            cl = 0.9
+            if_bn = 1
+            mub = 0
+            iflag = 0
+
+            uloutput = upperlim(fc)
+            sigma[ii] = (sigma0 / tot_rate) * uloutput
+
+    return sigma
