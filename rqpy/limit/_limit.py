@@ -18,6 +18,7 @@ __all__ = ["optimuminterval",
            "drde_max_q",
            "helmfactor",
            "upperlim",
+           "drde_gauss_smear2d",
           ]
 
 
@@ -423,3 +424,157 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
             sigma[ii] = (sigma0 / tot_rate) * uloutput
 
     return sigma
+
+def _norm2d_trunc(x0, x1, mu, cov, nsig):
+    """
+    Truncated two-dimensional normal probability density function, where we set the PDF to zero
+    for any points outside the confidence region ellipse defined by `nsig`.
+
+    Parameters
+    ----------
+    x0 : float, ndarray
+        Value or array of values at which to calculate the PDF.
+    x1 : float, ndarray
+        Value or array of values at which to calculate the PDF.
+    mu : float, ndarray
+        The center (mean) of the PDF, assumed to be the same for `x0` and `x1`.
+    cov : ndarray
+        The covariance matrix corresponding to `x0` and `x1`.
+    nsig : float
+        The number of sigma outside of which the PDF will be set to zero. This defines
+        an elliptical confidence region, whose shape comes from the covariance matrix.
+
+    Returns
+    -------
+    norm2d : ndarray
+        The truncated two-dimensional normal probability density function
+
+    """
+
+    # get the perimeter of the ellipse for the specified number of sigma
+    sig = lambda n: stats.norm.cdf(n) - stats.norm.cdf(-n)
+    mvar_ell = stats.chi2.ppf(sig(nsig), 2)
+
+    cov_inv = np.linalg.inv(cov)
+
+    # multiplied out 2d normal distribution (for vectorization)
+    ell = (x0 - mu)**2 * cov_inv[0, 0] + 2 * (x0 - mu) * (x1 - mu) * cov_inv[1, 0] + (x1 - mu)**2 * cov_inv[1, 1]
+    ell = np.atleast_1d(ell)
+
+    norm2d = np.exp(-0.5 * ell) / np.sqrt((2 * np.pi)**2 * np.linalg.det(cov))
+
+    inds = ell > mvar_ell
+    norm2d[inds] = 0
+
+    return norm2d
+
+def _largest_et(x, e0, cov_inv, nsig):
+    """
+    Helper function for determining the largest nonzero value of the trigger energy
+    when performing the the two-dimensional smearing. Determined from the edge of the
+    truncated two-dimensional normal distribution.
+
+    Parameters
+    ----------
+    x : float, ndarray
+        Reconstructed energy at which to calculate the largest nonzero trigger energy.
+    e0 : float, ndarray
+        The true energies at which to calculate the largest nonzero trigger energy.
+    cov_inv : ndarray
+        The inverse of the covariance matrix for the reconstructed and trigger energies.
+    nsig : float
+        The number of sigma outside of which the PDF will be set to zero. This defines
+        an elliptical confidence region, whose shape comes from the covariance matrix.
+
+    Returns
+    -------
+    et_max : float, ndarray
+        For each x or e0 inputted, the maximum nonzero trigger energy in the covariance
+        ellipse.
+
+    """
+
+    sig = lambda n: stats.norm.cdf(n) - stats.norm.cdf(-n)
+    mvar_ell = stats.chi2.ppf(sig(nsig), 2)
+
+    a = cov_inv[1, 1]
+    b = 2 * ((x - e0) * cov_inv[1, 0] - e0 * cov_inv[1, 1])
+    c = (x - e0)**2 * cov_inv[0, 0] - 2 * (x - e0) * e0 * cov_inv[1, 0] + e0**2 * cov_inv[1, 1] - mvar_ell
+
+    et_max = (-b + np.sqrt(b**2 - 4 * a * c))/ (2 * a)
+
+    return et_max
+
+def drde_gauss_smear2d(x, cov, delta, m_dm, sig0, nsig=3):
+    """
+    Function for smearing the differential rate for DM, given that we have a covariance matrix
+    for two energy estimators, where we have set a trigger threshold on one and a measured energy
+    for the other.
+
+    Parameters
+    ----------
+    x : float, ndarray
+        The measured energies at which to calculate the differential scattering rate.
+    cov : ndarray
+        The covariance matrix relating the measured energy and the trigger energy.
+    delta : float
+        The threshold value (in keV) for the trigger energy.
+    m_dm : float
+        The dark matter mass at which to calculate the expected differential
+        scattering rate. Expected units are GeV.
+    sig0 : float
+        The dark matter cross section at which to calculated the expected differential
+        scattering rate. Expected units are cm^2.
+    nsig : float, optional
+        The number of sigma outside of which the PDF will be set to zero. This defines
+        an elliptical confidence region, whose shape comes from the covariance matrix.
+
+    Returns
+    -------
+    out : ndarray
+        The expected dark matter differential rate for the inputted recoil energies,
+        dark matter mass, and dark matter cross section, taking into account the smearing
+        by a two-dimensional normal distribution. Units are events/keV/kg/day, or "DRU".
+
+    """
+
+    if np.isscalar(x):
+        x = np.atleast_1d(x)
+
+    cov_inv = np.linalg.inv(cov)
+
+    out = np.zeros(len(x))
+
+    for ii, val in enumerate(x):
+
+        func = lambda et, e0: np.heaviside(
+            et - delta,
+            0.5,
+        ) * _norm2d_trunc(
+            val,
+            e0,
+            et,
+            cov,
+            nsig,
+        ) * drde(e0, m_dm, sig0)
+
+        y = np.linspace(0.0, drde_max_q(m_dm), num=100)
+        d2 = np.diff(y).mean()
+        x_max = np.nanmax(
+            _largest_et(
+                val,
+                y,
+                cov_inv,
+                nsig,
+            ))
+
+        if x_max > delta:
+            x = np.linspace(delta, x_max, num=100)
+            d1 = np.diff(x).mean()
+
+            X, Y = np.meshgrid(x, y)
+            Z = func(X.flatten(), Y.flatten())
+
+            out[ii] = np.sum(Z) * d1 * d2
+
+    return out
