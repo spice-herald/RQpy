@@ -4,9 +4,10 @@ import time
 import os
 from pathlib import Path
 import contextlib
-from scipy import stats, signal, interpolate, constants, special
+from scipy import stats, signal, interpolate, special
 
 import rqpy as rp
+from rqpy import constants
 from rqpy.limit import _upperlim
 import mendeleev
 
@@ -191,10 +192,10 @@ def drde(q, m_dm, sig0, tm='Si'):
 
     q = np.atleast_1d(q) # convert to recoil energy in keV
 
-    v0 = 220e3 # sun velocity about glactic center [m/s]
-    ve = 232e3 # mean orbital velocity of Earch [m/s]
-    vesc = 544e3 # galactic escape velocity [m/s]
-    rho0 = 0.3 # local DM density [GeV/cm^3]
+    v0 = constants.v0_sun # sun velocity about galactic center [m/s]
+    ve = constants.ve_orbital # mean orbital velocity of Earth [m/s]
+    vesc = constants.vesc_galactic # galactic escape velocity [m/s]
+    rho0 = constants.rho0_dm # local DM density [GeV/cm^3]
 
     a = mendeleev.element(tm).atomic_weight
     mn = constants.atomic_mass * constants.c**2 / constants.e * 1e-9 # nucleon mass (1 amu) [GeV]
