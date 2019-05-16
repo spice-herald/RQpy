@@ -582,8 +582,9 @@ def drde_gauss_smear2d(x, cov, delta, m_dm, sig0, nsig=3, tm="Si"):
             out[ii] = np.sum(Z) * d1 * d2
 
     return out
+
 def optimuminterval_2dsmear(eventenergies, masslist, exposure, cov, delta,
-                            tm="Si", nsig=3, verbose=False):
+                            tm="Si", nsig=3, verbose=False, npts=1e3):
     """
     Function for running Steve Yellin's Optimum Interval code on an inputted spectrum, using the
     two-dimensional normal distribution defined by the inputted covariance matrix to model the
@@ -612,6 +613,9 @@ def optimuminterval_2dsmear(eventenergies, masslist, exposure, cov, delta,
     verbose : bool, optional
         If True, then the algorithm prints out the number of mass that it is currently calculating
         the limit for. If False, no information is printed. Default is False.
+    npts : float, optional
+        The number of energies at which to evaluate the smeared differential rate. Large values
+        result in long computation times. Default is 1e3.
 
     Returns
     -------
@@ -634,10 +638,10 @@ def optimuminterval_2dsmear(eventenergies, masslist, exposure, cov, delta,
 
     eventenergies = np.sort(eventenergies)
 
-    elow = max(0.001, min(effenergies))
-    ehigh = max(effenergies)
+    elow = max(0.001, min(eventenergies))
+    ehigh = max(eventenergies)
 
-    en_interp = np.logspace(np.log10(0.9 * elow), np.log10(1.1 * ehigh), 1e5)
+    en_interp = np.logspace(np.log10(0.9 * elow), np.log10(1.1 * ehigh), npts)
 
     delta_e = np.concatenate(([(en_interp[1] - en_interp[0])/2],
                               (en_interp[2:] - en_interp[:-2])/2,
