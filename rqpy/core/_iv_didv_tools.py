@@ -402,6 +402,8 @@ class IVanalysis(object):
         dites_err[0,0,:] = self.df[self.noiseinds].offset_err.values
         dites[0,1,:] = self.df[self.didvinds].offset.values
         dites_err[0,1,:] = self.df[self.didvinds].offset_err.values
+        vb_err[0,0,:] = np.sqrt((self.df[self.noiseinds].qetbias.values * self.rshunt_err)**2)
+        vb_err[0,1,:] = np.sqrt((self.df[self.didvinds].qetbias.values * self.rshunt_err)**2)
         
         self.vb = vb
         self.vb_err = vb_err
