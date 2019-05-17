@@ -1245,6 +1245,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
     if setup.do_trigsim[chan_num] and setup.trigger == chan_num:
         triggeramp_sim = np.zeros(len(signal))
         triggertime_sim = np.zeros(len(signal))
+        ofampnodelay_sim = np.zeros(len(signal))
 
     if any(readout_inds):
         # run the OF class for each trace
@@ -1368,6 +1369,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                 res_trigsim = setup.TS.trigger(setup.signal_full[jj, chan_num], k=setup.trigsim_k)
                 triggeramp_sim[jj] = res_trigsim[0]
                 triggertime_sim[jj] = res_trigsim[1]
+                ofampnodelay_sim[jj] = res_trigsim[2]
 
     # save variables to dict
     if setup.do_chi2_nopulse[chan_num]:
@@ -1522,6 +1524,8 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         rq_dict[f'triggeramp_sim_{chan}{det}'][readout_inds] = triggeramp_sim
         rq_dict[f'triggertime_sim_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'triggertime_sim_{chan}{det}'][readout_inds] = triggertime_sim
+        rq_dict[f'ofamp_nodelay_sim_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'ofamp_nodelay_sim_{chan}{det}'][readout_inds] = ofampnodelay_sim
 
     if any(setup.do_ofamp_shifted) and setup.trigger is not None:
         # do the shifted OF on each trace
