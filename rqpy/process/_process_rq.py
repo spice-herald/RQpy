@@ -91,6 +91,11 @@ class SetupRQ(object):
         The length of the window (in bins), centered on the middle of the trace, to constrain 
         the possible time shift values to when doing the optimum filter fit with constrained time shifting. 
         Each value in the list specifies this attribute for each channel.
+    ofamp_constrained_windowcenter : list of int
+        The bin, relative to the center bin of the trace, on which the delay window
+        specified by `nconstrain` is centered. Default of 0 centers the delay window
+        in the center of the trace. Equivalent to centering the `nconstrain` window
+        on `self.nbins//2 + windowcenter`.
     ofamp_constrained_pulse_constraint : list of int
         Sets a constraint on the direction of the fitted pulse. If 0, then no constraint on the 
         pulse direction is set. If 1, then a positive pulse constraint is set for all fits. 
@@ -108,6 +113,11 @@ class SetupRQ(object):
         The length of the window (in bins), centered on the middle of the trace, outside of which to 
         constrain the possible time shift values to when searching for a pileup pulse using ofamp_pileup. Each 
         value in the list specifies this attribute for each channel.
+    ofamp_pileup_windowcenter : list of int
+        The bin, relative to the center bin of the trace, on which the delay window
+        specified by `nconstrain` is centered. Default of 0 centers the delay window
+        in the center of the trace. Equivalent to centering the `nconstrain` window
+        on `self.nbins//2 + windowcenter`.
     ofamp_pileup_pulse_constraint : list of int
         Sets a constraint on the direction of the fitted pulse. If 0, then no constraint on the 
         pulse direction is set. If 1, then a positive pulse constraint is set for all fits. 
@@ -139,6 +149,11 @@ class SetupRQ(object):
         The length of the window (in bins), centered on the middle of the trace, to constrain 
         the possible time shift values to when doing the optimum filter fit with fixed baseline. Each 
         value in the list specifies this attribute for each channel.
+    ofamp_baseline_windowcenter : list of int
+        The bin, relative to the center bin of the trace, on which the delay window
+        specified by `nconstrain` is centered. Default of 0 centers the delay window
+        in the center of the trace. Equivalent to centering the `nconstrain` window
+        on `self.nbins//2 + windowcenter`.
     ofamp_baseline_pulse_constraint : list of int
         Sets a constraint on the direction of the fitted pulse. If 0, then no constraint on the 
         pulse direction is set. If 1, then a positive pulse constraint is set for all fits. 
@@ -342,11 +357,13 @@ class SetupRQ(object):
         self.do_ofamp_constrained_smooth = [False]*self.nchan
         self.ofamp_constrained_lowfreqchi2 = True
         self.ofamp_constrained_nconstrain = [80]*self.nchan
+        self.ofamp_constrained_windowcenter = [0]*self.nchan
         self.ofamp_constrained_pulse_constraint = [0]*self.nchan
 
         self.do_ofamp_pileup = [True]*self.nchan
         self.do_ofamp_pileup_smooth = [False]*self.nchan
         self.ofamp_pileup_nconstrain = [80]*self.nchan
+        self.ofamp_pileup_windowcenter = [0]*self.nchan
         self.ofamp_pileup_pulse_constraint = [0]*self.nchan
 
         self.do_chi2_nopulse = [True]*self.nchan
@@ -358,6 +375,7 @@ class SetupRQ(object):
         self.do_ofamp_baseline = [False]*self.nchan
         self.do_ofamp_baseline_smooth = [False]*self.nchan
         self.ofamp_baseline_nconstrain = [80]*self.nchan
+        self.ofamp_baseline_windowcenter = [0]*self.nchan
         self.ofamp_baseline_pulse_constraint = [0]*self.nchan
 
         self.do_baseline = [True]*self.nchan
@@ -588,7 +606,7 @@ class SetupRQ(object):
         self._check_of()
 
     def adjust_ofamp_constrained(self, lgcrun=True, lgcrun_smooth=False, calc_lowfreqchi2=True, 
-                                 nconstrain=80, pulse_direction_constraint=0):
+                                 nconstrain=80, windowcenter=0, pulse_direction_constraint=0):
         """
         Method for adjusting the calculation of the optimum filter fit with constrained 
         time shifting.
@@ -613,6 +631,11 @@ class SetupRQ(object):
             fit with constrained time shifting. Can be set to a list of values, if the
             constrain window should be different for each channel. The length of the list should
             be the same length as the number of channels.
+        windowcenter : int, list of int, optional
+            The bin, relative to the center bin of the trace, on which the delay window
+            specified by `nconstrain` is centered. Default of 0 centers the delay window
+            in the center of the trace. Equivalent to centering the `nconstrain` window
+            on `self.nbins//2 + windowcenter`.
         pulse_direction_constraint : int, list of int, optional
             Sets a constraint on the direction of the fitted pulse. If 0, then no constraint on the
             pulse direction is set. If 1, then a positive pulse constraint is set for all fits.
@@ -625,6 +648,7 @@ class SetupRQ(object):
             lgcrun=lgcrun,
             lgcrun_smooth=lgcrun_smooth,
             nconstrain=nconstrain,
+            windowcenter=windowcenter,
             pulse_direction_constraint=pulse_direction_constraint,
         )
 
@@ -632,13 +656,13 @@ class SetupRQ(object):
         self.do_ofamp_constrained_smooth = lgcrun_smooth
         self.ofamp_constrained_lowfreqchi2 = calc_lowfreqchi2
         self.ofamp_constrained_nconstrain = nconstrain
-
+        self.ofamp_constrained_windowcenter = windowcenter
         self.ofamp_constrained_pulse_constraint = pulse_direction_constraint
 
         self._check_of()
 
     def adjust_ofamp_baseline(self, lgcrun=True, lgcrun_smooth=False, 
-                              nconstrain=80, pulse_direction_constraint=0):
+                              nconstrain=80, windowcenter=0, pulse_direction_constraint=0):
         """
         Method for adjusting the calculation of the optimum filter fit with fixed 
         baseline.
@@ -658,6 +682,11 @@ class SetupRQ(object):
             fit with fixed baseline. Can be set to a list of values, if the 
             constrain window should be different for each channel. The length of the list should
             be the same length as the number of channels.
+        windowcenter : int, list of int, optional
+            The bin, relative to the center bin of the trace, on which the delay window
+            specified by `nconstrain` is centered. Default of 0 centers the delay window
+            in the center of the trace. Equivalent to centering the `nconstrain` window
+            on `self.nbins//2 + windowcenter`.
         pulse_direction_constraint : int, list of int, optional
             Sets a constraint on the direction of the fitted pulse. If 0, then no constraint on the
             pulse direction is set. If 1, then a positive pulse constraint is set for all fits.
@@ -670,19 +699,20 @@ class SetupRQ(object):
             lgcrun=lgcrun,
             lgcrun_smooth=lgcrun_smooth,
             nconstrain=nconstrain,
+            windowcenter=windowcenter,
             pulse_direction_constraint=pulse_direction_constraint,
         )
 
         self.do_ofamp_baseline = lgcrun
         self.do_ofamp_baseline_smooth = lgcrun_smooth
         self.ofamp_baseline_nconstrain = nconstrain
-
+        self.ofamp_baseline_windowcenter = windowcenter
         self.ofamp_baseline_pulse_constraint = pulse_direction_constraint
 
         self._check_of()
 
     def adjust_ofamp_pileup(self, lgcrun=True, lgcrun_smooth=False, 
-                            nconstrain=80, pulse_direction_constraint=0):
+                            nconstrain=80, windowcenter=0, pulse_direction_constraint=0):
         """
         Method for adjusting the calculation of the pileup optimum filter fit.
 
@@ -700,6 +730,11 @@ class SetupRQ(object):
             pileup pulse using ofamp_pileup. Can be set to a list of values, if the constrain
             window should be different for each channel. The length of the list should
             be the same length as the number of channels.
+        windowcenter : int, list of int, optional
+            The bin, relative to the center bin of the trace, on which the delay window
+            specified by `nconstrain` is centered. Default of 0 centers the delay window
+            in the center of the trace. Equivalent to centering the `nconstrain` window
+            on `self.nbins//2 + windowcenter`.
         pulse_direction_constraint : int, list of int, optional
             Sets a constraint on the direction of the fitted pulse. If 0, then no constraint on the
             pulse direction is set. If 1, then a positive pulse constraint is set for all fits.
@@ -712,13 +747,14 @@ class SetupRQ(object):
             lgcrun=lgcrun,
             lgcrun_smooth=lgcrun_smooth,
             nconstrain=nconstrain,
+            windowcenter=windowcenter,
             pulse_direction_constraint=pulse_direction_constraint,
         )
 
         self.do_ofamp_pileup = lgcrun
         self.do_ofamp_pileup_smooth = lgcrun_smooth
         self.ofamp_pileup_nconstrain = nconstrain
-
+        self.ofamp_pileup_windowcenter = windowcenter
         self.ofamp_pileup_pulse_constraint = pulse_direction_constraint
 
         self._check_of()
@@ -1278,69 +1314,107 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                 amp_nodelay_smooth[jj], chi2_nodelay_smooth[jj] = OF_smooth.ofamp_nodelay()
 
             if setup.ofamp_nodelay_lowfreqchi2 and setup.do_chi2_lowfreq[chan_num]:
-                chi2low_nodelay[jj] = OF.chi2_lowfreq(amp_nodelay[jj], 0, 
-                                              fcutoff=setup.chi2_lowfreq_fcutoff[chan_num])
+                chi2low_nodelay[jj] = OF.chi2_lowfreq(
+                    amp_nodelay[jj],
+                    0,
+                    fcutoff=setup.chi2_lowfreq_fcutoff[chan_num],
+                )
 
             if setup.do_ofamp_unconstrained[chan_num]:
                 amp_noconstrain[jj], t0_noconstrain[jj], chi2_noconstrain[jj] = OF.ofamp_withdelay()
                 if setup.ofamp_unconstrained_pulse_constraint[chan_num]!=0:
                     amp_noconstrain_pcon[jj], t0_noconstrain_pcon[jj], chi2_noconstrain_pcon[jj] = OF.ofamp_withdelay(
-                                            pulse_direction_constraint=setup.ofamp_unconstrained_pulse_constraint[chan_num])
+                        pulse_direction_constraint=setup.ofamp_unconstrained_pulse_constraint[chan_num],
+                    )
 
             if setup.do_ofamp_unconstrained_smooth[chan_num]:
                 amp_noconstrain_smooth[jj], t0_noconstrain_smooth[jj], chi2_noconstrain_smooth[jj] = OF_smooth.ofamp_withdelay()
 
             if setup.ofamp_unconstrained_lowfreqchi2 and setup.do_chi2_lowfreq[chan_num]:
-                chi2low_unconstrain[jj] = OF.chi2_lowfreq(amp_noconstrain[jj], t0_noconstrain[jj], 
-                                                          fcutoff=setup.chi2_lowfreq_fcutoff[chan_num])
+                chi2low_unconstrain[jj] = OF.chi2_lowfreq(
+                    mp_noconstrain[jj],
+                    t0_noconstrain[jj],
+                    fcutoff=setup.chi2_lowfreq_fcutoff[chan_num],
+                )
                 if setup.ofamp_unconstrained_pulse_constraint[chan_num]!=0:
-                    chi2low_unconstrain_pcon[jj] = OF.chi2_lowfreq(amp_noconstrain_pcon[jj], t0_noconstrain_pcon[jj], 
-                                                                   fcutoff=setup.chi2_lowfreq_fcutoff[chan_num])
+                    chi2low_unconstrain_pcon[jj] = OF.chi2_lowfreq(
+                        amp_noconstrain_pcon[jj],
+                        t0_noconstrain_pcon[jj],
+                        fcutoff=setup.chi2_lowfreq_fcutoff[chan_num],
+                    )
 
             if setup.do_ofamp_constrained[chan_num]:
                 amp_constrain[jj], t0_constrain[jj], chi2_constrain[jj] = OF.ofamp_withdelay(
-                                                                          nconstrain=setup.ofamp_constrained_nconstrain[chan_num])
+                    nconstrain=setup.ofamp_constrained_nconstrain[chan_num],
+                    windowcenter=setup.ofamp_constrained_windowcenter[chan_num],
+                )
                 if setup.ofamp_constrained_pulse_constraint[chan_num]!=0:
                     amp_constrain_pcon[jj], t0_constrain_pcon[jj], chi2_constrain_pcon[jj] = OF.ofamp_withdelay(
-                                                                 nconstrain=setup.ofamp_constrained_nconstrain[chan_num],
-                                            pulse_direction_constraint=setup.ofamp_constrained_pulse_constraint[chan_num])
+                        nconstrain=setup.ofamp_constrained_nconstrain[chan_num],
+                        pulse_direction_constraint=setup.ofamp_constrained_pulse_constraint[chan_num],
+                        windowcenter=setup.ofamp_constrained_windowcenter[chan_num],
+                    )
 
             if setup.do_ofamp_constrained_smooth[chan_num]:
                 amp_constrain_smooth[jj], t0_constrain_smooth[jj], chi2_constrain_smooth[jj] = OF_smooth.ofamp_withdelay(
-                                                                          nconstrain=setup.ofamp_constrained_nconstrain[chan_num])
+                    nconstrain=setup.ofamp_constrained_nconstrain[chan_num],
+                    windowcenter=setup.ofamp_constrained_windowcenter[chan_num],
+                )
 
             if setup.ofamp_constrained_lowfreqchi2 and setup.do_chi2_lowfreq[chan_num]:
-                chi2low_constrain[jj] = OF.chi2_lowfreq(amp_constrain[jj], t0_constrain[jj], 
-                                                        fcutoff=setup.chi2_lowfreq_fcutoff[chan_num])
+                chi2low_constrain[jj] = OF.chi2_lowfreq(
+                    amp_constrain[jj],
+                    t0_constrain[jj],
+                    fcutoff=setup.chi2_lowfreq_fcutoff[chan_num],
+                )
                 if setup.ofamp_constrained_pulse_constraint[chan_num]!=0:
-                    chi2low_constrain_pcon[jj] = OF.chi2_lowfreq(amp_constrain_pcon[jj], t0_constrain_pcon[jj], 
-                                                                fcutoff=setup.chi2_lowfreq_fcutoff[chan_num])
+                    chi2low_constrain_pcon[jj] = OF.chi2_lowfreq(
+                        amp_constrain_pcon[jj],
+                        t0_constrain_pcon[jj],
+                        fcutoff=setup.chi2_lowfreq_fcutoff[chan_num],
+                    )
 
             if setup.do_ofamp_pileup[chan_num]:
-                amp_pileup[jj], t0_pileup[jj], chi2_pileup[jj] = OF.ofamp_pileup_iterative(amp_constrain[jj], t0_constrain[jj],
-                                                                   nconstrain=setup.ofamp_pileup_nconstrain[chan_num])
+                amp_pileup[jj], t0_pileup[jj], chi2_pileup[jj] = OF.ofamp_pileup_iterative(
+                    amp_constrain[jj],
+                    t0_constrain[jj],
+                    nconstrain=setup.ofamp_pileup_nconstrain[chan_num],
+                    windowcenter=setup.ofamp_pileup_windowcenter[chan_num],
+                )
                 if setup.ofamp_pileup_pulse_constraint[chan_num]!=0:
-                    amp_pileup_pcon[jj], t0_pileup_pcon[jj], chi2_pileup_pcon[jj] = OF.ofamp_pileup_iterative(amp_constrain[jj], 
-                                                                 t0_constrain[jj],
-                                                                 nconstrain=setup.ofamp_pileup_nconstrain[chan_num],
-                                            pulse_direction_constraint=setup.ofamp_pileup_pulse_constraint[chan_num])
+                    amp_pileup_pcon[jj], t0_pileup_pcon[jj], chi2_pileup_pcon[jj] = OF.ofamp_pileup_iterative(
+                        amp_constrain[jj],
+                        t0_constrain[jj],
+                        nconstrain=setup.ofamp_pileup_nconstrain[chan_num],
+                        pulse_direction_constraint=setup.ofamp_pileup_pulse_constraint[chan_num],
+                        windowcenter=setup.ofamp_pileup_windowcenter[chan_num],
+                    )
 
             if setup.do_ofamp_pileup_smooth[chan_num]:
                 amp_pileup_smooth[jj], t0_pileup_smooth[jj], chi2_pileup_smooth[jj] = OF_smooth.ofamp_pileup_iterative(
-                                                                   amp_constrain_smooth[jj], t0_constrain_smooth[jj],
-                                                                   nconstrain=setup.ofamp_pileup_nconstrain[chan_num])
+                    amp_constrain_smooth[jj],
+                    t0_constrain_smooth[jj],
+                    nconstrain=setup.ofamp_pileup_nconstrain[chan_num],
+                    windowcenter=setup.ofamp_pileup_windowcenter[chan_num],
+                )
 
             if setup.do_ofamp_baseline[chan_num]:
                 amp_baseline[jj], t0_baseline[jj], chi2_baseline[jj] = OF.ofamp_baseline(
-                                                                       nconstrain=setup.ofamp_baseline_nconstrain[chan_num])
+                    nconstrain=setup.ofamp_baseline_nconstrain[chan_num],
+                    windowcenter=setup.ofamp_baseline_windowcenter[chan_num],
+                )
                 if setup.ofamp_baseline_pulse_constraint[chan_num]!=0:
                     amp_baseline_pcon[jj], t0_baseline_pcon[jj], chi2_baseline_pcon[jj] = OF.ofamp_baseline(
-                                                                 nconstrain=setup.ofamp_baseline_nconstrain[chan_num],
-                                            pulse_direction_constraint=setup.ofamp_baseline_pulse_constraint[chan_num])
+                        nconstrain=setup.ofamp_baseline_nconstrain[chan_num],
+                        pulse_direction_constraint=setup.ofamp_baseline_pulse_constraint[chan_num],
+                        windowcenter=setup.ofamp_baseline_windowcenter[chan_num],
+                    )
 
             if setup.do_ofamp_baseline_smooth[chan_num]:
                 amp_baseline_smooth[jj], t0_baseline_smooth[jj], chi2_baseline_smooth[jj] = OF_smooth.ofamp_baseline(
-                                                                       nconstrain=setup.ofamp_baseline_nconstrain[chan_num])
+                    nconstrain=setup.ofamp_baseline_nconstrain[chan_num],
+                    windowcenter=setup.ofamp_baseline_windowcenter[chan_num],
+                )
 
             if setup.do_ofnonlin[chan_num]:
                 if setup.ofnonlin_positive_pulses[chan_num]:
