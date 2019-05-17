@@ -138,7 +138,7 @@ class TrigSim(object):
                                     TrL_enables=np.array([1,0,0,0,0,0,0,0], dtype=bool),
                                     TrL_requires=TrL_requires, TrL_vetos=TrL_vetos,
                                     TrL_prescales=np.ones(8, dtype='float'))
-        
+
         self.of_coeffs = self._Trigger.build_OF_coeffs(self.input_psds, self.input_pulse_shapes)
         self._Trigger.set_FIR_coeffs(self.of_coeffs)
         self.convtoadcbins = self._convtoadcbins(fir_bits_out, fir_discard_msbs)
@@ -200,7 +200,7 @@ class TrigSim(object):
         """
 
         self._resolution = self._Trigger.resolution(self.input_psds, deltaT_phonon=1/self.fs)
-        
+
         return self._resolution
 
     def set_threshold(self, threshold):
