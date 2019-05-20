@@ -961,7 +961,7 @@ class SetupRQ(object):
 
         if indstop is None:
             indstop = 2*len(self.templates[0])//3
-        
+
         lgcrun, ioffset, qetbias, rload, rsh, indstart, indstop = self._check_arg_length(
             lgcrun=lgcrun,
             ioffset=ioffset,
@@ -1249,17 +1249,17 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         chi2_nodelay_smooth = np.zeros(len(signal))
 
     if setup.do_ofamp_unconstrained[chan_num]:
-        amp_noconstrain = np.zeros(len(signal))
-        t0_noconstrain = np.zeros(len(signal))
-        chi2_noconstrain = np.zeros(len(signal))
+        amp_unconstrain = np.zeros(len(signal))
+        t0_unconstrain = np.zeros(len(signal))
+        chi2_unconstrain = np.zeros(len(signal))
         if setup.ofamp_unconstrained_pulse_constraint[chan_num]!=0:
-            amp_noconstrain_pcon = np.zeros(len(signal))
-            t0_noconstrain_pcon  = np.zeros(len(signal))
-            chi2_noconstrain_pcon  = np.zeros(len(signal))
+            amp_unconstrain_pcon = np.zeros(len(signal))
+            t0_unconstrain_pcon  = np.zeros(len(signal))
+            chi2_unconstrain_pcon  = np.zeros(len(signal))
     if setup.do_ofamp_unconstrained_smooth[chan_num]:
-        amp_noconstrain_smooth = np.zeros(len(signal))
-        t0_noconstrain_smooth = np.zeros(len(signal))
-        chi2_noconstrain_smooth = np.zeros(len(signal))
+        amp_unconstrain_smooth = np.zeros(len(signal))
+        t0_unconstrain_smooth = np.zeros(len(signal))
+        chi2_unconstrain_smooth = np.zeros(len(signal))
 
     if setup.do_ofamp_constrained[chan_num]:
         amp_constrain = np.zeros(len(signal))
@@ -1375,25 +1375,25 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                 )
 
             if setup.do_ofamp_unconstrained[chan_num]:
-                amp_noconstrain[jj], t0_noconstrain[jj], chi2_noconstrain[jj] = OF.ofamp_withdelay()
+                amp_unconstrain[jj], t0_unconstrain[jj], chi2_unconstrain[jj] = OF.ofamp_withdelay()
                 if setup.ofamp_unconstrained_pulse_constraint[chan_num]!=0:
-                    amp_noconstrain_pcon[jj], t0_noconstrain_pcon[jj], chi2_noconstrain_pcon[jj] = OF.ofamp_withdelay(
+                    amp_unconstrain_pcon[jj], t0_unconstrain_pcon[jj], chi2_unconstrain_pcon[jj] = OF.ofamp_withdelay(
                         pulse_direction_constraint=setup.ofamp_unconstrained_pulse_constraint[chan_num],
                     )
 
             if setup.do_ofamp_unconstrained_smooth[chan_num]:
-                amp_noconstrain_smooth[jj], t0_noconstrain_smooth[jj], chi2_noconstrain_smooth[jj] = OF_smooth.ofamp_withdelay()
+                amp_unconstrain_smooth[jj], t0_unconstrain_smooth[jj], chi2_unconstrain_smooth[jj] = OF_smooth.ofamp_withdelay()
 
             if setup.ofamp_unconstrained_lowfreqchi2 and setup.do_chi2_lowfreq[chan_num]:
                 chi2low_unconstrain[jj] = OF.chi2_lowfreq(
-                    amp_noconstrain[jj],
-                    t0_noconstrain[jj],
+                    amp_unconstrain[jj],
+                    t0_unconstrain[jj],
                     fcutoff=setup.chi2_lowfreq_fcutoff[chan_num],
                 )
                 if setup.ofamp_unconstrained_pulse_constraint[chan_num]!=0:
                     chi2low_unconstrain_pcon[jj] = OF.chi2_lowfreq(
-                        amp_noconstrain_pcon[jj],
-                        t0_noconstrain_pcon[jj],
+                        amp_unconstrain_pcon[jj],
+                        t0_unconstrain_pcon[jj],
                         fcutoff=setup.chi2_lowfreq_fcutoff[chan_num],
                     )
 
@@ -1433,8 +1433,8 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                     amp1 = amp_constrain[jj]
                     t01 = t0_constrain[jj]
                 elif setup.do_ofamp_unconstrained[chan_num] and setup.which_fit_pileup=="unconstrained":
-                    amp1 = amp_noconstrain[jj]
-                    t01 = t0_noconstrain[jj]
+                    amp1 = amp_unconstrain[jj]
+                    t01 = t0_unconstrain[jj]
                 elif setup.do_ofamp_nodelay[chan_num] and setup.which_fit_pileup=="nodelay":
                     amp1 = amp_nodelay[jj]
                     t01 = 0
@@ -1459,8 +1459,8 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                     amp1 = amp_constrain_smooth[jj]
                     t01 = t0_constrain_smooth[jj]
                 elif setup.do_ofamp_unconstrained_smooth[chan_num] and setup.which_fit_pileup=="unconstrained":
-                    amp1 = amp_noconstrain_smooth[jj]
-                    t01 = t0_noconstrain_smooth[jj]
+                    amp1 = amp_unconstrain_smooth[jj]
+                    t01 = t0_unconstrain_smooth[jj]
                 elif setup.do_ofamp_nodelay_smooth[chan_num] and setup.which_fit_pileup=="nodelay":
                     amp1 = amp_nodelay_smooth[jj]
                     t01 = 0
@@ -1566,25 +1566,25 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
 
     if setup.do_ofamp_unconstrained[chan_num]:
         rq_dict[f'ofamp_unconstrain_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'ofamp_unconstrain_{chan}{det}'][readout_inds] = amp_noconstrain
+        rq_dict[f'ofamp_unconstrain_{chan}{det}'][readout_inds] = amp_unconstrain
         rq_dict[f't0_unconstrain_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f't0_unconstrain_{chan}{det}'][readout_inds] = t0_noconstrain
+        rq_dict[f't0_unconstrain_{chan}{det}'][readout_inds] = t0_unconstrain
         rq_dict[f'chi2_unconstrain_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'chi2_unconstrain_{chan}{det}'][readout_inds] = chi2_noconstrain
+        rq_dict[f'chi2_unconstrain_{chan}{det}'][readout_inds] = chi2_unconstrain
         if setup.ofamp_unconstrained_pulse_constraint[chan_num]!=0:
             rq_dict[f'ofamp_unconstrain_pcon_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-            rq_dict[f'ofamp_unconstrain_pcon_{chan}{det}'][readout_inds] = amp_noconstrain_pcon
+            rq_dict[f'ofamp_unconstrain_pcon_{chan}{det}'][readout_inds] = amp_unconstrain_pcon
             rq_dict[f't0_unconstrain_pcon_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-            rq_dict[f't0_unconstrain_pcon_{chan}{det}'][readout_inds] = t0_noconstrain_pcon
+            rq_dict[f't0_unconstrain_pcon_{chan}{det}'][readout_inds] = t0_unconstrain_pcon
             rq_dict[f'chi2_unconstrain_pcon_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-            rq_dict[f'chi2_unconstrain_pcon_{chan}{det}'][readout_inds] = chi2_noconstrain_pcon
+            rq_dict[f'chi2_unconstrain_pcon_{chan}{det}'][readout_inds] = chi2_unconstrain_pcon
     if setup.do_ofamp_unconstrained_smooth[chan_num]:
         rq_dict[f'ofamp_unconstrain_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'ofamp_unconstrain_smooth_{chan}{det}'][readout_inds] = amp_noconstrain_smooth
+        rq_dict[f'ofamp_unconstrain_smooth_{chan}{det}'][readout_inds] = amp_unconstrain_smooth
         rq_dict[f't0_unconstrain_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f't0_unconstrain_smooth_{chan}{det}'][readout_inds] = t0_noconstrain_smooth
+        rq_dict[f't0_unconstrain_smooth_{chan}{det}'][readout_inds] = t0_unconstrain_smooth
         rq_dict[f'chi2_unconstrain_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'chi2_unconstrain_smooth_{chan}{det}'][readout_inds] = chi2_noconstrain_smooth
+        rq_dict[f'chi2_unconstrain_smooth_{chan}{det}'][readout_inds] = chi2_unconstrain_smooth
 
     if setup.do_ofamp_constrained[chan_num]:
         rq_dict[f'ofamp_constrain_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
