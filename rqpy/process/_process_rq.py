@@ -1002,7 +1002,7 @@ class SetupRQ(object):
 
         self.do_ofamp_shifted = lgcrun
 
-        if self.do_ofamp_shifted:
+        if any(self.do_ofamp_shifted):
             if which_fit not in ["constrained", "unconstrained", "nodelay"]:
                 raise ValueError("which_fit should be set to 'constrained', 'unconstrained', or 'nodelay'")
 
@@ -1017,7 +1017,7 @@ class SetupRQ(object):
 
         self.do_ofamp_shifted_smooth = lgcrun_smooth
 
-        if self.do_ofamp_shifted_smooth:
+        if any(self.do_ofamp_shifted_smooth):
             if which_fit not in ["constrained", "unconstrained", "nodelay"]:
                 raise ValueError("which_fit should be set to 'constrained', 'unconstrained', or 'nodelay'")
 
