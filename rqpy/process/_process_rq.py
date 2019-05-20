@@ -227,6 +227,9 @@ class SetupRQ(object):
     t0_shifted : ndarray
         Attribute used to save the times to shift the non-trigger channels. Only used if `do_ofamp_shifted`
         is True.
+    t0_shifted_smooth : ndarray
+        Attribute used to save the times to shift the non-trigger channels. Only used if `do_ofamp_shifted_smooth`
+        is True.
     do_ofnonlin : list of bool
         Boolean flag for whether or not the nonlinear optimum filter fit with floating rise and fall time 
         should be calculated. Default is False. Each value in the list specifies this attribute for each channel.
@@ -400,6 +403,7 @@ class SetupRQ(object):
         self.do_ofamp_shifted_smooth = [False]*self.nchan
         self.which_fit = "constrained"
         self.t0_shifted = None
+        self.t0_shifted_smooth = None
 
         self.do_maxmin = [True]*self.nchan
         self.use_min = [False]*self.nchan
@@ -1266,6 +1270,33 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
             if setup.ofamp_constrained_pulse_constraint[chan_num]!=0:
                 chi2low_constrain_pcon = np.zeros(len(signal))
 
+    if any(setup.do_ofamp_shifted) and setup.trigger is not None:
+        # do the shifted OF on each trace
+        if chan_num==setup.trigger:
+            if setup.shifted_fit=="nodelay" and any(setup.do_ofamp_nodelay):
+                setup.t0_shifted = np.zeros(len(signal))
+            elif setup.shifted_fit=="constrained" and any(setup.do_ofamp_constrained):
+                setup.t0_shifted = t0_constrain
+            elif setup.shifted_fit=="unconstrained" and any(setup.do_ofamp_unconstrained):
+                setup.t0_shifted = t0_unconstrain
+        elif setup.do_ofamp_shifted[chan_num]:
+            amp_shifted = np.zeros(len(signal))
+            chi2_shifted = np.zeros(len(signal))
+
+    if any(setup.do_ofamp_shifted_smooth) and setup.trigger is not None:
+        # do the shifted OF on each trace
+        if chan_num==setup.trigger:
+            if not setup.do_ofamp_shifted:
+                if setup.shifted_fit=="nodelay" and any(setup.do_ofamp_nodelay_smooth):
+                    setup.t0_shifted_smooth = np.zeros(len(signal))
+                elif setup.shifted_fit=="constrained" and any(setup.do_ofamp_constrained_smooth):
+                    setup.t0_shifted_smooth = t0_constrain
+                elif setup.shifted_fit=="unconstrained" and any(setup.do_ofamp_unconstrained_smooth):
+                    setup.t0_shifted_smooth = t0_unconstrain
+        elif setup.do_ofamp_shifted_smooth[chan_num]:
+            amp_shifted_smooth = np.zeros(len(signal))
+            chi2_shifted_smooth = np.zeros(len(signal))
+
     if setup.do_ofnonlin[chan_num]:
         amp_nonlin = np.zeros(len(signal))
         amp_nonlin_err = np.zeros(len(signal))
@@ -1414,6 +1445,16 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                 amp_baseline_smooth[jj], t0_baseline_smooth[jj], chi2_baseline_smooth[jj] = OF_smooth.ofamp_baseline(
                     nconstrain=setup.ofamp_baseline_nconstrain[chan_num],
                     windowcenter=setup.ofamp_baseline_windowcenter[chan_num],
+                )
+
+            if setup.do_ofamp_shifted[chan_num] and setup.trigger is not None and chan_num!=setup.trigger:
+                amp_shifted[jj], chi2_shifted[jj] = OF.ofamp_nodelay(
+                    windowcenter=int(setup.t0_shifted[jj] * fs),
+                )
+
+            if setup.do_ofamp_shifted_smooth[chan_num] and setup.trigger is not None and chan_num!=setup.trigger:
+                amp_shifted_smooth[jj], _, chi2_shifted_smooth[jj] = OF_smooth.ofamp_nodelay(
+                    windowcenter=int(setup.t0_shifted_smooth[jj] * fs),
                 )
 
             if setup.do_ofnonlin[chan_num]:
@@ -1601,54 +1642,21 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         rq_dict[f'ofamp_nodelay_sim_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'ofamp_nodelay_sim_{chan}{det}'][readout_inds] = ofampnodelay_sim
 
-    if any(setup.do_ofamp_shifted) and setup.trigger is not None:
-        # do the shifted OF on each trace
-        if chan_num==setup.trigger:
-            if setup.shifted_fit=="nodelay" and any(setup.do_ofamp_nodelay):
-                setup.t0_shifted = np.zeros(len(signal))
-            elif setup.shifted_fit=="constrained" and any(setup.do_ofamp_constrained):
-                setup.t0_shifted = t0_constrain
-            elif setup.shifted_fit=="unconstrained" and any(setup.do_ofamp_unconstrained):
-                setup.t0_shifted = t0_unconstrain
-        elif setup.do_ofamp_shifted[chan_num]:
-            amp_shifted = np.zeros(len(signal))
-            chi2_shifted = np.zeros(len(signal))
+    if setup.do_ofamp_shifted[chan_num] and setup.trigger is not None and chan_num!=setup.trigger:
+        rq_dict[f'ofamp_shifted_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'ofamp_shifted_{chan}{det}'][readout_inds] = amp_shifted
+        rq_dict[f't0_shifted_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f't0_shifted_{chan}{det}'][readout_inds] = setup.t0_shifted
+        rq_dict[f'chi2_shifted_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2_shifted_{chan}{det}'][readout_inds] = chi2_shifted
 
-            for jj, s in enumerate(signal):
-                amp_shifted[jj], _, chi2_shifted[jj] = qp.ofamp(s, rp.shift(template, int(setup.t0_shifted[jj]*fs)), 
-                                                                            psd, fs, withdelay=False)
-
-            rq_dict[f'ofamp_shifted_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-            rq_dict[f'ofamp_shifted_{chan}{det}'][readout_inds] = amp_shifted
-            rq_dict[f't0_shifted_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-            rq_dict[f't0_shifted_{chan}{det}'][readout_inds] = setup.t0_shifted
-            rq_dict[f'chi2_shifted_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-            rq_dict[f'chi2_shifted_{chan}{det}'][readout_inds] = chi2_shifted
-
-    if any(setup.do_ofamp_shifted_smooth) and setup.trigger is not None:
-        # do the shifted OF on each trace
-        if chan_num==setup.trigger:
-            if not setup.do_ofamp_shifted:
-                if setup.shifted_fit=="nodelay" and any(setup.do_ofamp_nodelay_smooth):
-                    setup.t0_shifted = np.zeros(len(signal))
-                elif setup.shifted_fit=="constrained" and any(setup.do_ofamp_constrained_smooth):
-                    setup.t0_shifted = t0_constrain
-                elif setup.shifted_fit=="unconstrained" and any(setup.do_ofamp_unconstrained_smooth):
-                    setup.t0_shifted = t0_unconstrain
-        elif setup.do_ofamp_shifted_smooth[chan_num]:
-            amp_shifted_smooth = np.zeros(len(signal))
-            chi2_shifted_smooth = np.zeros(len(signal))
-
-            for jj, s in enumerate(signal):
-                amp_shifted_smooth[jj], _, chi2_shifted_smooth[jj] = qp.ofamp(s, rp.shift(template, int(setup.t0_shifted[jj]*fs)), 
-                                                                              psd_smooth, fs, withdelay=False)
-
-            rq_dict[f'ofamp_shifted_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-            rq_dict[f'ofamp_shifted_smooth_{chan}{det}'][readout_inds] = amp_shifted_smooth
-            rq_dict[f't0_shifted_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-            rq_dict[f't0_shifted_smooth_{chan}{det}'][readout_inds] = setup.t0_shifted
-            rq_dict[f'chi2_shifted_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-            rq_dict[f'chi2_shifted_smooth_{chan}{det}'][readout_inds] = chi2_shifted_smooth
+    if setup.do_ofamp_shifted_smooth[chan_num] and setup.trigger is not None and chan_num!=setup.trigger:
+        rq_dict[f'ofamp_shifted_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'ofamp_shifted_smooth_{chan}{det}'][readout_inds] = amp_shifted_smooth
+        rq_dict[f't0_shifted_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f't0_shifted_smooth_{chan}{det}'][readout_inds] = setup.t0_shifted
+        rq_dict[f'chi2_shifted_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2_shifted_smooth_{chan}{det}'][readout_inds] = chi2_shifted_smooth
 
     return rq_dict
 
