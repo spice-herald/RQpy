@@ -219,7 +219,7 @@ class SetupRQ(object):
         with a smoothed PSD. Useful in the case where the PSD for a channel has large spike(s) 
         in order to suppress echoes elsewhere in the trace. Each value in the list specifies this
         attribute for each channel.
-    shifted_fit : str
+    which_fit_shifted : str
         String specifying which fit that the time shift should be pulled from if the shifted
         optimum filter fit will be calculated. Should be "nodelay", "constrained", or "unconstrained",
         referring the the no delay OF, constrained OF, and unconstrained OF, respectively. Default
@@ -401,7 +401,7 @@ class SetupRQ(object):
 
         self.do_ofamp_shifted = [False]*self.nchan
         self.do_ofamp_shifted_smooth = [False]*self.nchan
-        self.which_fit = "constrained"
+        self.which_fit_shifted = "constrained"
         self.t0_shifted = None
         self.t0_shifted_smooth = None
 
@@ -1033,7 +1033,7 @@ class SetupRQ(object):
                 raise ValueError("""which_fit was set to 'nodelay', but that fit (using the smoothed PSD) 
                                  has been set to not be calculated""")
 
-        self.shifted_fit = which_fit
+        self.which_fit_shifted = which_fit
 
     def adjust_ofnonlin(self, lgcrun=True, positive_pulses=True):
         """
@@ -1273,11 +1273,11 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
     if any(setup.do_ofamp_shifted) and setup.trigger is not None:
         # do the shifted OF on each trace
         if chan_num==setup.trigger:
-            if setup.shifted_fit=="nodelay" and any(setup.do_ofamp_nodelay):
+            if setup.which_fit_shifted=="nodelay" and any(setup.do_ofamp_nodelay):
                 setup.t0_shifted = np.zeros(len(signal))
-            elif setup.shifted_fit=="constrained" and any(setup.do_ofamp_constrained):
+            elif setup.which_fit_shifted=="constrained" and any(setup.do_ofamp_constrained):
                 setup.t0_shifted = t0_constrain
-            elif setup.shifted_fit=="unconstrained" and any(setup.do_ofamp_unconstrained):
+            elif setup.which_fit_shifted=="unconstrained" and any(setup.do_ofamp_unconstrained):
                 setup.t0_shifted = t0_unconstrain
         elif setup.do_ofamp_shifted[chan_num]:
             amp_shifted = np.zeros(len(signal))
@@ -1287,11 +1287,11 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         # do the shifted OF on each trace
         if chan_num==setup.trigger:
             if not setup.do_ofamp_shifted:
-                if setup.shifted_fit=="nodelay" and any(setup.do_ofamp_nodelay_smooth):
+                if setup.which_fit_shifted=="nodelay" and any(setup.do_ofamp_nodelay_smooth):
                     setup.t0_shifted_smooth = np.zeros(len(signal))
-                elif setup.shifted_fit=="constrained" and any(setup.do_ofamp_constrained_smooth):
+                elif setup.which_fit_shifted=="constrained" and any(setup.do_ofamp_constrained_smooth):
                     setup.t0_shifted_smooth = t0_constrain
-                elif setup.shifted_fit=="unconstrained" and any(setup.do_ofamp_unconstrained_smooth):
+                elif setup.which_fit_shifted=="unconstrained" and any(setup.do_ofamp_unconstrained_smooth):
                     setup.t0_shifted_smooth = t0_unconstrain
         elif setup.do_ofamp_shifted_smooth[chan_num]:
             amp_shifted_smooth = np.zeros(len(signal))
