@@ -123,6 +123,11 @@ class SetupRQ(object):
         pulse direction is set. If 1, then a positive pulse constraint is set for all fits. 
         If -1, then a negative pulse constraint is set for all fits. If any other value, then
         an ValueError will be raised. Each value in the list specifies this attribute for each channel.
+    which_fit_pileup : str
+        String specifying which fit that first pulse should use if the iterative pileup
+        optimum filter fit will be calculated. Should be "nodelay", "constrained", or "unconstrained",
+        referring the the no delay OF, constrained OF, and unconstrained OF, respectively. Default
+        is "constrained".
     do_chi2_nopulse : list of bool
         Boolean flag for whether or not to calculate the chi^2 for no pulse. Each value in the list specifies
         this attribute for each channel.
@@ -368,6 +373,7 @@ class SetupRQ(object):
         self.ofamp_pileup_nconstrain = [80]*self.nchan
         self.ofamp_pileup_windowcenter = [0]*self.nchan
         self.ofamp_pileup_pulse_constraint = [0]*self.nchan
+        self.which_fit_pileup = "constrained"
 
         self.do_chi2_nopulse = [True]*self.nchan
         self.do_chi2_nopulse_smooth = [False]*self.nchan
@@ -715,7 +721,7 @@ class SetupRQ(object):
 
         self._check_of()
 
-    def adjust_ofamp_pileup(self, lgcrun=True, lgcrun_smooth=False, 
+    def adjust_ofamp_pileup(self, lgcrun=True, lgcrun_smooth=False, which_fit="constrained",
                             nconstrain=80, windowcenter=0, pulse_direction_constraint=0):
         """
         Method for adjusting the calculation of the pileup optimum filter fit.
@@ -728,6 +734,11 @@ class SetupRQ(object):
             Boolean flag for whether or not the pileup optimum filter fit should be calculated
             with a smoothed PSD. Useful in the case where the PSD for a channel has large spike(s)
             in order to suppress echoes elsewhere in the trace.
+        which_fit : str, optional
+            String specifying which fit that first pulse should use if the iterative pileup
+            optimum filter fit will be calculated. Should be "nodelay", "constrained", or "unconstrained",
+            referring the the no delay OF, constrained OF, and unconstrained OF, respectively. Default
+            is "constrained".
         nconstrain : int, list of int, optional
             The length of the window (in bins), centered on the middle of the trace, outside
             of which to constrain the possible time shift values to when searching for a
@@ -760,6 +771,37 @@ class SetupRQ(object):
         self.ofamp_pileup_nconstrain = nconstrain
         self.ofamp_pileup_windowcenter = windowcenter
         self.ofamp_pileup_pulse_constraint = pulse_direction_constraint
+
+        if any(self.do_ofamp_pileup):
+            if which_fit not in ["constrained", "unconstrained", "nodelay"]:
+                raise ValueError("which_fit should be set to 'constrained', 'unconstrained', or 'nodelay'")
+
+            if which_fit == "constrained" and not self.do_ofamp_constrained:
+                raise ValueError("which_fit was set to 'constrained', but that fit has been set to not be calculated")
+
+            if which_fit == "unconstrained" and not self.do_ofamp_unconstrained:
+                raise ValueError("which_fit was set to 'constrained', but that fit has been set to not be calculated")
+
+            if which_fit == "nodelay" and not self.do_ofamp_nodelay:
+                raise ValueError("which_fit was set to 'nodelay', but that fit has been set to not be calculated")
+
+        if any(self.do_ofamp_pileup_smooth):
+            if which_fit not in ["constrained", "unconstrained", "nodelay"]:
+                raise ValueError("which_fit should be set to 'constrained', 'unconstrained', or 'nodelay'")
+
+            if which_fit == "constrained" and not self.do_ofamp_constrained_smooth:
+                raise ValueError("""which_fit was set to 'constrained', but that fit (using the smoothed PSD) 
+                                 has been set to not be calculated""")
+
+            if which_fit == "unconstrained" and not self.do_ofamp_unconstrained_smooth:
+                raise ValueError("""which_fit was set to 'constrained', but that fit (using the smoothed PSD) 
+                                 has been set to not be calculated""")
+
+            if which_fit == "nodelay" and not self.do_ofamp_nodelay_smooth:
+                raise ValueError("""which_fit was set to 'nodelay', but that fit (using the smoothed PSD) 
+                                 has been set to not be calculated""")
+
+        self.which_fit_pileup = which_fit
 
         self._check_of()
 
@@ -1270,32 +1312,13 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
             if setup.ofamp_constrained_pulse_constraint[chan_num]!=0:
                 chi2low_constrain_pcon = np.zeros(len(signal))
 
-    if any(setup.do_ofamp_shifted) and setup.trigger is not None:
-        # do the shifted OF on each trace
-        if chan_num==setup.trigger:
-            if setup.which_fit_shifted=="nodelay" and any(setup.do_ofamp_nodelay):
-                setup.t0_shifted = np.zeros(len(signal))
-            elif setup.which_fit_shifted=="constrained" and any(setup.do_ofamp_constrained):
-                setup.t0_shifted = t0_constrain
-            elif setup.which_fit_shifted=="unconstrained" and any(setup.do_ofamp_unconstrained):
-                setup.t0_shifted = t0_unconstrain
-        elif setup.do_ofamp_shifted[chan_num]:
-            amp_shifted = np.zeros(len(signal))
-            chi2_shifted = np.zeros(len(signal))
+    if setup.do_ofamp_shifted[chan_num] and setup.trigger not in [None, chan_num]:
+        amp_shifted = np.zeros(len(signal))
+        chi2_shifted = np.zeros(len(signal))
 
-    if any(setup.do_ofamp_shifted_smooth) and setup.trigger is not None:
-        # do the shifted OF on each trace
-        if chan_num==setup.trigger:
-            if not setup.do_ofamp_shifted:
-                if setup.which_fit_shifted=="nodelay" and any(setup.do_ofamp_nodelay_smooth):
-                    setup.t0_shifted_smooth = np.zeros(len(signal))
-                elif setup.which_fit_shifted=="constrained" and any(setup.do_ofamp_constrained_smooth):
-                    setup.t0_shifted_smooth = t0_constrain
-                elif setup.which_fit_shifted=="unconstrained" and any(setup.do_ofamp_unconstrained_smooth):
-                    setup.t0_shifted_smooth = t0_unconstrain
-        elif setup.do_ofamp_shifted_smooth[chan_num]:
-            amp_shifted_smooth = np.zeros(len(signal))
-            chi2_shifted_smooth = np.zeros(len(signal))
+    if setup.do_ofamp_shifted_smooth[chan_num] and setup.trigger not in [None, chan_num]:
+        amp_shifted_smooth = np.zeros(len(signal))
+        chi2_shifted_smooth = np.zeros(len(signal))
 
     if setup.do_ofnonlin[chan_num]:
         amp_nonlin = np.zeros(len(signal))
@@ -1363,7 +1386,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
 
             if setup.ofamp_unconstrained_lowfreqchi2 and setup.do_chi2_lowfreq[chan_num]:
                 chi2low_unconstrain[jj] = OF.chi2_lowfreq(
-                    mp_noconstrain[jj],
+                    amp_noconstrain[jj],
                     t0_noconstrain[jj],
                     fcutoff=setup.chi2_lowfreq_fcutoff[chan_num],
                 )
@@ -1406,25 +1429,45 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                     )
 
             if setup.do_ofamp_pileup[chan_num]:
+                if setup.do_ofamp_constrained[chan_num] and setup.which_fit_pileup=="constrained":
+                    amp1 = amp_constrain[jj]
+                    t01 = t0_constrain[jj]
+                elif setup.do_ofamp_unconstrained[chan_num] and setup.which_fit_pileup=="unconstrained":
+                    amp1 = amp_noconstrain[jj]
+                    t01 = t0_noconstrain[jj]
+                elif setup.do_ofamp_nodelay[chan_num] and setup.which_fit_pileup=="nodelay":
+                    amp1 = amp_nodelay[jj]
+                    t01 = 0
+
                 amp_pileup[jj], t0_pileup[jj], chi2_pileup[jj] = OF.ofamp_pileup_iterative(
-                    amp_constrain[jj],
-                    t0_constrain[jj],
+                    amp1,
+                    t01,
                     nconstrain=setup.ofamp_pileup_nconstrain[chan_num],
                     windowcenter=setup.ofamp_pileup_windowcenter[chan_num],
                 )
                 if setup.ofamp_pileup_pulse_constraint[chan_num]!=0:
                     amp_pileup_pcon[jj], t0_pileup_pcon[jj], chi2_pileup_pcon[jj] = OF.ofamp_pileup_iterative(
-                        amp_constrain[jj],
-                        t0_constrain[jj],
+                        amp1,
+                        t01,
                         nconstrain=setup.ofamp_pileup_nconstrain[chan_num],
                         pulse_direction_constraint=setup.ofamp_pileup_pulse_constraint[chan_num],
                         windowcenter=setup.ofamp_pileup_windowcenter[chan_num],
                     )
 
             if setup.do_ofamp_pileup_smooth[chan_num]:
+                if setup.do_ofamp_constrained_smooth[chan_num] and setup.which_fit_pileup=="constrained":
+                    amp1 = amp_constrain_smooth[jj]
+                    t01 = t0_constrain_smooth[jj]
+                elif setup.do_ofamp_unconstrained_smooth[chan_num] and setup.which_fit_pileup=="unconstrained":
+                    amp1 = amp_noconstrain_smooth[jj]
+                    t01 = t0_noconstrain_smooth[jj]
+                elif setup.do_ofamp_nodelay_smooth[chan_num] and setup.which_fit_pileup=="nodelay":
+                    amp1 = amp_nodelay_smooth[jj]
+                    t01 = 0
+
                 amp_pileup_smooth[jj], t0_pileup_smooth[jj], chi2_pileup_smooth[jj] = OF_smooth.ofamp_pileup_iterative(
-                    amp_constrain_smooth[jj],
-                    t0_constrain_smooth[jj],
+                    amp1,
+                    t01,
                     nconstrain=setup.ofamp_pileup_nconstrain[chan_num],
                     windowcenter=setup.ofamp_pileup_windowcenter[chan_num],
                 )
@@ -1447,12 +1490,12 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                     windowcenter=setup.ofamp_baseline_windowcenter[chan_num],
                 )
 
-            if setup.do_ofamp_shifted[chan_num] and setup.trigger is not None and chan_num!=setup.trigger:
+            if setup.do_ofamp_shifted[chan_num] and setup.trigger not in [None, chan_num]:
                 amp_shifted[jj], chi2_shifted[jj] = OF.ofamp_nodelay(
                     windowcenter=int(setup.t0_shifted[jj] * fs),
                 )
 
-            if setup.do_ofamp_shifted_smooth[chan_num] and setup.trigger is not None and chan_num!=setup.trigger:
+            if setup.do_ofamp_shifted_smooth[chan_num] and setup.trigger not in [None, chan_num]:
                 amp_shifted_smooth[jj], _, chi2_shifted_smooth[jj] = OF_smooth.ofamp_nodelay(
                     windowcenter=int(setup.t0_shifted_smooth[jj] * fs),
                 )
@@ -1485,6 +1528,22 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                 triggeramp_sim[jj] = res_trigsim[0]
                 triggertime_sim[jj] = res_trigsim[1]
                 ofampnodelay_sim[jj] = res_trigsim[2]
+
+    if any(setup.do_ofamp_shifted) and setup.trigger is not None and chan_num==setup.trigger:
+        if setup.which_fit_shifted=="nodelay" and any(setup.do_ofamp_nodelay):
+            setup.t0_shifted = np.zeros(len(signal))
+        elif setup.which_fit_shifted=="constrained" and any(setup.do_ofamp_constrained):
+            setup.t0_shifted = t0_constrain
+        elif setup.which_fit_shifted=="unconstrained" and any(setup.do_ofamp_unconstrained):
+            setup.t0_shifted = t0_unconstrain
+
+    if any(setup.do_ofamp_shifted_smooth) and setup.trigger is not None and chan_num==setup.trigger:
+        if setup.which_fit_shifted=="nodelay" and any(setup.do_ofamp_nodelay_smooth):
+            setup.t0_shifted_smooth = np.zeros(len(signal))
+        elif setup.which_fit_shifted=="constrained" and any(setup.do_ofamp_constrained_smooth):
+            setup.t0_shifted_smooth = t0_constrain_smooth
+        elif setup.which_fit_shifted=="unconstrained" and any(setup.do_ofamp_unconstrained_smooth):
+            setup.t0_shifted_smooth = t0_unconstrain_smooth
 
     # save variables to dict
     if setup.do_chi2_nopulse[chan_num]:
