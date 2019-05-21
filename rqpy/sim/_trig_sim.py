@@ -63,19 +63,11 @@ class TrigSim(object):
         and re-arranged for input into the FIR filter code.
     fs : float
         The digitization rate of the data in Hz.
-    can_run_trigger : bool
-        A boolean flag for whether or not the `TrigSim.trigger` method can be run.
-    which_channel : int
-        The channel that the FIR filter will be triggering. Always set to zero, should not be
-        changed.
     of_coeffs : ndarray
         The coefficients of the FIR filter that will be applied to the downsampled
         data.
     _resolution : list
         The calculated resolution of the FIR filter.
-    threshold : int
-        The threshold to set for triggering on pulses, should be in the arbitrary units of the
-        filter.
     convtoadcbins : float
         The conversion factor for expressing FIR filter amplitudes in units of ADC bins.
 
@@ -112,12 +104,10 @@ class TrigSim(object):
         self.input_psds = [psd]*12 + [np.ones(4*len(psd))]*4
         self.input_pulse_shapes = [template]*12 + [np.zeros(4*template.shape[0])]*4
         self.fs = fs
-        self.can_run_trigger = False
-        self.threshold = 0
 
         raw_LC_coeffs = np.zeros((4,16))
-        self.which_channel = 0
-        raw_LC_coeffs[0, self.which_channel] = 1 # only one phonon channel
+        which_channel = 0
+        raw_LC_coeffs[0, which_channel] = 1 # only one phonon channel
         LC_coeffs = trigsim.scale_max(raw_LC_coeffs, bits=8, axis=1)
         TrL_requires = np.zeros((8,16), dtype=bool)
         TrL_vetos = np.zeros((8,16), dtype=bool)
@@ -138,7 +128,7 @@ class TrigSim(object):
                                     TrL_enables=np.array([1,0,0,0,0,0,0,0], dtype=bool),
                                     TrL_requires=TrL_requires, TrL_vetos=TrL_vetos,
                                     TrL_prescales=np.ones(8, dtype='float'))
-        
+
         self.of_coeffs = self._Trigger.build_OF_coeffs(self.input_psds, self.input_pulse_shapes)
         self._Trigger.set_FIR_coeffs(self.of_coeffs)
         self.convtoadcbins = self._convtoadcbins(fir_bits_out, fir_discard_msbs)
@@ -194,59 +184,14 @@ class TrigSim(object):
 
         Returns
         -------
-        resolution : ndarray
+        resolution : list
             The resolution of the FIR filter.
 
         """
 
         self._resolution = self._Trigger.resolution(self.input_psds, deltaT_phonon=1/self.fs)
-        
+
         return self._resolution
-
-    def set_threshold(self, threshold):
-        """
-        Method for calculation the resolution of the FIR filter in the arbitrary units of the filter.
-
-        Parameters
-        ----------
-        threshold : float
-            The threshold to set for triggering on pulses, should be in the arbitrary units of the
-            filter.
-
-        Notes
-        -----
-        For this function, if the trigger is already known, then it is recommended that the user
-        calculate the resolution of the FIR filter using the `TrigSim.resolution` method. The output
-        of that function times the number of standard deviations desired can then be directly passed 
-        to this function.
-
-        Examples
-        --------
-        >>> import rqpy as rp
-
-        Load the PSD, template, and fs for passing to `TrigSim`.
-
-        >>> psd, template, fs = my_load_function('/path/to/data/file.ext')
-        >>> TS = rp.sim.TrigSim(psd, template, fs)
-        >>> resolution = TS.resolution()
-
-        Set the treshold to a 5-sigma threshold.
-
-        >>> TS.set_threshold(5*resolution[0])
-
-        Now the `TrigSim.trigger` method can be run on some data, where we have a 5-sigma trigger
-        threshold.
-
-        """
-
-        self.threshold = threshold
-
-        if np.isscalar(threshold):
-            threshold = (~np.all(~self.of_coeffs, axis=1)).astype(float)*threshold
-
-        self._Trigger.ThL.ThLs[self.which_channel].set_thresholds(np.int64(threshold), 0)
-
-        self.can_run_trigger = True
 
     def trigger(self, x, k=12):
         """
@@ -270,20 +215,15 @@ class TrigSim(object):
             The time of the triggered pulse as calculated by the FIR filter, in s. Taken as the bin
             number of the maximum amplitude within the valid part of the trace divided by the
             downsampled digitization rate.
+        fir_nodelay : float
+            The OF amplitude at the center of the trace, taken as the center value of FIR filtered
+            trace. This is equivalent to the no time-shifting OF amplitude, using the FIR filter
+            output.
         fir_out : ndarray
             The complete, filtered trace corresponding to the inputted trace, in the arbitrary
             units of the filter.
 
-        Raises
-        ------
-        ValueError
-            If the `TrigSim.set_threshold` method was not used to set the trigger threshold,
-            then an error is thrown because the trigger is not properly set up.
-
         """
-
-        if not self.can_run_trigger:
-            raise ValueError("The threshold was not set, please use the TrigSim.set_threshold method.")
 
         input_traces = [(x[k:] - 32768).astype('int64')] + [np.zeros(len(x[k:]),dtype='int64')]*11 + \
                        [np.zeros(4*len(x[k:]),dtype='int64')]*4
@@ -293,14 +233,12 @@ class TrigSim(object):
         pipe = trigsim.pipeline(self._Trigger.DF, self._Trigger.LC, self._Trigger.LC_trunc, 
                                 self._Trigger.FIR, self._Trigger.FIR_trunc)
 
-        fir_out = pipe.send(input_traces)
-
         bins_to_keep = (len(x) - k)//16 - 1024
 
-        if any(fir_out[0, -bins_to_keep:] >= self.threshold):
-            triggeramp = fir_out[0, -bins_to_keep:].max()
-            triggertime = (np.argmax(fir_out[0, -bins_to_keep:]) + 512 + k / 16) / (self.fs / 16)
+        fir_out = pipe.send(input_traces)[0, -bins_to_keep:]
 
-            return triggeramp, triggertime, fir_out[0, -bins_to_keep:]
-        else:
-            return 0, 0, fir_out[0, -bins_to_keep:]
+        triggeramp = fir_out.max()
+        triggertime = (np.argmax(fir_out) + 513 + k / 16) / (self.fs / 16)
+        fir_nodelay = fir_out[len(fir_out)//2 - 1 + len(fir_out)%2]
+
+        return triggeramp, triggertime, fir_nodelay, fir_out
