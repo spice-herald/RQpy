@@ -654,7 +654,7 @@ class SetupRQ(object):
 
         """
 
-        lgcrun, lgcrun_smooth, nconstrain, pulse_direction_constraint = self._check_arg_length(
+        lgcrun, lgcrun_smooth, nconstrain, windowcenter, pulse_direction_constraint = self._check_arg_length(
             lgcrun=lgcrun,
             lgcrun_smooth=lgcrun_smooth,
             nconstrain=nconstrain,
@@ -705,7 +705,7 @@ class SetupRQ(object):
 
         """
 
-        lgcrun, lgcrun_smooth, nconstrain, pulse_direction_constraint = self._check_arg_length(
+        lgcrun, lgcrun_smooth, nconstrain, windowcenter, pulse_direction_constraint = self._check_arg_length(
             lgcrun=lgcrun,
             lgcrun_smooth=lgcrun_smooth,
             nconstrain=nconstrain,
@@ -758,7 +758,7 @@ class SetupRQ(object):
 
         """
 
-        lgcrun, lgcrun_smooth, nconstrain, pulse_direction_constraint = self._check_arg_length(
+        lgcrun, lgcrun_smooth, nconstrain, windowcenter, pulse_direction_constraint = self._check_arg_length(
             lgcrun=lgcrun,
             lgcrun_smooth=lgcrun_smooth,
             nconstrain=nconstrain,
