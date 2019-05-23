@@ -824,6 +824,11 @@ def conf_ellipse(mu, cov, conf=0.68, ax=None, **kwargs):
     ax : axes.Axes object
         Matplotlib Axes object
 
+    Raises
+    ------
+    ValueError
+        If `conf` is not in the range [0, 1]
+
     Notes
     -----
     The valid keyword arguments are (taken from the Ellipse docstring). In this function, `fill` is defaulted to False.
@@ -862,6 +867,9 @@ def conf_ellipse(mu, cov, conf=0.68, ax=None, **kwargs):
 
     if isinstance(mu, np.ndarray):
         mu = mu.tolist()
+
+    if not rp.inrange(conf, 0, 1):
+        raise ValueError("conf should be in the range [0, 1]")
 
     if ax is None:
         fig, ax = plt.subplots(figsize=(9, 6))
