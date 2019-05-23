@@ -1,16 +1,20 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors as clrs
+from matplotlib.patches import Ellipse
+from scipy import stats
 import rqpy as rp
 import types
 
 
-__all__ = ["hist",
-           "scatter",
-           "densityplot",
-           "passageplot",
-           "RatePlot",
-          ]
+__all__ = [
+    "hist",
+    "scatter",
+    "densityplot",
+    "passageplot",
+    "RatePlot",
+    "conf_ellipse",
+]
 
 
 def hist(arr, nbins='sqrt', xlims=None, cuts=None, lgcrawdata=True,
@@ -793,3 +797,96 @@ class RatePlot(RQpyPlot):
                         )
 
         self._update_colors("--")
+
+def conf_ellipse(mu, cov, conf=0.68, ax=None, **kwargs):
+    """
+    Draw a 2-D confidence level ellipse based on a mean, covariance matrix,
+    and specified confidence level.
+
+    Parameters
+    ----------
+    mu : array_like
+        The x and y values of the mean, where the ellipse will be centered.
+    cov : ndarray
+        A 2-by-2 covariance matrix describing the relation of the x and y variables.
+    conf : float
+        The confidence level at which to draw the ellipse. Should be a value between
+        0 and 1. Default is 0.68.
+    ax : axes.Axes object, NoneType, optional
+        Option to pass an existing Matplotlib Axes object to plot over, if it already exists.
+    **kwargs
+        Keyword arguments to pass to `Ellipse`. See Notes for more information.
+
+    Returns
+    -------
+    fig : Figure, NoneType
+        Matplotlib Figure object. Set to None if ax is passed as a parameter.
+    ax : axes.Axes object
+        Matplotlib Axes object
+
+    Notes
+    -----
+    The valid keyword arguments are (taken from the Ellipse docstring). In this function, `fill` is defaulted to False.
+        agg_filter: a filter function, which takes a (m, n, 3) float array and a dpi value, and returns a (m, n, 3) array
+        alpha: float or None
+        animated: bool
+        antialiased: unknown
+        capstyle: {'butt', 'round', 'projecting'}
+        clip_box: `.Bbox`
+        clip_on: bool
+        clip_path: [(`~matplotlib.path.Path`, `.Transform`) | `.Patch` | None]
+        color: color
+        contains: callable
+        edgecolor: color or None or 'auto'
+        facecolor: color or None
+        figure: `.Figure`
+        fill: bool
+        gid: str
+        hatch: {'/', '\\', '|', '-', '+', 'x', 'o', 'O', '.', '*'}
+        in_layout: bool
+        joinstyle: {'miter', 'round', 'bevel'}
+        label: object
+        linestyle: {'-', '--', '-.', ':', '', (offset, on-off-seq), ...}
+        linewidth: float or None for default
+        path_effects: `.AbstractPathEffect`
+        picker: None or bool or float or callable
+        rasterized: bool or None
+        sketch_params: (scale: float, length: float, randomness: float)
+        snap: bool or None
+        transform: `.Transform`
+        url: str
+        visible: bool
+        zorder: float
+
+    """
+
+    if isinstance(mu, np.ndarray):
+        mu = mu.tolist()
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(9, 6))
+    else:
+        fig = None
+
+    if 'fill' not in kwargs:
+        kwargs['fill'] = False
+
+    a, v = np.linalg.eig(cov)
+    v0 = v[:,0]
+    v1 = v[:,1]
+
+    theta = np.arctan2(v1[1], v1[0])
+
+    quantile = stats.chi2.ppf(conf, 2)
+
+    ell = Ellipse(
+        mu,
+        2 * (quantile * a[1])**0.5,
+        2 * (quantile * a[0])**0.5,
+        angle=theta * 180/np.pi,
+        **kwargs,
+    )
+
+    ax_ell = ax.add_artist(ell)
+
+    return fig, ax
