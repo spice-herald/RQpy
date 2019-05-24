@@ -874,6 +874,9 @@ def conf_ellipse(mu, cov, conf=0.68, ax=None, **kwargs):
 
     if ax is None:
         fig, ax = plt.subplots(figsize=(9, 6))
+        ax.grid()
+        ax.grid(which="minor", axis="both", linestyle="dotted")
+        ax.tick_params(which="both", direction="in", right=True, top=True)
         autoscale_axes = True
     else:
         fig = None
@@ -882,7 +885,7 @@ def conf_ellipse(mu, cov, conf=0.68, ax=None, **kwargs):
     if 'fill' not in kwargs:
         kwargs['fill'] = False
 
-    if 'zorder' not in kwargs:
+    if 'zorder' not in kwargs and len(ax.lines + ax.collections) > 0:
         kwargs['zorder'] = max(lc.get_zorder() for lc in ax.lines + ax.collections) + 0.1
 
     a, v = np.linalg.eig(cov)
