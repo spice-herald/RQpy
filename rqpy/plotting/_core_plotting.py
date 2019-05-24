@@ -1,16 +1,20 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors as clrs
+from matplotlib.patches import Ellipse
+from scipy import stats
 import rqpy as rp
 import types
 
 
-__all__ = ["hist",
-           "scatter",
-           "densityplot",
-           "passageplot",
-           "RatePlot",
-          ]
+__all__ = [
+    "hist",
+    "scatter",
+    "densityplot",
+    "passageplot",
+    "RatePlot",
+    "conf_ellipse",
+]
 
 
 def hist(arr, nbins='sqrt', xlims=None, cuts=None, lgcrawdata=True,
@@ -550,7 +554,7 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
     cax = ax.hist2d(xvals[limitcut & cut], yvals[limitcut & cut], bins=nbins,
                     norm=norm, cmap=cmap)
     cbar = fig.colorbar(cax[-1], label = 'Density of Data')
-    cbar.ax.tick_params(direction="in")
+    cbar.ax.tick_params(which="both", direction="in")
     ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
     ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
     ax.tick_params(which="both", direction="in", right=True, top=True)
@@ -793,3 +797,129 @@ class RatePlot(RQpyPlot):
                         )
 
         self._update_colors("--")
+
+def conf_ellipse(mu, cov, conf=0.683, ax=None, **kwargs):
+    """
+    Draw a 2-D confidence level ellipse based on a mean, covariance matrix,
+    and specified confidence level.
+
+    Parameters
+    ----------
+    mu : array_like
+        The x and y values of the mean, where the ellipse will be centered.
+    cov : ndarray
+        A 2-by-2 covariance matrix describing the relation of the x and y variables.
+    conf : float
+        The confidence level at which to draw the ellipse. Should be a value between
+        0 and 1. Default is 0.683. See Notes for more information
+    ax : axes.Axes object, NoneType, optional
+        Option to pass an existing Matplotlib Axes object to plot over, if it already exists.
+    **kwargs
+        Keyword arguments to pass to `Ellipse`. See Notes for more information.
+
+    Returns
+    -------
+    fig : Figure, NoneType
+        Matplotlib Figure object. Set to None if ax is passed as a parameter.
+    ax : axes.Axes object
+        Matplotlib Axes object
+
+    Raises
+    ------
+    ValueError
+        If `conf` is not in the range [0, 1]
+
+    Notes
+    -----
+    When deciding the value for `conf`, the standard frequentist statement about what this contour means is:
+
+        "If the experiment is repeated many times with the same statistical analysis, then the
+        contour (which will in general be different for each realization of the experiment) will
+        define a region which contains the true value in 68.3% of the experiments."
+
+    Note that the 68.3% confidence level contour in 2 dimensions is not the same as 1-sigma contour. The
+    1-sigma contour for 2 dimensions (i.e. the value by which the chi^2 value increases by 1) contains
+    the true value in 39.3% of the experiments.
+
+    More discussion on multi-parameter errors can be found here:
+        http://seal.web.cern.ch/seal/documents/minuit/mnerror.pdf
+
+    The valid keyword arguments are below (taken from the Ellipse docstring). In this function, `fill` is
+    defaulted to False and 'zorder' is defaulted so that the ellipse is be on top of previous plots.
+        agg_filter: a filter function, which takes a (m, n, 3) float array and a dpi value, and returns a (m, n, 3) array
+        alpha: float or None
+        animated: bool
+        antialiased: unknown
+        capstyle: {'butt', 'round', 'projecting'}
+        clip_box: `.Bbox`
+        clip_on: bool
+        clip_path: [(`~matplotlib.path.Path`, `.Transform`) | `.Patch` | None]
+        color: color
+        contains: callable
+        edgecolor: color or None or 'auto'
+        facecolor: color or None
+        figure: `.Figure`
+        fill: bool
+        gid: str
+        hatch: {'/', '\\', '|', '-', '+', 'x', 'o', 'O', '.', '*'}
+        in_layout: bool
+        joinstyle: {'miter', 'round', 'bevel'}
+        label: object
+        linestyle: {'-', '--', '-.', ':', '', (offset, on-off-seq), ...}
+        linewidth: float or None for default
+        path_effects: `.AbstractPathEffect`
+        picker: None or bool or float or callable
+        rasterized: bool or None
+        sketch_params: (scale: float, length: float, randomness: float)
+        snap: bool or None
+        transform: `.Transform`
+        url: str
+        visible: bool
+        zorder: float
+
+    """
+
+    if isinstance(mu, np.ndarray):
+        mu = mu.tolist()
+
+    if not rp.inrange(conf, 0, 1):
+        raise ValueError("conf should be in the range [0, 1]")
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(9, 6))
+        ax.grid()
+        ax.grid(which="minor", axis="both", linestyle="dotted")
+        ax.tick_params(which="both", direction="in", right=True, top=True)
+        autoscale_axes = True
+    else:
+        fig = None
+        autoscale_axes = False
+
+    if 'fill' not in kwargs:
+        kwargs['fill'] = False
+
+    if 'zorder' not in kwargs and len(ax.lines + ax.collections) > 0:
+        kwargs['zorder'] = max(lc.get_zorder() for lc in ax.lines + ax.collections) + 0.1
+
+    a, v = np.linalg.eig(cov)
+    v0 = v[:,0]
+    v1 = v[:,1]
+
+    theta = np.arctan2(v1[1], v1[0])
+
+    quantile = stats.chi2.ppf(conf, 2)
+
+    ell = Ellipse(
+        mu,
+        2 * (quantile * a[1])**0.5,
+        2 * (quantile * a[0])**0.5,
+        angle=theta * 180/np.pi,
+        **kwargs,
+    )
+
+    ax_ell = ax.add_patch(ell)
+
+    if autoscale_axes:
+        ax.autoscale()
+
+    return fig, ax
