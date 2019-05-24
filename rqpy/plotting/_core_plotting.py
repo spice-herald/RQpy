@@ -554,7 +554,7 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
     cax = ax.hist2d(xvals[limitcut & cut], yvals[limitcut & cut], bins=nbins,
                     norm=norm, cmap=cmap)
     cbar = fig.colorbar(cax[-1], label = 'Density of Data')
-    cbar.ax.tick_params(direction="in")
+    cbar.ax.tick_params(which="both", direction="in")
     ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
     ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
     ax.tick_params(which="both", direction="in", right=True, top=True)
@@ -831,7 +831,8 @@ def conf_ellipse(mu, cov, conf=0.68, ax=None, **kwargs):
 
     Notes
     -----
-    The valid keyword arguments are (taken from the Ellipse docstring). In this function, `fill` is defaulted to False.
+    The valid keyword arguments are below (taken from the Ellipse docstring). In this function, `fill` is
+    defaulted to False and 'zorder' is defaulted so that the ellipse is be on top of previous plots.
         agg_filter: a filter function, which takes a (m, n, 3) float array and a dpi value, and returns a (m, n, 3) array
         alpha: float or None
         animated: bool
@@ -873,11 +874,16 @@ def conf_ellipse(mu, cov, conf=0.68, ax=None, **kwargs):
 
     if ax is None:
         fig, ax = plt.subplots(figsize=(9, 6))
+        autoscale_axes = True
     else:
         fig = None
+        autoscale_axes = False
 
     if 'fill' not in kwargs:
         kwargs['fill'] = False
+
+    if 'zorder' not in kwargs:
+        kwargs['zorder'] = max(lc.get_zorder() for lc in ax.lines + ax.collections)
 
     a, v = np.linalg.eig(cov)
     v0 = v[:,0]
@@ -895,6 +901,9 @@ def conf_ellipse(mu, cov, conf=0.68, ax=None, **kwargs):
         **kwargs,
     )
 
-    ax_ell = ax.add_artist(ell)
+    ax_ell = ax.add_patch(ell)
+
+    if autoscale_axes:
+        ax.autoscale()
 
     return fig, ax
