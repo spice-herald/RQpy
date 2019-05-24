@@ -798,7 +798,7 @@ class RatePlot(RQpyPlot):
 
         self._update_colors("--")
 
-def conf_ellipse(mu, cov, conf=0.68, ax=None, **kwargs):
+def conf_ellipse(mu, cov, conf=0.683, ax=None, **kwargs):
     """
     Draw a 2-D confidence level ellipse based on a mean, covariance matrix,
     and specified confidence level.
@@ -811,7 +811,7 @@ def conf_ellipse(mu, cov, conf=0.68, ax=None, **kwargs):
         A 2-by-2 covariance matrix describing the relation of the x and y variables.
     conf : float
         The confidence level at which to draw the ellipse. Should be a value between
-        0 and 1. Default is 0.68.
+        0 and 1. Default is 0.683. See Notes for more information
     ax : axes.Axes object, NoneType, optional
         Option to pass an existing Matplotlib Axes object to plot over, if it already exists.
     **kwargs
@@ -831,6 +831,19 @@ def conf_ellipse(mu, cov, conf=0.68, ax=None, **kwargs):
 
     Notes
     -----
+    When deciding the value for `conf`, the standard frequentist statement about what this contour means is:
+
+        "If the experiment is repeated many times with the same statistical analysis, then the
+        contour (which will in general be different for each realization of the experiment) will
+        define a region which contains the true value in 68.3% of the experiments."
+
+    Note that the 68.3% confidence level contour in 2 dimensions is not the same as 1-sigma contour. The
+    1-sigma contour for 2 dimensions (i.e. the value by which the chi^2 value increases by 1) contains
+    the true value in 39.3% of the experiments.
+
+    More discussion on multi-parameter errors can be found here:
+        http://seal.web.cern.ch/seal/documents/minuit/mnerror.pdf
+
     The valid keyword arguments are below (taken from the Ellipse docstring). In this function, `fill` is
     defaulted to False and 'zorder' is defaulted so that the ellipse is be on top of previous plots.
         agg_filter: a filter function, which takes a (m, n, 3) float array and a dpi value, and returns a (m, n, 3) array
