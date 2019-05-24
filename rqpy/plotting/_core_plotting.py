@@ -883,7 +883,7 @@ def conf_ellipse(mu, cov, conf=0.68, ax=None, **kwargs):
         kwargs['fill'] = False
 
     if 'zorder' not in kwargs:
-        kwargs['zorder'] = max(lc.get_zorder() for lc in ax.lines + ax.collections) + 1
+        kwargs['zorder'] = max(lc.get_zorder() for lc in ax.lines + ax.collections) + 0.1
 
     a, v = np.linalg.eig(cov)
     v0 = v[:,0]
