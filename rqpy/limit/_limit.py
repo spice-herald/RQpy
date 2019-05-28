@@ -538,23 +538,23 @@ def drde_gauss_smear2d(x, cov, delta, m_dm, sig0, nsig=3, tm="Si"):
             1,
         ) * _norm2d_trunc(
             val,
-            e0,
             et,
+            e0,
             cov,
             nsig,
         ) * drde(e0, m_dm, sig0, tm=tm)
 
         # get x values inside ellipse for each y value
         etvals = []
-        for en in e0:
+        for en in y:
             if rp.inrange(val, en - ep_top, en + ep_top):
                 ets = np.linspace(en - et_top, en + et_top, num=100)
-                etvals.append([en, ets])
+                etvals.append([ets, en])
 
         # evaluate double integral
         if len(etvals) > 0:
             temp_out = 0
-            for en, ets in etvals:
+            for ets, en in etvals:
                 temp_out += np.sum(func(ets, en)) * np.diff(ets).mean() * ydiff
             out[ii] = temp_out
 
