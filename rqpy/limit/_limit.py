@@ -12,15 +12,16 @@ from rqpy.limit import _upperlim
 import mendeleev
 
 
-__all__ = ["optimuminterval",
-           "gauss_smear",
-           "drde",
-           "drde_max_q",
-           "helmfactor",
-           "upperlim",
-           "drde_gauss_smear2d",
-           "optimuminterval_2dsmear",
-          ]
+__all__ = [
+    "optimuminterval",
+    "gauss_smear",
+    "drde",
+    "drde_max_q",
+    "helmfactor",
+    "upperlim",
+    "drde_gauss_smear2d",
+    "optimuminterval_2dsmear",
+]
 
 
 @contextlib.contextmanager
@@ -469,42 +470,6 @@ def _norm2d_trunc(x0, x1, mu, cov, nsig):
 
     return norm2d
 
-def _largest_et(x, e0, cov_inv, nsig):
-    """
-    Helper function for determining the largest nonzero value of the trigger energy
-    when performing the the two-dimensional smearing. Determined from the edge of the
-    truncated two-dimensional normal distribution.
-
-    Parameters
-    ----------
-    x : float, ndarray
-        Reconstructed energy at which to calculate the largest nonzero trigger energy.
-    e0 : float, ndarray
-        The true energies at which to calculate the largest nonzero trigger energy.
-    cov_inv : ndarray
-        The inverse of the covariance matrix for the reconstructed and trigger energies.
-    nsig : float
-        The number of sigma outside of which the PDF will be set to zero. This defines
-        an elliptical confidence region, whose shape comes from the covariance matrix.
-
-    Returns
-    -------
-    et_max : float, ndarray
-        For each x or e0 inputted, the maximum nonzero trigger energy in the covariance
-        ellipse.
-
-    """
-
-    sig = lambda n: stats.norm.cdf(n) - stats.norm.cdf(-n)
-    mvar_ell = stats.chi2.ppf(sig(nsig), 2)
-
-    a = cov_inv[1, 1]
-    b = 2 * ((x - e0) * cov_inv[1, 0] - e0 * cov_inv[1, 1])
-    c = (x - e0)**2 * cov_inv[0, 0] - 2 * (x - e0) * e0 * cov_inv[1, 0] + e0**2 * cov_inv[1, 1] - mvar_ell
-
-    et_max = (-b + np.sqrt(b**2 - 4 * a * c))/ (2 * a)
-
-    return et_max
 
 def drde_gauss_smear2d(x, cov, delta, m_dm, sig0, nsig=3, tm="Si"):
     """
@@ -542,18 +507,35 @@ def drde_gauss_smear2d(x, cov, delta, m_dm, sig0, nsig=3, tm="Si"):
 
     """
 
-    if np.isscalar(x):
-        x = np.atleast_1d(x)
+    x = np.atleast_1d(x)
+
+    sig = lambda n: stats.norm.cdf(n) - stats.norm.cdf(-n)
+    conf = stats.chi2.ppf(sig(nsig), 2)
 
     cov_inv = np.linalg.inv(cov)
+
+    a = cov_inv[0, 0]
+    b = 2 * cov_inv[1, 0]
+    c = cov_inv[1, 1]
+
+    # get the deltas of the confidence ellipse for trigger and reconstructed energies
+    et_top = np.sqrt(conf / (c - b**2 / (4 * a)))
+    ep_top = np.sqrt(conf / (a - b**2 / (4 * c)))
+
+    # get range of nonzero true energies in integral
+    start = 0.0
+    end = drde_max_q(m_dm)
+    d2 = 0.001
+    y = np.linspace(start, end, num=int((end - start) / d2) + 1)
+    ydiff = np.diff(y).mean()
 
     out = np.zeros(len(x))
 
     for ii, val in enumerate(x):
-
+        # define function that we will be integrating over
         func = lambda et, e0: np.heaviside(
             et - delta,
-            0.5,
+            1,
         ) * _norm2d_trunc(
             val,
             e0,
@@ -562,24 +544,19 @@ def drde_gauss_smear2d(x, cov, delta, m_dm, sig0, nsig=3, tm="Si"):
             nsig,
         ) * drde(e0, m_dm, sig0, tm=tm)
 
-        y = np.linspace(0.0, drde_max_q(m_dm), num=100)
-        d2 = np.diff(y).mean()
-        x_max = np.nanmax(
-            _largest_et(
-                val,
-                y,
-                cov_inv,
-                nsig,
-            ))
+        # get x values inside ellipse for each y value
+        etvals = []
+        for en in e0:
+            if rp.inrange(val, en - ep_top, en + ep_top):
+                ets = np.linspace(en - et_top, en + et_top, num=100)
+                etvals.append([en, ets])
 
-        if x_max > delta:
-            x = np.linspace(delta, x_max, num=100)
-            d1 = np.diff(x).mean()
-
-            X, Y = np.meshgrid(x, y)
-            Z = func(X.flatten(), Y.flatten())
-
-            out[ii] = np.sum(Z) * d1 * d2
+        # evaluate double integral
+        if len(etvals) > 0:
+            temp_out = 0
+            for en, ets in etvals:
+                temp_out += np.sum(func(ets, en)) * np.diff(ets).mean() * ydiff
+            out[ii] = temp_out
 
     return out
 
