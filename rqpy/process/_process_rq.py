@@ -1035,7 +1035,7 @@ class SetupRQ(object):
         which_fit : str, optional
             String specifying which fit that the time shift should be pulled from if the shifted
             optimum filter fit will be calculated. Should be "nodelay", "constrained", or "unconstrained",
-            referring the the no delay OF, constrained OF, and unconstrained OF, respectively. Default
+            referring the no delay OF, constrained OF, and unconstrained OF, respectively. Default
             is "constrained".
 
         """
@@ -1052,7 +1052,7 @@ class SetupRQ(object):
                 raise ValueError("which_fit was set to 'constrained', but that fit has been set to not be calculated")
 
             if which_fit == "unconstrained" and not self.do_ofamp_unconstrained:
-                raise ValueError("which_fit was set to 'constrained', but that fit has been set to not be calculated")
+                raise ValueError("which_fit was set to 'unconstrained', but that fit has been set to not be calculated")
 
             if which_fit == "nodelay" and not self.do_ofamp_nodelay:
                 raise ValueError("which_fit was set to 'nodelay', but that fit has been set to not be calculated")
@@ -1068,7 +1068,7 @@ class SetupRQ(object):
                                  has been set to not be calculated""")
 
             if which_fit == "unconstrained" and not self.do_ofamp_unconstrained_smooth:
-                raise ValueError("""which_fit was set to 'constrained', but that fit (using the smoothed PSD) 
+                raise ValueError("""which_fit was set to 'unconstrained', but that fit (using the smoothed PSD) 
                                  has been set to not be calculated""")
 
             if which_fit == "nodelay" and not self.do_ofamp_nodelay_smooth:
