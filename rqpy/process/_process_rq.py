@@ -215,25 +215,25 @@ class SetupRQ(object):
         The index at which the integral should be calculated up to in order to reduce noise by 
         truncating the rest of the trace. Default is two-thirds of the trace length. Each value in the list
         specifies this attribute for each channel.
-    do_ofamp_shifted : list of bool
-        Boolean flag for whether or not the shifted optimum filter fit should be calculated for
+    do_ofamp_coinc : list of bool
+        Boolean flag for whether or not the coincident optimum filter fit should be calculated for
         the non-trigger channels. If set to True, then self.trigger must have been set to a value. Each 
         value in the list specifies this attribute for each channel.
-    do_ofamp_shifted_smooth : list of bool
-        Boolean flag for whether or not the shifted optimum filter fit should be calculated 
+    do_ofamp_coinc_smooth : list of bool
+        Boolean flag for whether or not the coincident optimum filter fit should be calculated 
         with a smoothed PSD. Useful in the case where the PSD for a channel has large spike(s) 
         in order to suppress echoes elsewhere in the trace. Each value in the list specifies this
         attribute for each channel.
-    which_fit_shifted : str
-        String specifying which fit that the time shift should be pulled from if the shifted
+    which_fit_coinc : str
+        String specifying which fit that the time shift should be pulled from if the coincident
         optimum filter fit will be calculated. Should be "nodelay", "constrained", or "unconstrained",
         referring the the no delay OF, constrained OF, and unconstrained OF, respectively. Default
         is "constrained".
-    t0_shifted : ndarray
-        Attribute used to save the times to shift the non-trigger channels. Only used if `do_ofamp_shifted`
+    t0_coinc : ndarray
+        Attribute used to save the times to shift the non-trigger channels. Only used if `do_ofamp_coinc`
         is True.
-    t0_shifted_smooth : ndarray
-        Attribute used to save the times to shift the non-trigger channels. Only used if `do_ofamp_shifted_smooth`
+    t0_coinc_smooth : ndarray
+        Attribute used to save the times to shift the non-trigger channels. Only used if `do_ofamp_coinc_smooth`
         is True.
     do_ofnonlin : list of bool
         Boolean flag for whether or not the nonlinear optimum filter fit with floating rise and fall time 
@@ -405,11 +405,11 @@ class SetupRQ(object):
         self.indstart_energy_absorbed = [len(self.templates[0])//3]*self.nchan
         self.indstop_energy_absorbed = [2*len(self.templates[0])//3]*self.nchan
 
-        self.do_ofamp_shifted = [False]*self.nchan
-        self.do_ofamp_shifted_smooth = [False]*self.nchan
-        self.which_fit_shifted = "constrained"
-        self.t0_shifted = None
-        self.t0_shifted_smooth = None
+        self.do_ofamp_coinc = [False]*self.nchan
+        self.do_ofamp_coinc_smooth = [False]*self.nchan
+        self.which_fit_coinc = "constrained"
+        self.t0_coinc = None
+        self.t0_coinc_smooth = None
 
         self.do_maxmin = [True]*self.nchan
         self.use_min = [False]*self.nchan
@@ -1019,21 +1019,21 @@ class SetupRQ(object):
         self.indstart_maxmin = indstart
         self.indstop_maxmin = indstop
 
-    def adjust_ofamp_shifted(self, lgcrun=True, lgcrun_smooth=False, which_fit="constrained"):
+    def adjust_ofamp_coinc(self, lgcrun=True, lgcrun_smooth=False, which_fit="constrained"):
         """
-        Method for adjusting the calculation of the shifted optimum filter fit.
+        Method for adjusting the calculation of the coincident optimum filter fit.
 
         Parameters
         ----------
         lgcrun : bool, optional
-            Boolean flag for whether or not the shifted optimum filter fit should be calculated for
+            Boolean flag for whether or not the coincident optimum filter fit should be calculated for
             the non-trigger channels. If set to True, then self.trigger must have been set to a value.
         lgcrun_smooth : bool, optional
-            Boolean flag for whether or not the shifted optimum filter fit should be calculated 
+            Boolean flag for whether or not the coincident optimum filter fit should be calculated 
             with a smoothed PSD. Useful in the case where the PSD for a channel has large spike(s) 
             in order to suppress echoes elsewhere in the trace.
         which_fit : str, optional
-            String specifying which fit that the time shift should be pulled from if the shifted
+            String specifying which fit that the time shift should be pulled from if the coincident
             optimum filter fit will be calculated. Should be "nodelay", "constrained", or "unconstrained",
             referring the no delay OF, constrained OF, and unconstrained OF, respectively. Default
             is "constrained".
@@ -1042,9 +1042,9 @@ class SetupRQ(object):
 
         lgcrun, lgcrun_smooth = self._check_arg_length(lgcrun=lgcrun, lgcrun_smooth=lgcrun_smooth)
 
-        self.do_ofamp_shifted = lgcrun
+        self.do_ofamp_coinc = lgcrun
 
-        if any(self.do_ofamp_shifted):
+        if any(self.do_ofamp_coinc):
             if which_fit not in ["constrained", "unconstrained", "nodelay"]:
                 raise ValueError("which_fit should be set to 'constrained', 'unconstrained', or 'nodelay'")
 
@@ -1057,9 +1057,9 @@ class SetupRQ(object):
             if which_fit == "nodelay" and not self.do_ofamp_nodelay:
                 raise ValueError("which_fit was set to 'nodelay', but that fit has been set to not be calculated")
 
-        self.do_ofamp_shifted_smooth = lgcrun_smooth
+        self.do_ofamp_coinc_smooth = lgcrun_smooth
 
-        if any(self.do_ofamp_shifted_smooth):
+        if any(self.do_ofamp_coinc_smooth):
             if which_fit not in ["constrained", "unconstrained", "nodelay"]:
                 raise ValueError("which_fit should be set to 'constrained', 'unconstrained', or 'nodelay'")
 
@@ -1075,7 +1075,7 @@ class SetupRQ(object):
                 raise ValueError("""which_fit was set to 'nodelay', but that fit (using the smoothed PSD) 
                                  has been set to not be calculated""")
 
-        self.which_fit_shifted = which_fit
+        self.which_fit_coinc = which_fit
 
     def adjust_ofnonlin(self, lgcrun=True, positive_pulses=True):
         """
@@ -1312,13 +1312,13 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
             if setup.ofamp_constrained_pulse_constraint[chan_num]!=0:
                 chi2low_constrain_pcon = np.zeros(len(signal))
 
-    if setup.do_ofamp_shifted[chan_num] and setup.trigger not in [None, chan_num]:
-        amp_shifted = np.zeros(len(signal))
-        chi2_shifted = np.zeros(len(signal))
+    if setup.do_ofamp_coinc[chan_num] and setup.trigger not in [None, chan_num]:
+        amp_coinc = np.zeros(len(signal))
+        chi2_coinc = np.zeros(len(signal))
 
-    if setup.do_ofamp_shifted_smooth[chan_num] and setup.trigger not in [None, chan_num]:
-        amp_shifted_smooth = np.zeros(len(signal))
-        chi2_shifted_smooth = np.zeros(len(signal))
+    if setup.do_ofamp_coinc_smooth[chan_num] and setup.trigger not in [None, chan_num]:
+        amp_coinc_smooth = np.zeros(len(signal))
+        chi2_coinc_smooth = np.zeros(len(signal))
 
     if setup.do_ofnonlin[chan_num]:
         amp_nonlin = np.zeros(len(signal))
@@ -1490,14 +1490,14 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                     windowcenter=setup.ofamp_baseline_windowcenter[chan_num],
                 )
 
-            if setup.do_ofamp_shifted[chan_num] and setup.trigger not in [None, chan_num]:
-                amp_shifted[jj], chi2_shifted[jj] = OF.ofamp_nodelay(
-                    windowcenter=int(setup.t0_shifted[jj] * fs),
+            if setup.do_ofamp_coinc[chan_num] and setup.trigger not in [None, chan_num]:
+                amp_coinc[jj], chi2_coinc[jj] = OF.ofamp_nodelay(
+                    windowcenter=int(setup.t0_coinc[jj] * fs),
                 )
 
-            if setup.do_ofamp_shifted_smooth[chan_num] and setup.trigger not in [None, chan_num]:
-                amp_shifted_smooth[jj], _, chi2_shifted_smooth[jj] = OF_smooth.ofamp_nodelay(
-                    windowcenter=int(setup.t0_shifted_smooth[jj] * fs),
+            if setup.do_ofamp_coinc_smooth[chan_num] and setup.trigger not in [None, chan_num]:
+                amp_coinc_smooth[jj], _, chi2_coinc_smooth[jj] = OF_smooth.ofamp_nodelay(
+                    windowcenter=int(setup.t0_coinc_smooth[jj] * fs),
                 )
 
             if setup.do_ofnonlin[chan_num]:
@@ -1529,21 +1529,21 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                 triggertime_sim[jj] = res_trigsim[1]
                 ofampnodelay_sim[jj] = res_trigsim[2]
 
-    if any(setup.do_ofamp_shifted) and setup.trigger is not None and chan_num==setup.trigger:
-        if setup.which_fit_shifted=="nodelay" and any(setup.do_ofamp_nodelay):
-            setup.t0_shifted = np.zeros(len(signal))
-        elif setup.which_fit_shifted=="constrained" and any(setup.do_ofamp_constrained):
-            setup.t0_shifted = t0_constrain
-        elif setup.which_fit_shifted=="unconstrained" and any(setup.do_ofamp_unconstrained):
-            setup.t0_shifted = t0_unconstrain
+    if any(setup.do_ofamp_coinc) and setup.trigger is not None and chan_num==setup.trigger:
+        if setup.which_fit_coinc=="nodelay" and any(setup.do_ofamp_nodelay):
+            setup.t0_coinc = np.zeros(len(signal))
+        elif setup.which_fit_coinc=="constrained" and any(setup.do_ofamp_constrained):
+            setup.t0_coinc = t0_constrain
+        elif setup.which_fit_coinc=="unconstrained" and any(setup.do_ofamp_unconstrained):
+            setup.t0_coinc = t0_unconstrain
 
-    if any(setup.do_ofamp_shifted_smooth) and setup.trigger is not None and chan_num==setup.trigger:
-        if setup.which_fit_shifted=="nodelay" and any(setup.do_ofamp_nodelay_smooth):
-            setup.t0_shifted_smooth = np.zeros(len(signal))
-        elif setup.which_fit_shifted=="constrained" and any(setup.do_ofamp_constrained_smooth):
-            setup.t0_shifted_smooth = t0_constrain_smooth
-        elif setup.which_fit_shifted=="unconstrained" and any(setup.do_ofamp_unconstrained_smooth):
-            setup.t0_shifted_smooth = t0_unconstrain_smooth
+    if any(setup.do_ofamp_coinc_smooth) and setup.trigger is not None and chan_num==setup.trigger:
+        if setup.which_fit_coinc=="nodelay" and any(setup.do_ofamp_nodelay_smooth):
+            setup.t0_coinc_smooth = np.zeros(len(signal))
+        elif setup.which_fit_coinc=="constrained" and any(setup.do_ofamp_constrained_smooth):
+            setup.t0_coinc_smooth = t0_constrain_smooth
+        elif setup.which_fit_coinc=="unconstrained" and any(setup.do_ofamp_unconstrained_smooth):
+            setup.t0_coinc_smooth = t0_unconstrain_smooth
 
     # save variables to dict
     if setup.do_chi2_nopulse[chan_num]:
@@ -1701,21 +1701,21 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         rq_dict[f'ofamp_nodelay_sim_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'ofamp_nodelay_sim_{chan}{det}'][readout_inds] = ofampnodelay_sim
 
-    if setup.do_ofamp_shifted[chan_num] and setup.trigger is not None and chan_num!=setup.trigger:
-        rq_dict[f'ofamp_shifted_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'ofamp_shifted_{chan}{det}'][readout_inds] = amp_shifted
-        rq_dict[f't0_shifted_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f't0_shifted_{chan}{det}'][readout_inds] = setup.t0_shifted
-        rq_dict[f'chi2_shifted_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'chi2_shifted_{chan}{det}'][readout_inds] = chi2_shifted
+    if setup.do_ofamp_coinc[chan_num] and setup.trigger is not None and chan_num!=setup.trigger:
+        rq_dict[f'ofamp_coinc_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'ofamp_coinc_{chan}{det}'][readout_inds] = amp_coinc
+        rq_dict[f't0_coinc_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f't0_coinc_{chan}{det}'][readout_inds] = setup.t0_coinc
+        rq_dict[f'chi2_coinc_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2_coinc_{chan}{det}'][readout_inds] = chi2_coinc
 
-    if setup.do_ofamp_shifted_smooth[chan_num] and setup.trigger is not None and chan_num!=setup.trigger:
-        rq_dict[f'ofamp_shifted_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'ofamp_shifted_smooth_{chan}{det}'][readout_inds] = amp_shifted_smooth
-        rq_dict[f't0_shifted_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f't0_shifted_smooth_{chan}{det}'][readout_inds] = setup.t0_shifted
-        rq_dict[f'chi2_shifted_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'chi2_shifted_smooth_{chan}{det}'][readout_inds] = chi2_shifted_smooth
+    if setup.do_ofamp_coinc_smooth[chan_num] and setup.trigger is not None and chan_num!=setup.trigger:
+        rq_dict[f'ofamp_coinc_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'ofamp_coinc_smooth_{chan}{det}'][readout_inds] = amp_coinc_smooth
+        rq_dict[f't0_coinc_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f't0_coinc_smooth_{chan}{det}'][readout_inds] = setup.t0_coinc
+        rq_dict[f'chi2_coinc_smooth_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'chi2_coinc_smooth_{chan}{det}'][readout_inds] = chi2_coinc_smooth
 
     return rq_dict
 
@@ -1754,8 +1754,8 @@ def _calc_rq(traces, channels, det, setup, readout_inds=None):
     if setup.calcchans:
         vals = list(enumerate(zip(channels, det)))
 
-        if setup.do_ofamp_shifted and setup.trigger is not None:
-            # change order so that trigger is processed to be able get the shifted times
+        if setup.do_ofamp_coinc and setup.trigger is not None:
+            # change order so that trigger is processed to be able get the coinc times
             # to be able to shift the non-trigger channels to the right time
             vals[setup.trigger], vals[0] = vals[0], vals[setup.trigger]
 
