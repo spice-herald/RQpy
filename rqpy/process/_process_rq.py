@@ -851,6 +851,64 @@ class SetupRQ(object):
 
         self._check_of()
 
+    def adjust_ofamp_coinc(self, lgcrun=True, lgcrun_smooth=False, which_fit="constrained"):
+        """
+        Method for adjusting the calculation of the coincident optimum filter fit.
+
+        Parameters
+        ----------
+        lgcrun : bool, optional
+            Boolean flag for whether or not the coincident optimum filter fit should be calculated for
+            the non-trigger channels. If set to True, then self.trigger must have been set to a value.
+        lgcrun_smooth : bool, optional
+            Boolean flag for whether or not the coincident optimum filter fit should be calculated 
+            with a smoothed PSD. Useful in the case where the PSD for a channel has large spike(s) 
+            in order to suppress echoes elsewhere in the trace.
+        which_fit : str, optional
+            String specifying which fit that the time shift should be pulled from if the coincident
+            optimum filter fit will be calculated. Should be "nodelay", "constrained", or "unconstrained",
+            referring the no delay OF, constrained OF, and unconstrained OF, respectively. Default
+            is "constrained".
+
+        """
+
+        lgcrun, lgcrun_smooth = self._check_arg_length(lgcrun=lgcrun, lgcrun_smooth=lgcrun_smooth)
+
+        self.do_ofamp_coinc = lgcrun
+
+        if any(self.do_ofamp_coinc):
+            if which_fit not in ["constrained", "unconstrained", "nodelay"]:
+                raise ValueError("which_fit should be set to 'constrained', 'unconstrained', or 'nodelay'")
+
+            if which_fit == "constrained" and not self.do_ofamp_constrained:
+                raise ValueError("which_fit was set to 'constrained', but that fit has been set to not be calculated")
+
+            if which_fit == "unconstrained" and not self.do_ofamp_unconstrained:
+                raise ValueError("which_fit was set to 'unconstrained', but that fit has been set to not be calculated")
+
+            if which_fit == "nodelay" and not self.do_ofamp_nodelay:
+                raise ValueError("which_fit was set to 'nodelay', but that fit has been set to not be calculated")
+
+        self.do_ofamp_coinc_smooth = lgcrun_smooth
+
+        if any(self.do_ofamp_coinc_smooth):
+            if which_fit not in ["constrained", "unconstrained", "nodelay"]:
+                raise ValueError("which_fit should be set to 'constrained', 'unconstrained', or 'nodelay'")
+
+            if which_fit == "constrained" and not self.do_ofamp_constrained_smooth:
+                raise ValueError("""which_fit was set to 'constrained', but that fit (using the smoothed PSD)
+                                 has been set to not be calculated""")
+
+            if which_fit == "unconstrained" and not self.do_ofamp_unconstrained_smooth:
+                raise ValueError("""which_fit was set to 'unconstrained', but that fit (using the smoothed PSD)
+                                 has been set to not be calculated""")
+
+            if which_fit == "nodelay" and not self.do_ofamp_nodelay_smooth:
+                raise ValueError("""which_fit was set to 'nodelay', but that fit (using the smoothed PSD)
+                                 has been set to not be calculated""")
+
+        self.which_fit_coinc = which_fit
+
     def adjust_baseline(self, lgcrun=True, indbasepre=None):
         """
         Method for adjusting the calculation of the DC baseline.
@@ -1018,64 +1076,6 @@ class SetupRQ(object):
         self.use_min = use_min
         self.indstart_maxmin = indstart
         self.indstop_maxmin = indstop
-
-    def adjust_ofamp_coinc(self, lgcrun=True, lgcrun_smooth=False, which_fit="constrained"):
-        """
-        Method for adjusting the calculation of the coincident optimum filter fit.
-
-        Parameters
-        ----------
-        lgcrun : bool, optional
-            Boolean flag for whether or not the coincident optimum filter fit should be calculated for
-            the non-trigger channels. If set to True, then self.trigger must have been set to a value.
-        lgcrun_smooth : bool, optional
-            Boolean flag for whether or not the coincident optimum filter fit should be calculated 
-            with a smoothed PSD. Useful in the case where the PSD for a channel has large spike(s) 
-            in order to suppress echoes elsewhere in the trace.
-        which_fit : str, optional
-            String specifying which fit that the time shift should be pulled from if the coincident
-            optimum filter fit will be calculated. Should be "nodelay", "constrained", or "unconstrained",
-            referring the no delay OF, constrained OF, and unconstrained OF, respectively. Default
-            is "constrained".
-
-        """
-
-        lgcrun, lgcrun_smooth = self._check_arg_length(lgcrun=lgcrun, lgcrun_smooth=lgcrun_smooth)
-
-        self.do_ofamp_coinc = lgcrun
-
-        if any(self.do_ofamp_coinc):
-            if which_fit not in ["constrained", "unconstrained", "nodelay"]:
-                raise ValueError("which_fit should be set to 'constrained', 'unconstrained', or 'nodelay'")
-
-            if which_fit == "constrained" and not self.do_ofamp_constrained:
-                raise ValueError("which_fit was set to 'constrained', but that fit has been set to not be calculated")
-
-            if which_fit == "unconstrained" and not self.do_ofamp_unconstrained:
-                raise ValueError("which_fit was set to 'unconstrained', but that fit has been set to not be calculated")
-
-            if which_fit == "nodelay" and not self.do_ofamp_nodelay:
-                raise ValueError("which_fit was set to 'nodelay', but that fit has been set to not be calculated")
-
-        self.do_ofamp_coinc_smooth = lgcrun_smooth
-
-        if any(self.do_ofamp_coinc_smooth):
-            if which_fit not in ["constrained", "unconstrained", "nodelay"]:
-                raise ValueError("which_fit should be set to 'constrained', 'unconstrained', or 'nodelay'")
-
-            if which_fit == "constrained" and not self.do_ofamp_constrained_smooth:
-                raise ValueError("""which_fit was set to 'constrained', but that fit (using the smoothed PSD) 
-                                 has been set to not be calculated""")
-
-            if which_fit == "unconstrained" and not self.do_ofamp_unconstrained_smooth:
-                raise ValueError("""which_fit was set to 'unconstrained', but that fit (using the smoothed PSD) 
-                                 has been set to not be calculated""")
-
-            if which_fit == "nodelay" and not self.do_ofamp_nodelay_smooth:
-                raise ValueError("""which_fit was set to 'nodelay', but that fit (using the smoothed PSD) 
-                                 has been set to not be calculated""")
-
-        self.which_fit_coinc = which_fit
 
     def adjust_ofnonlin(self, lgcrun=True, positive_pulses=True):
         """
