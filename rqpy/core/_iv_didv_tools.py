@@ -326,7 +326,7 @@ class IVanalysis(object):
     
     def __init__(self, df, nnorm, nsc, channels=None, channelname='', rshunt=5e-3, 
                  rshunt_err = 0.05*5e-3, tbath=0, tbath_err=0, tc=0, tc_err=0, Gta=0, 
-                 ib_err=None, lgcremove_badseries = True, figsavepath=''):
+                 Gta_err=0, ib_err=None, lgcremove_badseries = True, figsavepath=''):
         """
         Initialization of IVanalysis object. Note, currently only single channel analysis is supported
         
@@ -439,6 +439,7 @@ class IVanalysis(object):
         self.tc = tc
         self.tc_err = tc_err
         self.Gta = Gta
+        self.Gta_err = Gta_err
         self.rload_err = None
         
         tempdidv = DIDV(1,1,1,1,1)
@@ -1024,6 +1025,7 @@ class IVanalysis(object):
             s_ptfn = np.zeros((nsamples, len(f)))
             s_ptot = np.zeros((nsamples, len(f)))
             s_psquid = np.zeros((nsamples, len(f)))
+            s_psd = np.zeros((nsamples, len(f)))
             
             energy_res = []
             
@@ -1051,6 +1053,8 @@ class IVanalysis(object):
                 s_ptot[ii] = tesnoise.s_ptot()
                 s_psquid[ii] = tesnoise.s_psquid()
                 
+                s_psd[ii] = psd/(np.abs(tesnoise.dIdP(f))**2)
+                
             ites_err = np.std(s_ites, axis=0)
             iload_err = np.std(s_iload, axis=0)
             itfn_err = np.std(s_itfn, axis=0)
@@ -1075,7 +1079,7 @@ class IVanalysis(object):
             ptot_mu = np.mean(s_ptot, axis=0)
             psquid_mu = np.mean(s_psquid, axis=0)
             
-            return ites_err, iload_err, itfn_err, itot_err, isquid_err, ptes_err, pload_err, ptfn_err, ptot_err, psquid_err, ites_mu, iload_mu, itfn_mu, itot_mu, isquid_mu, ptes_mu, pload_mu, ptfn_mu, ptot_mu, psquid_mu, energy_res
+            return ites_err, iload_err, itfn_err, itot_err, isquid_err, ptes_err, pload_err, ptfn_err, ptot_err, psquid_err, ites_mu, iload_mu, itfn_mu, itot_mu, isquid_mu, ptes_mu, pload_mu, ptfn_mu, ptot_mu, psquid_mu, energy_res, s_psd
                 
             
         
