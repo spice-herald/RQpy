@@ -513,6 +513,12 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
     ax : axes.Axes object
         Matplotlib Axes object
 
+    Raises
+    ------
+    ValueError
+        If there are no `xvals` in the range specified by `xlims`.
+        If there are no `yvals` in the range specified by `ylims`.
+
     """
 
     labels = {'title'  : 'Density Plot',
@@ -540,6 +546,11 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
         ylimitcut = (yvals>ylims[0]) & (yvals<ylims[1])
     else:
         ylimitcut = np.ones(len(yvals), dtype=bool)
+
+    if np.sum(xlimitcut)==0:
+        raise ValueError("There are no x values in the specified range.")
+    if np.sum(ylimitcut)==0:
+        raise ValueError("There are no y values in the specified range.")
 
     limitcut = xlimitcut & ylimitcut
 
