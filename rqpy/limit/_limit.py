@@ -569,6 +569,10 @@ def drde_gauss_smear2d(x, cov, delta, m_dm, sig0, nsig=3, tm="Si", subtract_zero
     tm : str, int, optional
         The target material of the detector. Can be passed as either the atomic symbol, the
         atomic number, or the full name of the element. Default is 'Si'.
+    subtract_zero : bool, optional
+        Option to subtract out the zero-energy multivariate normal distribution in true energy for
+        a more conservative estimate of the 2D Gaussian smeared limit. This will have only a small
+        effect. Default is False.
 
     Returns
     -------
@@ -635,7 +639,7 @@ def drde_gauss_smear2d(x, cov, delta, m_dm, sig0, nsig=3, tm="Si", subtract_zero
     return out
 
 def optimuminterval_2dsmear(eventenergies, masslist, exposure, cov, delta,
-                            tm="Si", nsig=3, verbose=False, npts=1e3):
+                            tm="Si", nsig=3, verbose=False, npts=1e3, subtract_zero=False):
     """
     Function for running Steve Yellin's Optimum Interval code on an inputted spectrum, using the
     two-dimensional normal distribution defined by the inputted covariance matrix to model the
@@ -667,6 +671,10 @@ def optimuminterval_2dsmear(eventenergies, masslist, exposure, cov, delta,
     npts : float, optional
         The number of energies at which to evaluate the smeared differential rate. Large values
         result in long computation times. Default is 1e3.
+    subtract_zero : bool, optional
+        Option to subtract out the zero-energy multivariate normal distribution in true energy for
+        a more conservative estimate of the 2D Gaussian smeared limit. This will have only a small
+        effect. Default is False.
 
     Returns
     -------
@@ -717,6 +725,7 @@ def optimuminterval_2dsmear(eventenergies, masslist, exposure, cov, delta,
             sigma0,
             nsig=nsig,
             tm=tm,
+            subtract_zero=subtract_zero,
         )
 
         rate = init_rate * exposure
