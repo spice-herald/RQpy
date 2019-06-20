@@ -1,11 +1,14 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import rqpy as rp
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+import matplotlib.cm as cm
 
 
 __all__ = ["_make_iv_noiseplots",
            "_plot_energy_res_vs_bias",
            "_plot_rload_rn_qetbias",
+           "_plot_didv_bias",
           ]
 
 
@@ -256,4 +259,66 @@ def _plot_energy_res_vs_bias(r0s,
 
     if lgcsave:
         plt.savefig(f'{figsavepath}energy_res_vs_bias.png')
+        
+def _plot_didv_bias(data, xlims=(-.15,0.025), ylims=(0,.08),
+                   cmap='magma'):
+    """
+    Helper function to plot the real vs imaginary
+    part of the didv for different QET bias values
+    for an IVanalysis object
+    
+    Parameters
+    ----------
+    data : IVanalysis object
+        The IVanalysis object with the didv fits
+        already done
+    xlims : tuple, optional
+        The xlimits of the plot
+    ylims : tuple, optional
+        The ylimits of the plot
+    cmap : str, optional
+        The colormap to use for the 
+        plot. 
+        
+    Returns
+    -------
+    fig, ax : matplotlib fig and axes objects
+    """
+    
+    fig,ax=plt.subplots(figsize=(10,6))
+    ax.set_xlabel('Re($dI/dV$) ($\Omega^{-1}$)')
+    ax.set_ylabel('Im($dI/dV$) ($\Omega^{-1}$)')
 
+    ax.set_title("Real and Imaginary Part of dIdV")
+    ax.tick_params(which='both',direction='in',right=True,top=True)
+    ax.grid(which='major')
+    ax.grid(which='minor',linestyle='dotted',alpha=0.3)
+    ax.set_xlim(xlims)
+    ax.set_ylim(ylims)
+
+    qets = np.abs(data.df.loc[data.didvinds, 'qetbias'].iloc[data.traninds].values)*1e6
+
+    normalize = mcolors.Normalize(vmin=min(qets), vmax=max(qets))
+    colormap = plt.get_cmap(cmap)
+    ax.grid(True, linestyle='--')
+
+    for ind in (data.traninds):
+        ii = ind-data.traninds[0]
+        row = data.df[data.didvinds].iloc[ind]
+        didv = row.didvobj2
+        goodinds=np.abs(didv.didvmean/didv.didvstd) > 2.0 
+        fitinds = didv.freq>0
+        plotinds= np.logical_and(fitinds, goodinds)
+        ax.plot(np.real(didv.didvmean)[plotinds],np.imag(didv.didvmean)[plotinds], linestyle=' ',
+                marker ='.', alpha = 0.9, ms=10,
+                  c=colormap(normalize(qets[ii])))
+
+        ax.plot(np.real(didv.didvfit_freqdomain)[fitinds],np.imag(didv.didvfit_freqdomain)[fitinds],
+                    c=colormap(normalize(qets[ii])) )
+
+    scalarmappaple = cm.ScalarMappable(norm=normalize, cmap=colormap)
+    scalarmappaple.set_array(qets[:-1])
+    cbar = plt.colorbar(scalarmappaple)
+    cbar.set_label('QET Bias [μA]', labelpad = 3) 
+    
+    return fig, ax

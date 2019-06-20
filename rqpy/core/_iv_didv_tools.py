@@ -11,7 +11,7 @@ from scipy.signal import savgol_filter
 from lmfit import Model
 
 import rqpy as rp
-from rqpy.plotting import _plot_rload_rn_qetbias, _make_iv_noiseplots, _plot_energy_res_vs_bias
+from rqpy.plotting import _plot_rload_rn_qetbias, _make_iv_noiseplots, _plot_energy_res_vs_bias,_plot_didv_bias
 from qetpy import IV2, DIDV, DIDV2, Noise, didvinitfromdata, autocuts
 from qetpy.sim import TESnoise, loadfromdidv, energy_res_estimate
 from qetpy.plotting import plot_noise_sim
@@ -407,6 +407,7 @@ class IVanalysis(object):
         self.scinds = range(len(self.df)//2-nsc, len(self.df)//2)
         self.traninds = range(self.norminds[-1]+1, self.scinds[0])
     
+        
         #vb = np.zeros((1,2,self.noiseinds.sum()))
         #vb_err = np.zeros(vb.shape)
         #vb[0,0,:] = self.df[self.noiseinds].qetbias.values * rshunt
@@ -427,6 +428,7 @@ class IVanalysis(object):
         #vb_err[0,0,:] = np.sqrt((self.df[self.noiseinds].qetbias.values * self.rshunt_err)**2)
         #vb_err[0,1,:] = np.sqrt((self.df[self.didvinds].qetbias.values * self.rshunt_err)**2)
         
+        self.vb = None
         #self.vb = vb
         #self.vb_err = vb_err
         self.ibias = ibias
@@ -629,8 +631,14 @@ class IVanalysis(object):
         self.df.loc[self.noiseinds, 'rp_err'] =  ivobj.rp_err[0,0]
         self.df.loc[self.didvinds, 'rp_err'] =  ivobj.rp_err[0,1]
         
+        
+        self.rp_iv = ivobj.rp[0,0]
+        self.rp_iv_err = ivobj.rp_err[0,0]
         self.rn_iv = ivobj.rnorm[0,0]
         self.rn_iv_err = ivobj.rnorm_err[0,0]
+
+        self.vb = ivobj.vb
+
 
         if lgcplot:
             ivobj.plot_all_curves(lgcsave=lgcsave, savepath=self.figsavepath, savename=self.chname)
@@ -708,7 +716,7 @@ class IVanalysis(object):
             dt0 = irwinparams['dt']
             
             guess = np.concatenate((np.abs([rshunt0, rp0,r0,beta0,l0,L0,tau0]), [dt0]))
-            
+           
             invcov = np.zeros((8,8))
 
             rp_sig = row.rp_err
@@ -719,19 +727,19 @@ class IVanalysis(object):
             r_cov[0,0] = rshunt_sig**2
             r_cov[1,1] = rp_sig**2
             r_cov[2,2] = r0_sig**2
-            r_cov[0,1] = r_cov[1,0] = .8*rshunt_sig*rp_sig
-            r_cov[0,2] = r_cov[2,0] = .8*rshunt_sig*r0_sig
+            r_cov[0,1] = r_cov[1,0] = .5*rshunt_sig*rp_sig
+            r_cov[0,2] = r_cov[2,0] = .5*rshunt_sig*r0_sig
             r_cov[1,2] = r_cov[2,1] = -.2*rp_sig*r0_sig
 
             r_cov_inv = np.linalg.inv(r_cov)
 
             invcov[:3,:3] = r_cov_inv
-
+    
             didvobj2.invpriorscov = invcov
             didvobj2.priors = [rshunt0, rp0,r0,beta0,l0,L0,tau0,dt0]
-
+            #return didvobj2
             
-            didvobj2.dofit()
+            didvobj2.dofit(guess)
             
             self.df.iat[int(np.flatnonzero(self.didvinds)[ind]), self.df.columns.get_loc('didvobj2')] = didvobj2
             self.df.iat[int(np.flatnonzero(self.noiseinds)[ind]), self.df.columns.get_loc('didvobj2')] = didvobj2
@@ -1435,6 +1443,33 @@ class IVanalysis(object):
         """
         
         _plot_rload_rn_qetbias(self, lgcsave, xlims_rl, ylims_rl, xlims_rn, ylims_rn)
+        
+    def plot_didv_bias(self, xlims=(-.15,0.025), ylims=ylim(0,.08),
+                   cmap='magma'):
+        """
+        Helper function to plot the real vs imaginary
+        part of the didv for different QET bias values
+        for an IVanalysis object
+
+        Parameters
+        ----------
+        data : IVanalysis object
+            The IVanalysis object with the didv fits
+            already done
+        xlims : tuple, optional
+            The xlimits of the plot
+        ylims : tuple, optional
+            The ylimits of the plot
+        cmap : str, optional
+            The colormap to use for the 
+            plot. 
+
+        Returns
+        -------
+        fig, ax : matplotlib fig and axes objects
+        """
+
+        _plot_didv_bias(self, xlims=xlims, ylims=ylims, cmap=cmap)
         
         
             
