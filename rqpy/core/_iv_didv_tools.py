@@ -1006,15 +1006,17 @@ class IVanalysis(object):
         #('rshunt0','rp0','r0','beta0','l0','L0','tau0' dt)
         cov = didvobj2.irwincov[:-1,:-1]
         mu = didvobj.irwinparams[:-1]
-        full_cov = np.zeros((cov.shape[0]+2, cov.shape[1]+2))
-        full_mu = np.zeros((mu.shape[0]+2))
-        full_mu[:-2] = mu
-        full_mu[-2] = self.tc
-        full_mu[-1] = self.tbath
+        full_cov = np.zeros((cov.shape[0]+3, cov.shape[1]+3))
+        full_mu = np.zeros((mu.shape[0]+3))
+        full_mu[:-3] = mu
+        full_mu[-3] = self.tc
+        full_mu[-2] = self.tbath
+        full_mu[-1] = self.Gta
 
-        full_cov[:-2,:-2] = cov
-        full_cov[-2,-2] = self.tc_err**2
-        full_cov[-1,-1] = self.tbath_err**2
+        full_cov[:-3,:-3] = cov
+        full_cov[-3,-3] = self.tc_err**2
+        full_cov[-2,-2] = self.tbath_err**2
+        full_cov[-1,-1] = self.Gta_err**2
 
         rand_data = np.random.multivariate_normal(full_mu, full_cov, nsamples)
 
@@ -1027,8 +1029,9 @@ class IVanalysis(object):
         tau0 = rand_data[:,6]
         tc = rand_data[:,7]
         tb = rand_data[:,8]
+        gta = rand_data[:,9]
 
-        return rshutn, rp, r0, beta, l, L, tau0, tc, tb
+        return rshunt, rp, r0, beta, l, L, tau0, tc, tb, gta
     @staticmethod    
     def _err_bounds(arr):
         """
@@ -1060,80 +1063,81 @@ class IVanalysis(object):
         mean = np.exp(mu)
         sig_upper = np.exp(x_p)
         sig_lower = np.exp(x_m)
+        
         return mean, sig_upper, sig_lower
 
-    def _get_tes_params(data, didvobj, nsamples=100, scale=np.array([1e3, 1e3, 1, 1e-3, 1e8, 1e3, 1e3, 1e3])):
-        """
-        Function to return parameters sampled from multivariate
-        normal distribution based on TES fitted parameters
+#     def _get_tes_params(data, didvobj, nsamples=100, scale=np.array([1e3, 1e3, 1, 1e-3, 1e8, 1e3, 1e3, 1e3])):
+#         """
+#         Function to return parameters sampled from multivariate
+#         normal distribution based on TES fitted parameters
 
-        Parameters
-        ----------
-        didvobj : DIDV object
-            DIDV object after fit has been done
-        nsamples : int
-            Number of samples to generate
+#         Parameters
+#         ----------
+#         didvobj : DIDV object
+#             DIDV object after fit has been done
+#         nsamples : int
+#             Number of samples to generate
 
-        Returns
-        -------
-        rload : Array
-            Array of rload samples of length nsamples
-        r0 : Array
-            Array of r0 samples of length nsamples
-        beta : Array
-            Array of beta samples of length nsamples
-        l : Array
-            Array of irwins loop gain samples of length nsamples
-        L : Array
-            Array of inductance samples of length nsamples
-        tau0 : Array
-            Array of tau0 samples of length nsamples
-        tc : Array
-            Array of tc samples of length nsamples
-        tb : Array
-            Array of tb samples of length nsamples
-        """
-        # didv params are in the following order
-        #(rload, r0, beta, l, L, tau0, dt)
+#         Returns
+#         -------
+#         rload : Array
+#             Array of rload samples of length nsamples
+#         r0 : Array
+#             Array of r0 samples of length nsamples
+#         beta : Array
+#             Array of beta samples of length nsamples
+#         l : Array
+#             Array of irwins loop gain samples of length nsamples
+#         L : Array
+#             Array of inductance samples of length nsamples
+#         tau0 : Array
+#             Array of tau0 samples of length nsamples
+#         tc : Array
+#             Array of tc samples of length nsamples
+#         tb : Array
+#             Array of tb samples of length nsamples
+#         """
+#         # didv params are in the following order
+#         #(rload, r0, beta, l, L, tau0, dt)
 
 
 
-        cov = didvobj.irwincov2priors[:-1,:-1]
-        mu = didvobj.irwinparams2priors[:-1]
-        #things = didvobj.get_irwinparams_dict(2, True)
-        full_cov = np.zeros((cov.shape[0]+4, cov.shape[1]+4))
-        full_mu = np.zeros((mu.shape[0]+4))
+#         cov = didvobj.irwincov2priors[:-1,:-1]
+#         mu = didvobj.irwinparams2priors[:-1]
+#         #things = didvobj.get_irwinparams_dict(2, True)
+#         full_cov = np.zeros((cov.shape[0]+4, cov.shape[1]+4))
+#         full_mu = np.zeros((mu.shape[0]+4))
 
-        full_mu[:-4] = mu
-        full_mu[-4] = data.rshunt
-        full_mu[-3] = data.Gta
-        full_mu[-2] = data.tc
-        full_mu[-1] = data.tbath
+#         full_mu[:-4] = mu
+#         full_mu[-4] = data.rshunt
+#         full_mu[-3] = data.Gta
+#         full_mu[-2] = data.tc
+#         full_mu[-1] = data.tbath
 
-        full_cov[:-4,:-4] = cov
-        full_cov[-4,-4] = data.rshunt_err**2
-        full_cov[-3,-3] = data.Gta_err**2
-        full_cov[-2,-2] = data.tc_err**2
-        full_cov[-1,-1] = data.tbath_err**2
+#         full_cov[:-4,:-4] = cov
+#         full_cov[-4,-4] = data.rshunt_err**2
+#         full_cov[-3,-3] = data.Gta_err**2
+#         full_cov[-2,-2] = data.tc_err**2
+#         full_cov[-1,-1] = data.tbath_err**2
 
-        scale = np.ones_like(full_mu)#1/np.sqrt(full_cov.diagonal())
-        scale_cov = np.dot(scale[:,np.newaxis], scale[:, np.newaxis].T)
+#         scale = np.ones_like(full_mu)#1/np.sqrt(full_cov.diagonal())
+#         scale_cov = np.dot(scale[:,np.newaxis], scale[:, np.newaxis].T)
 
-        rand_data = np.random.multivariate_normal(full_mu*scale, full_cov*scale_cov, nsamples)
-        rand_data = rand_data/scale
+#         rand_data = np.random.multivariate_normal(full_mu*scale, full_cov*scale_cov, nsamples)
+#         rand_data = rand_data/scale
 
-        rload = rand_data[:,0]
-        r0 = rand_data[:,1]
-        beta = rand_data[:,2]
-        l = rand_data[:,3]
-        L = rand_data[:,4]
-        tau0 = rand_data[:,5]
-        rsh = rand_data[:,6]
-        gta = rand_data[:,7]
-        tc = rand_data[:,8]
-        tb = rand_data[:,9]
+#         rload = rand_data[:,0]
+#         r0 = rand_data[:,1]
+#         beta = rand_data[:,2]
+#         l = rand_data[:,3]
+#         L = rand_data[:,4]
+#         tau0 = rand_data[:,5]
+#         rsh = rand_data[:,6]
+#         gta = rand_data[:,7]
+#         tc = rand_data[:,8]
+#         tb = rand_data[:,9]
 
-        return rload, r0, beta, l, L, tau0, rsh, gta, tc, tb, full_mu, full_cov
+#         return rload, r0, beta, l, L, tau0, rsh, gta, tc, tb, full_mu, full_cov
 
     def estimate_noise_errors(self, tau_collect=0, collection_eff=1,
                               inds = 'all', nsamples=100, 
@@ -1226,8 +1230,11 @@ class IVanalysis(object):
             noise_row = data.df[self.noiseinds].iloc[self.traninds].iloc[ind]
             f = noise_row.f[1:]
             psd = noise_row.psd[1:]
-            didvobj = noise_row.didvobj
-            rload, r0, beta, l, L, tau0, rsh, gta, tc, tb = _get_tes_params(data, didvobj, nsamples=nsamples, scale=scale)
+            didvobj = noise_row.didvobj2
+            rshunt, rp, r0, beta, l, L, tau0, tc, tb, gta = _get_tes_params(self, 
+                                                                            didvobj, 
+                                                                            nsamples=nsamples, 
+                                                                            scale=scale)
 
             s_ites = np.zeros((nsamples, len(f)))
             s_iload = np.zeros((nsamples, len(f)))
@@ -1248,7 +1255,7 @@ class IVanalysis(object):
 
             for ii in range(nsamples):
 
-                tesnoise = TESnoise(freqs=f, rload=rload[ii], r0=r0[ii], rshunt=rsh[ii], beta=beta[ii]
+                tesnoise = TESnoise(freqs=f, rload=rp[ii]+rshunt[ii], r0=r0[ii], rshunt=rshunt[ii], beta=beta[ii]
                                            , loopgain=l[ii], inductance=L[ii], tau0=tau0[ii], G=gta[ii], 
                                            qetbias=noise_row.qetbias, tc=tc[ii], tload=data.tload, tbath=tb[ii],
                                            n=5.0, lgcb=True, squiddc=data.squiddc, 
@@ -1273,22 +1280,22 @@ class IVanalysis(object):
                 s_psd[ii] = psd/(np.abs(tesnoise.dIdP(f))**2)
 
 
-            ites_mu[ind], ites_upper[ind], ites_lower[ind] = _err_bounds(s_ites)
-            iload_mu[ind], iload_upper[ind], iload_lower[ind] = _err_bounds(s_iload)
-            itfn_mu[ind], itfn_upper[ind], itfn_lower[ind] = _err_bounds(s_itfn)
-            itot_mu[ind], itot_upper[ind], itot_lower[ind] = _err_bounds(s_itot)
-            isquid_mu[ind], isquid_upper[ind], isquid_lower[ind] = _err_bounds(s_isquid)
+            ites_mu[ind], ites_upper[ind], ites_lower[ind] = IVanalysis._err_bounds(s_ites)
+            iload_mu[ind], iload_upper[ind], iload_lower[ind] = IVanalysis._err_bounds(s_iload)
+            itfn_mu[ind], itfn_upper[ind], itfn_lower[ind] = IVanalysis._err_bounds(s_itfn)
+            itot_mu[ind], itot_upper[ind], itot_lower[ind] = IVanalysis._err_bounds(s_itot)
+            isquid_mu[ind], isquid_upper[ind], isquid_lower[ind] = IVanalysis._err_bounds(s_isquid)
 
-            ptes_mu[ind], ptes_upper[ind], ptes_lower[ind] = _err_bounds(s_ptes)
-            pload_mu[ind], pload_upper[ind], pload_lower[ind] = _err_bounds(s_pload)
-            ptfn_mu[ind], ptfn_upper[ind], ptfn_lower[ind] = _err_bounds(s_ptfn)
-            ptot_mu[ind], ptot_upper[ind], ptot_lower[ind] = _err_bounds(s_ptot)
-            psquid_mu[ind], psquid_upper[ind], psquid_lower[ind] = _err_bounds(s_psquid)
-            s_psd_mu[ind], s_psd_upper[ind], s_psd_lower[ind] = _err_bounds(s_psd)
+            ptes_mu[ind], ptes_upper[ind], ptes_lower[ind] = IVanalysis._err_bounds(s_ptes)
+            pload_mu[ind], pload_upper[ind], pload_lower[ind] = IVanalysis._err_bounds(s_pload)
+            ptfn_mu[ind], ptfn_upper[ind], ptfn_lower[ind] = IVanalysis._err_bounds(s_ptfn)
+            ptot_mu[ind], ptot_upper[ind], ptot_lower[ind] = IVanalysis._err_bounds(s_ptot)
+            psquid_mu[ind], psquid_upper[ind], psquid_lower[ind] = IVanalysis._err_bounds(s_psquid)
+            s_psd_mu[ind], s_psd_upper[ind], s_psd_lower[ind] = IVanalysis._err_bounds(s_psd)
 
             e_res[ind] = np.mean(energy_res)
             e_res_err[ind] = np.std(energy_res)
-
+        
         return ites_mu, ites_upper, ites_lower, \
                iload_mu, iload_upper, iload_lower, \
                itfn_mu, itfn_upper, itfn_lower, \
@@ -1444,7 +1451,7 @@ class IVanalysis(object):
         
         _plot_rload_rn_qetbias(self, lgcsave, xlims_rl, ylims_rl, xlims_rn, ylims_rn)
         
-    def plot_didv_bias(self, xlims=(-.15,0.025), ylims=ylim(0,.08),
+    def plot_didv_bias(self, xlims=(-.15,0.025), ylims=(0,.08),
                    cmap='magma'):
         """
         Helper function to plot the real vs imaginary
