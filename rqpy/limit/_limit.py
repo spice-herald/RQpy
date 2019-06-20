@@ -4,7 +4,7 @@ import time
 import os
 from pathlib import Path
 import contextlib
-from scipy import stats, signal, interpolate, special
+from scipy import stats, signal, interpolate, special, integrate
 
 import rqpy as rp
 from rqpy import constants
@@ -394,14 +394,17 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
 
         rate = init_rate * curr_exp(en_interp)
 
-        integ_rate = np.cumsum(rate * delta_e * inlim)
+        integ_rate = integrate.cumtrapz(rate[inlim], x=en_interp[inlim], initial=0)
 
-        integ_rate[0] = 0
         tot_rate = integ_rate[-1]
 
-        x_val_fcn = interpolate.interp1d(en_interp, integ_rate,
-                                         kind="linear",
-                                         bounds_error=True)
+        x_val_fcn = interpolate.interp1d(
+            en_interp[inlim],
+            integ_rate,
+            kind="linear",
+            bounds_error=False,
+            fill_value=(0, tot_rate),
+        )
 
         x_vals = x_val_fcn(eventenergies[event_inds])
 
@@ -426,6 +429,45 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
             sigma[ii] = (sigma0 / tot_rate) * uloutput
 
     return sigma
+
+def _norm2d(x0, x1, mu, cov, return_ellipse=False):
+    """
+    Two-dimensional normal probability density function.
+
+    Parameters
+    ----------
+    x0 : float, ndarray
+        Value or array of values at which to calculate the PDF.
+    x1 : float, ndarray
+        Value or array of values at which to calculate the PDF.
+    mu : float, ndarray
+        The center (mean) of the PDF, assumed to be the same for `x0` and `x1`.
+    cov : ndarray
+        The covariance matrix corresponding to `x0` and `x1`.
+    return_ellipse : bool, optional
+        Boolean flag for whether or not the `ell` value should also be returned. Default is False.
+
+    Returns
+    -------
+    norm2d : ndarray
+        The two-dimensional normal probability density function
+    ell : ndarray, optional
+        The chi-squared calculated for each data point, equivalent to `[x0, x1] * inv(cov) * [x0, x1]'`.
+
+    """
+
+    cov_inv = np.linalg.inv(cov)
+
+    # multiplied out 2d normal distribution (for vectorization)
+    ell = (x0 - mu)**2 * cov_inv[0, 0] + 2 * (x0 - mu) * (x1 - mu) * cov_inv[1, 0] + (x1 - mu)**2 * cov_inv[1, 1]
+    ell = np.atleast_1d(ell)
+
+    norm2d = np.exp(-0.5 * ell) / np.sqrt((2 * np.pi)**2 * np.linalg.det(cov))
+
+    if return_ellipse:
+        return norm2d, ell
+    else:
+        return norm2d
 
 def _norm2d_trunc(x0, x1, mu, cov, nsig):
     """
@@ -455,23 +497,53 @@ def _norm2d_trunc(x0, x1, mu, cov, nsig):
 
     # get the perimeter of the ellipse for the specified number of sigma
     sig = lambda n: stats.norm.cdf(n) - stats.norm.cdf(-n)
-    mvar_ell = stats.chi2.ppf(sig(nsig), 2)
+    max_ell = stats.chi2.ppf(sig(nsig), 2)
 
-    cov_inv = np.linalg.inv(cov)
+    norm2d, ell = _norm2d(x0, x1, mu, cov, return_ellipse=True)
 
-    # multiplied out 2d normal distribution (for vectorization)
-    ell = (x0 - mu)**2 * cov_inv[0, 0] + 2 * (x0 - mu) * (x1 - mu) * cov_inv[1, 0] + (x1 - mu)**2 * cov_inv[1, 1]
-    ell = np.atleast_1d(ell)
-
-    norm2d = np.exp(-0.5 * ell) / np.sqrt((2 * np.pi)**2 * np.linalg.det(cov))
-
-    inds = ell > mvar_ell
+    inds = ell > max_ell
     norm2d[inds] = 0
 
     return norm2d
 
+def _gauss2d_integrand(recon_energy, et, e0, delta, cov, nsig, m_dm, sig0, subtract_zero=False, tm="Si"):
+    """Helper function for calculating the integrand for doing 2D smearing of the dRdE."""
 
-def drde_gauss_smear2d(x, cov, delta, m_dm, sig0, nsig=3, tm="Si"):
+    step_function = np.heaviside(
+        et - delta,
+        1,
+    )
+
+    normal_dist = _norm2d_trunc(
+        recon_energy,
+        et,
+        e0,
+        cov,
+        nsig,
+    )
+
+    if subtract_zero:
+        normal_dist -= _norm2d(
+            recon_energy,
+            et,
+            0,
+            cov,
+        )
+
+    scattering_rate = drde(
+        e0,
+        m_dm,
+        sig0,
+        tm=tm,
+    )
+
+    res = step_function * normal_dist * scattering_rate
+
+    res[res < 0] = 0
+
+    return res
+
+def drde_gauss_smear2d(x, cov, delta, m_dm, sig0, nsig=3, tm="Si", subtract_zero=False):
     """
     Function for smearing the differential rate for DM, given that we have a covariance matrix
     for two energy estimators, where we have set a trigger threshold on one and a measured energy
@@ -497,6 +569,10 @@ def drde_gauss_smear2d(x, cov, delta, m_dm, sig0, nsig=3, tm="Si"):
     tm : str, int, optional
         The target material of the detector. Can be passed as either the atomic symbol, the
         atomic number, or the full name of the element. Default is 'Si'.
+    subtract_zero : bool, optional
+        Option to subtract out the zero-energy multivariate normal distribution in true energy for
+        a more conservative estimate of the 2D Gaussian smeared limit. This will have only a small
+        effect. Default is False.
 
     Returns
     -------
@@ -533,16 +609,18 @@ def drde_gauss_smear2d(x, cov, delta, m_dm, sig0, nsig=3, tm="Si"):
 
     for ii, val in enumerate(x):
         # define function that we will be integrating over
-        func = lambda et, e0: np.heaviside(
-            et - delta,
-            1,
-        ) * _norm2d_trunc(
+        func = lambda et, e0: _gauss2d_integrand(
             val,
             et,
             e0,
+            delta,
             cov,
             nsig,
-        ) * drde(e0, m_dm, sig0, tm=tm)
+            m_dm,
+            sig0,
+            subtract_zero=subtract_zero,
+            tm=tm,
+        )
 
         # get x values inside ellipse for each y value
         etvals = []
@@ -561,7 +639,7 @@ def drde_gauss_smear2d(x, cov, delta, m_dm, sig0, nsig=3, tm="Si"):
     return out
 
 def optimuminterval_2dsmear(eventenergies, masslist, exposure, cov, delta,
-                            tm="Si", nsig=3, verbose=False, npts=1e3):
+                            tm="Si", nsig=3, verbose=False, npts=1e3, subtract_zero=False):
     """
     Function for running Steve Yellin's Optimum Interval code on an inputted spectrum, using the
     two-dimensional normal distribution defined by the inputted covariance matrix to model the
@@ -593,6 +671,10 @@ def optimuminterval_2dsmear(eventenergies, masslist, exposure, cov, delta,
     npts : float, optional
         The number of energies at which to evaluate the smeared differential rate. Large values
         result in long computation times. Default is 1e3.
+    subtract_zero : bool, optional
+        Option to subtract out the zero-energy multivariate normal distribution in true energy for
+        a more conservative estimate of the 2D Gaussian smeared limit. This will have only a small
+        effect. Default is False.
 
     Returns
     -------
@@ -643,19 +725,22 @@ def optimuminterval_2dsmear(eventenergies, masslist, exposure, cov, delta,
             sigma0,
             nsig=nsig,
             tm=tm,
+            subtract_zero=subtract_zero,
         )
 
         rate = init_rate * exposure
 
-        integ_rate = np.cumsum(rate * delta_e * inlim)
+        integ_rate = integrate.cumtrapz(rate[inlim], x=en_interp[inlim], initial=0)
 
-        integ_rate[0] = 0
         tot_rate = integ_rate[-1]
 
-        x_val_fcn = interpolate.interp1d(en_interp,
-                                         integ_rate,
-                                         kind="linear",
-                                         bounds_error=True)
+        x_val_fcn = interpolate.interp1d(
+            en_interp[inlim],
+            integ_rate,
+            kind="linear",
+            bounds_error=False,
+            fill_value=(0, tot_rate),
+        )
 
         x_vals = x_val_fcn(eventenergies[event_inds])
 
