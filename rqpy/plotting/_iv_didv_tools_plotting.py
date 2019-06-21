@@ -9,6 +9,7 @@ __all__ = ["_make_iv_noiseplots",
            "_plot_energy_res_vs_bias",
            "_plot_rload_rn_qetbias",
            "_plot_didv_bias",
+           "_plot_ztes_bias",
           ]
 
 
@@ -263,7 +264,7 @@ def _plot_energy_res_vs_bias(r0s,
 def _plot_didv_bias(data, xlims=(-.15,0.025), ylims=(0,.08),
                    cmap='magma'):
     """
-    Helper function to plot the real vs imaginary
+    Helper function to plot the imaginary vs real
     part of the didv for different QET bias values
     for an IVanalysis object
     
@@ -314,6 +315,71 @@ def _plot_didv_bias(data, xlims=(-.15,0.025), ylims=(0,.08),
                   c=colormap(normalize(qets[ii])))
 
         ax.plot(np.real(didv.didvfit_freqdomain)[fitinds],np.imag(didv.didvfit_freqdomain)[fitinds],
+                    c=colormap(normalize(qets[ii])) )
+
+    scalarmappaple = cm.ScalarMappable(norm=normalize, cmap=colormap)
+    scalarmappaple.set_array(qets[:-1])
+    cbar = plt.colorbar(scalarmappaple)
+    cbar.set_label('QET Bias [μA]', labelpad = 3) 
+    
+    return fig, ax
+
+def _plot_ztes_bias(data, xlims=(-110,110), ylims=(-120,0),
+                   cmap='magma_r'):
+    """
+    Helper function to plot the imaginary vs real
+    part of the complex impedance for different QET 
+    bias values for an IVanalysis object
+    
+    Parameters
+    ----------
+    data : IVanalysis object
+        The IVanalysis object with the didv fits
+        already done
+    xlims : tuple, optional
+        The xlimits of the plot
+    ylims : tuple, optional
+        The ylimits of the plot
+    cmap : str, optional
+        The colormap to use for the 
+        plot. 
+        
+    Returns
+    -------
+    fig, ax : matplotlib fig and axes objects
+    """
+    
+    fig,ax=plt.subplots(figsize=(10,6))
+    ax.set_xlabel('Re($Z_{TES}$) ($\Omega$)')
+    ax.set_ylabel('Im($Z_{TES}$) ($\Omega$)')
+
+    ax.set_title("Real and Imaginary Complex Impedance")
+    ax.tick_params(which='both',direction='in',right=True,top=True)
+    ax.grid(which='major')
+    ax.grid(which='minor',linestyle='dotted',alpha=0.3)
+    ax.set_xlim(xlims)
+    ax.set_ylim(ylims)
+
+    qets = np.abs(data.df.loc[data.didvinds, 'qetbias'].iloc[data.traninds].values)*1e6
+
+    normalize = mcolors.Normalize(vmin=min(qets), vmax=max(qets))
+    colormap = plt.get_cmap(cmap)
+    ax.grid(True, linestyle='--')
+
+    for ind in (data.traninds):
+        ii = ind-data.traninds[0]
+        row = data.df[data.didvinds].iloc[ind]
+        didv = row.didvobj2
+        goodinds=np.abs(didv.didvmean/didv.didvstd) > 2.0 ## don't plot points with huge errors
+        fitinds = (didv.freq>0) & (didv.freq<3e4)
+        plotinds= np.logical_and(fitinds, goodinds)
+        func = (didv.didvmean-didv.offset)
+        ax.plot(np.real(1/func)[plotinds], np.imag(1/func)[plotinds], linestyle=' ',
+                marker ='.', alpha = .5, ms=10,
+                  c=colormap(normalize(qets[ii])))
+
+        #print(qets[ii])
+        ax.plot(np.real(1/didv.didvfit_freqdomain)[fitinds],np.imag(1/didv.didvfit_freqdomain)[fitinds],
                     c=colormap(normalize(qets[ii])) )
 
     scalarmappaple = cm.ScalarMappable(norm=normalize, cmap=colormap)

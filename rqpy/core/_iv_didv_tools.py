@@ -11,7 +11,7 @@ from scipy.signal import savgol_filter
 from lmfit import Model
 
 import rqpy as rp
-from rqpy.plotting import _plot_rload_rn_qetbias, _make_iv_noiseplots, _plot_energy_res_vs_bias,_plot_didv_bias
+import rqpy.plotting as plot 
 from qetpy import IV2, DIDV, DIDV2, Noise, didvinitfromdata, autocuts
 from qetpy.sim import TESnoise, loadfromdidv, energy_res_estimate
 from qetpy.plotting import plot_noise_sim
@@ -1295,19 +1295,36 @@ class IVanalysis(object):
 
             e_res[ind] = np.mean(energy_res)
             e_res_err[ind] = np.std(energy_res)
+            
+        noise_model = {}
+        noise_model['ites'] = (ites_mu, ites_upper, ites_lower)
+        noise_model['iload'] = (iload_mu, iload_upper, iload_lower)
+        noise_model['itfn'] = (itfn_mu, itfn_upper, itfn_lower)
+        noise_model['isquid'] = (isquid_mu, isquid_upper, isquid_lower)
+        noise_model['itot'] = (itot_mu, itot_upper, itot_lower)
+        noise_model['ptes'] = (ptes_mu, ptes_upper, ptes_lower)
+        noise_model['pload'] = (pload_mu, pload_upper, pload_lower)
+        noise_model['ptfn'] = (ptfn_mu, ptfn_upper, ptfn_lower)
+        noise_model['psquid'] = (psquid_mu, psquid_upper, psquid_lower)
+        noise_model['ptot'] = (ptot_mu, ptot_upper, ptot_lower)
+        noise_model['energy_res'] = e_res
+        noise_model['energy_res_err'] = e_res_err
         
-        return ites_mu, ites_upper, ites_lower, \
-               iload_mu, iload_upper, iload_lower, \
-               itfn_mu, itfn_upper, itfn_lower, \
-               itot_mu, itot_upper, itot_lower, \
-               isquid_mu, isquid_upper, isquid_lower, \
-               ptes_mu, ptes_upper, ptes_lower, \
-               pload_mu, pload_upper, pload_lower, \
-               ptfn_mu, ptfn_upper, ptfn_lower, \
-               ptot_mu, ptot_upper, ptot_lower, \
-               psquid_mu, psquid_upper, psquid_lower, \
-               s_psd_mu, s_psd_upper, s_psd_lower, \
-               e_res, e_res_err
+        self.noise_model = noise_model
+            
+        
+#         return ites_mu, ites_upper, ites_lower, \
+#                iload_mu, iload_upper, iload_lower, \
+#                itfn_mu, itfn_upper, itfn_lower, \
+#                itot_mu, itot_upper, itot_lower, \
+#                isquid_mu, isquid_upper, isquid_lower, \
+#                ptes_mu, ptes_upper, ptes_lower, \
+#                pload_mu, pload_upper, pload_lower, \
+#                ptfn_mu, ptfn_upper, ptfn_lower, \
+#                ptot_mu, ptot_upper, ptot_lower, \
+#                psquid_mu, psquid_upper, psquid_lower, \
+#                s_psd_mu, s_psd_upper, s_psd_lower, \
+#                e_res, e_res_err
                 
             
         
@@ -1389,7 +1406,7 @@ class IVanalysis(object):
         optimum_t = energy_res[tauminind]
 
         if lgcplot:
-            _plot_energy_res_vs_bias(r0s, energy_res, qets, taus,
+            plot._plot_energy_res_vs_bias(r0s, energy_res, qets, taus,
                                 xlims, ylims, lgcoptimum=lgcoptimum,
                                  lgctau=lgctau, energyscale=energyscale)
         if lgctau:
@@ -1419,7 +1436,7 @@ class IVanalysis(object):
 
         """
         
-        _make_iv_noiseplots(self, lgcsave)
+        plot._make_iv_noiseplots(self, lgcsave)
     
     def plot_rload_rn_qetbias(self, lgcsave=False, xlims_rl=None, ylims_rl=None, xlims_rn=None, ylims_rn=None):
         """
@@ -1449,7 +1466,7 @@ class IVanalysis(object):
         
         """
         
-        _plot_rload_rn_qetbias(self, lgcsave, xlims_rl, ylims_rl, xlims_rn, ylims_rn)
+        plot._plot_rload_rn_qetbias(self, lgcsave, xlims_rl, ylims_rl, xlims_rn, ylims_rn)
         
     def plot_didv_bias(self, xlims=(-.15,0.025), ylims=(0,.08),
                    cmap='magma'):
@@ -1476,7 +1493,34 @@ class IVanalysis(object):
         fig, ax : matplotlib fig and axes objects
         """
 
-        _plot_didv_bias(self, xlims=xlims, ylims=ylims, cmap=cmap)
+        plot._plot_didv_bias(self, xlims=xlims, ylims=ylims, cmap=cmap)
+        
+    def plot_ztes_bias(self, xlims=(-110,110), ylims=(-120, 0),
+                   cmap='magma_r'):
+        """
+        Helper function to plot the imaginary vs real
+        part of the complex impedance for different QET 
+        bias values for an IVanalysis object
+
+        Parameters
+        ----------
+        data : IVanalysis object
+            The IVanalysis object with the didv fits
+            already done
+        xlims : tuple, optional
+            The xlimits of the plot
+        ylims : tuple, optional
+            The ylimits of the plot
+        cmap : str, optional
+            The colormap to use for the 
+            plot. 
+
+        Returns
+        -------
+        fig, ax : matplotlib fig and axes objects
+        """
+
+        plot._plot_ztes_bias(self, xlims=xlims, ylims=ylims, cmap=cmap)
         
         
             
