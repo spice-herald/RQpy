@@ -12,6 +12,7 @@ from lmfit import Model
 
 import rqpy as rp
 import rqpy.plotting as plot 
+import qetpy as qp
 from qetpy import IV2, DIDV, DIDV2, Noise, didvinitfromdata, autocuts
 from qetpy.sim import TESnoise, loadfromdidv, energy_res_estimate
 from qetpy.plotting import plot_noise_sim
@@ -321,6 +322,23 @@ class IVanalysis(object):
         The power of the 1/f^n noise for the squid
     inductance : float
         The inductance of the TES line
+    noise_model : dict
+        dictionary of arrays of the components of the 
+        nosie modeling. defined as:
+            noise_model = {}
+            noise_model['ites'] = (ites_mu, ites_upper, ites_lower)
+            noise_model['iload'] = (iload_mu, iload_upper, iload_lower)
+            noise_model['itfn'] = (itfn_mu, itfn_upper, itfn_lower)
+            noise_model['isquid'] = (isquid_mu, isquid_upper, isquid_lower)
+            noise_model['itot'] = (itot_mu, itot_upper, itot_lower)
+            noise_model['ptes'] = (ptes_mu, ptes_upper, ptes_lower)
+            noise_model['pload'] = (pload_mu, pload_upper, pload_lower)
+            noise_model['ptfn'] = (ptfn_mu, ptfn_upper, ptfn_lower)
+            noise_model['psquid'] = (psquid_mu, psquid_upper, psquid_lower)
+            noise_model['ptot'] = (ptot_mu, ptot_upper, ptot_lower)
+            noise_model['energy_res'] = e_res
+            noise_model['energy_res_err'] = e_res_err
+        where each element of the tuple is an array of shape (bias point, #freq bins)
         
     """
     
@@ -448,7 +466,7 @@ class IVanalysis(object):
         tempdidv2 = DIDV2(1,1,1,1,1)
         self.df = self.df.assign(didvobj = tempdidv)
         self.df = self.df.assign(didvobj2 = tempdidv)
-        
+        self.noise_model = None
     
     def _fit_rload_didv(self, lgcplot=False, lgcsave=False, **kwargs):
         """
@@ -971,15 +989,15 @@ class IVanalysis(object):
         self.df.loc[self.noiseinds, 'tau_eff'] =  tau_eff_arr
         self.df.loc[self.didvinds, 'tau_eff'] =  tau_eff_arr
            
-    def _get_tes_params(self, didvobj2, nsamples=100):
+    def _get_tes_params(self, didvobj, nsamples=100):
         """
         Function to return parameters sampled from multivariate
         normal distribution based on TES fitted parameters
         
         Parameters
         ----------
-        didvobj : DIDV object
-            DIDV object after fit has been done
+        didvobj : DIDV2 object
+            DIDV2 object after fit has been done
         nsamples : int
             Number of samples to generate
             
@@ -1004,7 +1022,7 @@ class IVanalysis(object):
         """
         # didv params are in the following order
         #('rshunt0','rp0','r0','beta0','l0','L0','tau0' dt)
-        cov = didvobj2.irwincov[:-1,:-1]
+        cov = didvobj.irwincov[:-1,:-1]
         mu = didvobj.irwinparams[:-1]
         full_cov = np.zeros((cov.shape[0]+3, cov.shape[1]+3))
         full_mu = np.zeros((mu.shape[0]+3))
@@ -1183,7 +1201,7 @@ class IVanalysis(object):
         elif not isinstance(inds, list):
             inds = [inds]
 
-        f = data.df[self.noiseinds].iloc[self.traninds].iloc[0].f[1:]
+        f = self.df[self.noiseinds].iloc[self.traninds].iloc[0].f[1:]
 
         ites_mu = np.zeros((len(inds), len(f)))
         ites_upper = np.zeros((len(inds), len(f)))
@@ -1227,14 +1245,13 @@ class IVanalysis(object):
 
         for ind in inds:
 
-            noise_row = data.df[self.noiseinds].iloc[self.traninds].iloc[ind]
+            noise_row = self.df[self.noiseinds].iloc[self.traninds].iloc[ind]
             f = noise_row.f[1:]
             psd = noise_row.psd[1:]
             didvobj = noise_row.didvobj2
-            rshunt, rp, r0, beta, l, L, tau0, tc, tb, gta = _get_tes_params(self, 
-                                                                            didvobj, 
-                                                                            nsamples=nsamples, 
-                                                                            scale=scale)
+            rshunt, rp, r0, beta, l, L, tau0, tc, tb, gta = self._get_tes_params(
+                didvobj, nsamples=nsamples,
+            )
 
             s_ites = np.zeros((nsamples, len(f)))
             s_iload = np.zeros((nsamples, len(f)))
@@ -1255,11 +1272,27 @@ class IVanalysis(object):
 
             for ii in range(nsamples):
 
-                tesnoise = TESnoise(freqs=f, rload=rp[ii]+rshunt[ii], r0=r0[ii], rshunt=rshunt[ii], beta=beta[ii]
-                                           , loopgain=l[ii], inductance=L[ii], tau0=tau0[ii], G=gta[ii], 
-                                           qetbias=noise_row.qetbias, tc=tc[ii], tload=data.tload, tbath=tb[ii],
-                                           n=5.0, lgcb=True, squiddc=data.squiddc, 
-                                           squidpole=data.squidpole, squidn=data.squidn)
+                tesnoise = TESnoise(
+                    freqs=f,
+                    rload=rp[ii] + rshunt[ii],
+                    r0=r0[ii],
+                    rshunt=rshunt[ii],
+                    beta=beta[ii],
+                    loopgain=l[ii],
+                    inductance=L[ii],
+                    tau0=tau0[ii],
+                    G=gta[ii],
+                    qetbias=noise_row.qetbias,
+                    tc=tc[ii],
+                    tload=self.tload,
+                    tbath=tb[ii],
+                    n=5.0,
+                    lgcb=True,
+                    squiddc=self.squiddc,
+                    squidpole=self.squidpole,
+                    squidn=self.squidn,
+                )
+
                 res = qp.sim.energy_res_estimate(freqs=f, tau_collect=tau_collect,
                                                   Sp=psd/(np.abs(tesnoise.dIdP(f))**2),
                                                   collection_eff = collection_eff)
@@ -1279,7 +1312,8 @@ class IVanalysis(object):
 
                 s_psd[ii] = psd/(np.abs(tesnoise.dIdP(f))**2)
 
-
+            return s_ites, s_iload, s_itfn, s_itot, s_isquid
+        
             ites_mu[ind], ites_upper[ind], ites_lower[ind] = IVanalysis._err_bounds(s_ites)
             iload_mu[ind], iload_upper[ind], iload_lower[ind] = IVanalysis._err_bounds(s_iload)
             itfn_mu[ind], itfn_upper[ind], itfn_lower[ind] = IVanalysis._err_bounds(s_itfn)
@@ -1307,6 +1341,7 @@ class IVanalysis(object):
         noise_model['ptfn'] = (ptfn_mu, ptfn_upper, ptfn_lower)
         noise_model['psquid'] = (psquid_mu, psquid_upper, psquid_lower)
         noise_model['ptot'] = (ptot_mu, ptot_upper, ptot_lower)
+        noise_model['s_psd'] = (s_psd_mu, s_psd_upper, s_psd_lower)
         noise_model['energy_res'] = e_res
         noise_model['energy_res_err'] = e_res_err
         
