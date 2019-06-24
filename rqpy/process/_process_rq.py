@@ -1624,7 +1624,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                                 flip * s[maxind + 1:maxind + 1 + int(300e-6 * setup.fs)] - tauval,
                             ),
                         ) + maxind + 1
-                        taufallguess = (tauind - maxind) / self.fs
+                        taufallguess = (tauind - maxind) / setup.fs
                         tauriseguess = 20e-6
                         guess = (
                             np.abs(amp_constrain[jj]),
@@ -1662,7 +1662,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                                 flip * s[maxind + 1:maxind + 1 + int(300e-6 * setup.fs)] - tauval,
                             ),
                         ) + maxind + 1
-                        taufallguess = (tauind - maxind) / self.fs
+                        taufallguess = (tauind - maxind) / setup.fs
                         guess = (
                             np.abs(amp_constrain[jj]),
                             taufallguess,
