@@ -131,7 +131,8 @@ def _plot_rload_rn_qetbias(IVanalysisOBJ, lgcsave, xlims_rl, ylims_rl, xlims_rn,
 
 
 def _plot_energy_res_vs_bias(r0s, 
-                             energy_res, 
+                             energy_res,
+                             energy_res_err,
                              qets, 
                              taus,
                              xlims=None, 
@@ -151,6 +152,10 @@ def _plot_energy_res_vs_bias(r0s,
         Array of r0 values (in Ohms)
     energy_res : ndarray
         Array of expected energy resolutions (in eV)
+    energy_res_err : ndarray, NoneType
+        Array of energy resolution error bounds in eV.
+        must be of shape (2, #qet bias) where the first
+        dims are the lower and upper bounds
     qets : ndarray
         Array of QET bias values (in Amps)
     taus : ndarray
@@ -208,11 +213,14 @@ def _plot_energy_res_vs_bias(r0s,
 
     r0s = r0s[crangey & crangex]*1e3
     energy_res = energy_res[crangey & crangex]*scale
+    energy_ress_err = energy_res[:,crangey & crangex]*scale
     qets = (qets[crangey & crangex]*1e6).round().astype(int)
     taus = taus[crangey & crangex]*1e6
 
     ax.plot(r0s, energy_res, linestyle = ' ', marker = '.', ms = 10, c='g')
-    ax.plot(r0s, energy_res, linestyle = '-', marker = ' ', linewidth = 3, alpha = .5, c='g')
+    ax.plot(r0s, energy_res, linestyle='-', marker=' ', linewidth = 3, alpha = .5, c='g')
+    ax.fill_between(r0s, energy_res_err[0], energy_res_err[1],  alpha=.5, c='g')
+    
     ax.grid(True, which = 'both', linestyle = '--')
     ax.set_xlabel('$R_0$ [mΩ]')
     ax.set_ylabel(r'$σ_E$'+f' [{energyscale}eV]', color='g')
