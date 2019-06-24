@@ -260,6 +260,9 @@ class SetupRQ(object):
         If True, then the pulses are assumed to be in the positive direction. If False, then the 
         pulses are assumed to be in the negative direction. Default is True. Each value in the list specifies
         this attribute for each channel.
+    taurise : list of float, list of NoneType
+        The fixed rise times for each channel, if specified. Default is None, which corresponds to letting
+        the fall time parameter float. Each value in the list specifies this attribute for each channel.
     do_optimumfilters : list of bool
         Boolean flag for whether or not any of the optimum filters will be calculated. If only
         calculating non-OF-related RQs, then this will be False, and processing time will not
@@ -441,6 +444,7 @@ class SetupRQ(object):
 
         self.do_ofnonlin = [False]*self.nchan
         self.ofnonlin_positive_pulses = [True]*self.nchan
+        self.taurise = [None] * self.nchan
 
         self.do_optimumfilters = [True]*self.nchan
         self.do_optimumfilters_smooth = [False]*self.nchan
@@ -1149,7 +1153,7 @@ class SetupRQ(object):
         self.indstart_maxmin = indstart
         self.indstop_maxmin = indstop
 
-    def adjust_ofnonlin(self, lgcrun=True, positive_pulses=True):
+    def adjust_ofnonlin(self, lgcrun=True, positive_pulses=True, taurise=None):
         """
         Method for adjusting the calculation of the nonlinear optimum filter fit with rise and 
         fall time floating.
@@ -1161,16 +1165,22 @@ class SetupRQ(object):
         positive_pulses : bool, list of bool, optional
             If True, then the pulses are assumed to be in the positive direction. If False, then the 
             pulses are assumed to be in the negative direction. Default is True.
+        taurise : float, list of float, NoneType, optional
+            If set, then this is the fixed rise time used for the nonlinear OF. Otherwise, the rise
+            time is left as a floating parameter.
 
         """
 
-        lgcrun, positive_pulses = self._check_arg_length(lgcrun=lgcrun, positive_pulses=positive_pulses)
+        lgcrun, positive_pulses, taurise = self._check_arg_length(
+            lgcrun=lgcrun, positive_pulses=positive_pulses, taurise=taurise,
+        )
 
         if any(lgcrun):
             warnings.warn("The nonlinear OF should only be run on a cluster due to the slow computation speed.")
 
         self.do_ofnonlin = lgcrun
         self.ofnonlin_positive_pulses = positive_pulses
+        self.taurise = taurise
 
     def adjust_trigsim(self, trigger_template, trigger_psd, k=12, fir_bits_out=32, fir_discard_msbs=4):
         """
@@ -1605,22 +1615,78 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                 else:
                     flip = -1
 
-                res_nlin = nlin.fit_falltimes(flip*s, npolefit=2, lgcfullrtn=True)
+                if setup.taurise[chan_num] is None:
+                    if setup.do_ofamp_constrained[chan_num]:
+                        tauval = np.abs(amp_constrain[jj]) / np.e
+                        tauind = np.argmin(
+                            np.abs(
+                                pulse[maxind + 1:maxind + 1 + int(300e-6 * setup.fs)] - tauval,
+                            ),
+                        ) + maxind + 1
+                        taufallguess = (tauind - maxind) / self.fs
+                        tauriseguess = 20e-6
+                        guess = (
+                            np.abs(amp_constrain[jj]),
+                            tauriseguess,
+                            taufallguess,
+                            t0_constrain[jj] + len(s)//2 / setup.fs,
+                        )
+                    else:
+                        guess = None
 
-                params_nlin = res_nlin[0]
-                errors_nlin = res_nlin[1]
-                reducedchi2_nlin = res_nlin[3]
+                    res_nlin = nlin.fit_falltimes(
+                        flip * s, npolefit=2, lgcfullrtn=True, guess=guess,
+                    )
 
-                amp_nonlin[jj] = flip*params_nlin[0]
-                amp_nonlin_err[jj] = errors_nlin[0]
-                taurise_nonlin[jj] = params_nlin[1]
-                taurise_nonlin_err[jj] = errors_nlin[1]
-                taufall_nonlin[jj] = params_nlin[2]
-                taufall_nonlin_err[jj] = errors_nlin[2]
-                t0_nonlin[jj] = params_nlin[3]
-                t0_nonlin_err[jj] = errors_nlin[3]
-                chi2_nonlin[jj] = reducedchi2_nlin * (len(nlin.data)-nlin.dof)
-                success_nonlin[jj] = res_nlin[4]
+                    params_nlin = res_nlin[0]
+                    errors_nlin = res_nlin[1]
+                    reducedchi2_nlin = res_nlin[3]
+
+                    amp_nonlin[jj] = flip*params_nlin[0]
+                    amp_nonlin_err[jj] = errors_nlin[0]
+                    taurise_nonlin[jj] = params_nlin[1]
+                    taurise_nonlin_err[jj] = errors_nlin[1]
+                    taufall_nonlin[jj] = params_nlin[2]
+                    taufall_nonlin_err[jj] = errors_nlin[2]
+                    t0_nonlin[jj] = params_nlin[3]
+                    t0_nonlin_err[jj] = errors_nlin[3]
+                    chi2_nonlin[jj] = reducedchi2_nlin * (len(nlin.data) - nlin.dof)
+                    success_nonlin[jj] = res_nlin[4]
+                else:
+                    if setup.do_ofamp_constrained[chan_num]:
+                        tauval = np.abs(amp_constrain[jj]) / np.e
+                        tauind = np.argmin(
+                            np.abs(
+                                pulse[maxind + 1:maxind + 1 + int(300e-6 * setup.fs)] - tauval,
+                            ),
+                        ) + maxind + 1
+                        taufallguess = (tauind - maxind) / self.fs
+                        guess = (
+                            np.abs(amp_constrain[jj]),
+                            taufallguess,
+                            t0_constrain[jj] + len(s)//2 / setup.fs,
+                        )
+                    else:
+                        guess = None
+
+                    res_nlin = nlin.fit_falltimes(
+                        flip * s, npolefit=1, lgcfullrtn=True, guess=guess, taurise=setup.taurise[chan_num],
+                    )
+
+                    params_nlin = res_nlin[0]
+                    errors_nlin = res_nlin[1]
+                    reducedchi2_nlin = res_nlin[3]
+
+                    amp_nonlin[jj] = flip*params_nlin[0]
+                    amp_nonlin_err[jj] = errors_nlin[0]
+                    taurise_nonlin[jj] = setup.taurise[chan_num]
+                    taurise_nonlin_err[jj] = 0.0
+                    taufall_nonlin[jj] = params_nlin[1]
+                    taufall_nonlin_err[jj] = errors_nlin[1]
+                    t0_nonlin[jj] = params_nlin[2]
+                    t0_nonlin_err[jj] = errors_nlin[2]
+                    chi2_nonlin[jj] = reducedchi2_nlin * (len(nlin.data) - nlin.dof)
+                    success_nonlin[jj] = res_nlin[3]
 
             if setup.do_trigsim[chan_num] and setup.trigger == chan_num:
                 res_trigsim = setup.TS.trigger(setup.signal_full[jj, chan_num], k=setup.trigsim_k)
