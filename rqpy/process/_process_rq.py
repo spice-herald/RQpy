@@ -1617,6 +1617,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
 
                 if setup.taurise[chan_num] is None:
                     if setup.do_ofamp_constrained[chan_num]:
+                        maxind = int(t0_constrain[jj] * setup.fs) + len(s)//2
                         tauval = np.abs(amp_constrain[jj]) / np.e
                         tauind = np.argmin(
                             np.abs(
@@ -1654,6 +1655,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                     success_nonlin[jj] = res_nlin[4]
                 else:
                     if setup.do_ofamp_constrained[chan_num]:
+                        maxind = int(t0_constrain[jj] * setup.fs) + len(s)//2
                         tauval = np.abs(amp_constrain[jj]) / np.e
                         tauind = np.argmin(
                             np.abs(
