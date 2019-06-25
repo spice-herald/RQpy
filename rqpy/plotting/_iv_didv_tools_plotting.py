@@ -10,6 +10,7 @@ __all__ = ["_make_iv_noiseplots",
            "_plot_rload_rn_qetbias",
            "_plot_didv_bias",
            "_plot_ztes_bias",
+           "_plot_noise_model",
           ]
 
 
@@ -205,24 +206,24 @@ def _plot_energy_res_vs_bias(r0s,
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(9, 6))
 
     if xlims is None:
-        xlims = (min(r0s*1e3), max(r0s*1e3))
+        xlims = (min(r0s), max(r0s))
     if ylims is None:
         ylims = (min(energy_res*scale), max(energy_res*scale))
     crangey = rp.inrange(energy_res, ylims[0], ylims[1])
-    crangex = rp.inrange(r0s*1e3, xlims[0], xlims[1])
+    crangex = rp.inrange(r0s, xlims[0], xlims[1])
 
-    r0s = r0s[crangey & crangex]*1e3
+    r0s = r0s[crangey & crangex]
     energy_res = energy_res[crangey & crangex]*scale
-    energy_ress_err = energy_res[:,crangey & crangex]*scale
+    energy_res_err = energy_res_err[:,crangey & crangex]*scale
     qets = (qets[crangey & crangex]*1e6).round().astype(int)
     taus = taus[crangey & crangex]*1e6
 
     ax.plot(r0s, energy_res, linestyle = ' ', marker = '.', ms = 10, c='g')
     ax.plot(r0s, energy_res, linestyle='-', marker=' ', linewidth = 3, alpha = .5, c='g')
-    ax.fill_between(r0s, energy_res_err[0], energy_res_err[1],  alpha=.5, c='g')
+    ax.fill_between(r0s, energy_res_err[0], energy_res_err[1],  alpha=.5, color='g')
     
     ax.grid(True, which = 'both', linestyle = '--')
-    ax.set_xlabel('$R_0$ [mΩ]')
+    ax.set_xlabel('$R_0/R_N$')
     ax.set_ylabel(r'$σ_E$'+f' [{energyscale}eV]', color='g')
     ax.tick_params('y', colors='g')
     ax.tick_params(which="both", direction="in", right=True, top=True)
@@ -260,7 +261,7 @@ def _plot_energy_res_vs_bias(r0s,
     if ylims is not None:
         ax.set_ylim(ylims)
 
-    ax.set_title('Expected Energy Resolution vs QET bias and $R_0$')
+    ax.set_title('Expected Energy Resolution vs QET bias and $R_0/R_N$')
     if lgcoptimum:
         ax.legend()
         if lgctau:
@@ -396,3 +397,142 @@ def _plot_ztes_bias(data, xlims=(-110,110), ylims=(-120,0),
     cbar.set_label('QET Bias [μA]', labelpad = 3) 
     
     return fig, ax
+
+
+def _plot_noise_model(data, idx='all', xlims=(10, 2e5), ylims_current=None, ylims_power=None):
+    """
+    Function to plot noise models with errors for IVanalysis object
+    
+    Paramters
+    ---------
+    data : IVanalysis object
+        The IVanalysis object to plot
+    idx : range, str, optional
+        The range of indeces to plot
+        must be either a range() object
+        or 'all'. If 'all', it defaults
+        to all the transistion data
+    xlims : tuple, optional
+        The xlimits for all the plots
+    ylims_current : tuple, NoneType, optional
+        The ylimits for all the current
+        noise plots
+    ylims_power : tuple, NoneType, optional
+        The ylimits for all the power
+        noise plots
+    
+    Returns
+    -------
+    None
+    """
+        
+    noise = data.noise_model
+    if idx == 'all':
+        inds = data.traninds
+    else:
+        inds = idx
+    
+    for ind in inds:
+        if idx == 'all':
+            ii = ind - data.traninds[0]
+        else:
+            ii = ind - idx[0]
+        noise_row = data.df[data.noiseinds].iloc[ind]
+        r0 = noise_row.r0
+        f = noise_row.f
+        psd = noise_row.psd
+        didvobj = noise_row.didvobj
+
+        freqs = f[1:]
+        psd = psd[1:]
+        
+        fig, ax = plt.subplots(1,1, figsize=(11,6))
+        if ylims_current is not None:
+            ax.set_ylim(ylims_current)
+        if xlims is not None:
+            ax.set_xlim(xlims)
+        
+
+        ax.grid(which="major", linestyle='--')
+        ax.grid(which="minor", linestyle="dotted", alpha=0.5)
+        ax.tick_params(which="both", direction="in", right=True, top=True)
+        ax.set_xlabel(r'Frequency [Hz]')
+
+        ax.set_title(f"Current Noise For $R_0$ : {r0*1e3:.2f} $m\Omega$")
+        ax.loglog(freqs, np.sqrt(np.abs(data.noise_model['ites'][0][ii])), color='#1f77b4',
+                   linewidth=1.5, label='TES johnson Noise')
+        ax.fill_between(freqs, np.sqrt(np.abs(data.noise_model['ites'][1][ii])),
+                       np.sqrt(np.abs(data.noise_model['ites'][2][ii])), alpha=.5,
+                       color='#1f77b4')
+        ax.loglog(freqs, np.sqrt(np.abs(data.noise_model['iload'][0][ii])), color='#ff7f0e',
+                   linewidth=1.5, label='Load Noise')
+        ax.fill_between(freqs, np.sqrt(np.abs(data.noise_model['iload'][1][ii])),
+                       np.sqrt(np.abs(data.noise_model['iload'][2][ii])), alpha=.5,
+                       color='#ff7f0e')
+        ax.loglog(freqs, np.sqrt(np.abs(data.noise_model['itfn'][0][ii])), color='#2ca02c',
+                   linewidth=1.5, label='TFN Noise')
+        ax.fill_between(freqs, np.sqrt(np.abs(data.noise_model['itfn'][1][ii])),
+                       np.sqrt(np.abs(data.noise_model['itfn'][2][ii])), alpha=.5,
+                       color='#2ca02c')
+        ax.loglog(freqs, np.sqrt(np.abs(data.noise_model['itot'][0][ii])), color='#d62728',
+                   linewidth=1.5, label='Total Noise')
+        ax.fill_between(freqs, np.sqrt(np.abs(data.noise_model['itot'][1][ii])),
+                       np.sqrt(np.abs(data.noise_model['itot'][2][ii])), alpha=.5,
+                       color='#d62728')
+        ax.loglog(freqs, np.sqrt(np.abs(data.noise_model['isquid'][0][ii])), color='#9467bd',
+                   linewidth=1.5, label='Squid+Electronics Noise')
+        ax.fill_between(freqs, np.sqrt(np.abs(data.noise_model['isquid'][1][ii])),
+                       np.sqrt(np.abs(data.noise_model['isquid'][2][ii])), alpha=.5,
+                       color='#9467bd')
+        ax.loglog(freqs, np.sqrt(np.abs(psd)), color = '#8c564b',
+                  alpha = 0.8, label ='Raw Data')
+        ax.set_ylabel(r'Input Referenced Current Noise [A/$\sqrt{\mathrm{Hz}}$]')
+
+        lgd = plt.legend(loc='upper right')
+
+        fig, ax = plt.subplots(1,1, figsize=(11,6))
+        if ylims_power is not None:
+            ax.set_ylim(ylims_power)
+        if xlims is not None:
+            ax.set_xlim(xlims)
+        
+
+        ax.grid(which="major", linestyle='--')
+        ax.grid(which="minor", linestyle="dotted", alpha=0.5)
+        ax.tick_params(which="both", direction="in", right=True, top=True)
+        ax.set_xlabel(r'Frequency [Hz]')
+
+        ax.set_title(f"Power Noise For $R_0$ : {r0*1e3:.2f} $m\Omega$")
+        ax.loglog(freqs, np.sqrt(np.abs(data.noise_model['ptes'][0][ii])), color='#1f77b4',
+                   linewidth=1.5, label='TES johnson Noise')
+        ax.fill_between(freqs, np.sqrt(np.abs(data.noise_model['ptes'][1][ii])),
+                       np.sqrt(np.abs(data.noise_model['ptes'][2][ii])), alpha=.5,
+                       color='#1f77b4')
+        ax.loglog(freqs, np.sqrt(np.abs(data.noise_model['pload'][0][ii])), color='#ff7f0e',
+                   linewidth=1.5, label='Load Noise')
+        ax.fill_between(freqs, np.sqrt(np.abs(data.noise_model['pload'][1][ii])),
+                       np.sqrt(np.abs(data.noise_model['pload'][2][ii])), alpha=.5,
+                       color='#ff7f0e')
+        ax.loglog(freqs, np.sqrt(np.abs(data.noise_model['ptfn'][0][ii])), color='#2ca02c',
+                   linewidth=1.5, label='TFN Noise')
+        ax.fill_between(freqs, np.sqrt(np.abs(data.noise_model['ptfn'][1][ii])),
+                       np.sqrt(np.abs(data.noise_model['ptfn'][2][ii])), alpha=.5,
+                       color='#2ca02c')
+        ax.loglog(freqs, np.sqrt(np.abs(data.noise_model['ptot'][0][ii])), color='#d62728',
+                   linewidth=1.5, label='Total Noise')
+        ax.fill_between(freqs, np.sqrt(np.abs(data.noise_model['ptot'][1][ii])),
+                       np.sqrt(np.abs(data.noise_model['ptot'][2][ii])), alpha=.5,
+                       color='#d62728')
+        ax.loglog(freqs, np.sqrt(np.abs(data.noise_model['psquid'][0][ii])), color='#9467bd',
+                   linewidth=1.5, label='Squid+Electronics Noise')
+        ax.fill_between(freqs, np.sqrt(np.abs(data.noise_model['psquid'][1][ii])),
+                       np.sqrt(np.abs(data.noise_model['psquid'][2][ii])), alpha=.5,
+                       color='#9467bd')
+        ax.loglog(freqs, np.sqrt(np.abs(data.noise_model['s_psd'][0][ii])), color = '#8c564b',
+                  alpha = 0.8, label ='Raw Data')
+        ax.fill_between(freqs, np.sqrt(np.abs(data.noise_model['s_psd'][1][ii])),
+                       np.sqrt(np.abs(data.noise_model['s_psd'][2][ii])), alpha=.5,
+                       color='#8c564b')
+        ax.set_ylabel(r'Input Referenced Power Noise [W/$\sqrt{\mathrm{Hz}}$]')
+
+        lgd = plt.legend(loc='upper right')

@@ -429,7 +429,7 @@ class IVanalysis(object):
         if ntran is None:
             self.traninds = range(self.norminds[-1]+1, self.scinds[0])
         else:
-            self.transinds = ntran
+            self.traninds = ntran
         ibias = np.zeros((1,2,self.noiseinds.sum()))
         if ib_err is None:
             ibias_err = np.zeros(ibias.shape)
@@ -797,6 +797,7 @@ class IVanalysis(object):
         squidn_list = []
         
         self.normal_psd = np.mean(self.df[self.noiseinds].iloc[self.norminds].psd.values, axis=0)[1:]
+        
         for ind in self.norminds:
             noise_row = self.df[self.noiseinds].iloc[ind]
             f = noise_row.f
@@ -914,7 +915,7 @@ class IVanalysis(object):
             
         self.tload = np.mean(tload_list)
         
-    def model_noise(self, tau_collect=20e-6, collection_eff=1, lgcplot=False, lgcsave=False, 
+    def model_noise_simple(self, tau_collect=20e-6, collection_eff=1, lgcplot=False, lgcsave=False, 
                     xlims=None, ylims_current = None, ylims_power = None):
         """
         Function to plot noise PSD with all the theoretical noise
@@ -1031,9 +1032,12 @@ class IVanalysis(object):
         full_cov[-3,-3] = self.tc_err**2
         full_cov[-2,-2] = self.tbath_err**2
         full_cov[-1,-1] = self.Gta_err**2
+        
+        scale = 1/np.sqrt(np.diag(full_cov))
+        scale_cov = scale[np.newaxis].T.dot(scale[np.newaxis])
 
-        rand_data = np.random.multivariate_normal(full_mu, full_cov, nsamples)
-
+        rand_data = np.random.multivariate_normal(full_mu*scale, full_cov*scale_cov, nsamples)
+        rand_data = rand_data/scale
         rshunt = rand_data[:,0]
         rp = rand_data[:,1]
         r0 = rand_data[:,2]
@@ -1076,26 +1080,13 @@ class IVanalysis(object):
         median = np.median(arr, axis=0)
         p_lower = np.percentile(arr, q=perc[0], axis=0)
         p_upper = np.percentile(arr, q=perc[1], axis=0)
-
-        
-#         mu = np.mean(np.log(arr), axis=0)
-#         sig = np.std(np.log(arr), axis=0)
-#         x_p = mu + sig
-#         x_m = mu - sig
-#         mean = np.exp(mu)
-#         sig_upper = np.exp(x_p)
-#         sig_lower = np.exp(x_m)
         
         return median, p_upper, p_lower
 
 
 
-    def estimate_noise_errors(self, tau_collect=0, collection_eff=1,
-                              inds = 'all', nsamples=500, perc=(10,90),
-                              scale=np.array([1e3, 1e3, 1, 1e-3, 1e8, 1e3, 1e3, 1e3]),
-                              lgcplot=False, 
-                              lgcsave=False, xlims=None, ylims_current = None, 
-                              ylims_power = None):
+    def estimate_noise_errors(self, tau_collect=0, collection_eff=1, inds = 'all',
+                              nsamples=500, perc=(10,90)):
         """
         Function to estimate the errors in the theoretical noise model
 
@@ -1113,18 +1104,6 @@ class IVanalysis(object):
         perc : tuple, optional
             (upper and lower percentiales).
             If calculating 95 percentile, pass (5, 95)
-        lgcplot : bool, optional
-            If True, a plot of the fit is shown
-        lgcsave : bool, optional
-            If True, the figure is saved
-        xlims : NoneType, tuple, optional
-            Limits to be passed to ax.set_xlim()
-        ylims_current : NoneType, tuple, optional
-            Limits to be passed to ax.set_ylim()
-            for the current nosie plots
-        ylims_power : NoneType, tuple, optional
-            Limits to be passed to ax.set_ylim()  
-            for the power noise plots
 
         Returns
         -------
@@ -1174,13 +1153,10 @@ class IVanalysis(object):
         s_psd_upper = np.zeros((len(inds), len(f)))
         s_psd_lower = np.zeros((len(inds), len(f)))
         
-        e_res = np.zeros((len(inds), len(f)))
-        e_res_upper = np.zeros((len(inds), len(f)))
-        e_res_lower = np.zeros((len(inds), len(f)))
+        e_res = np.zeros((len(inds)))
+        e_res_upper = np.zeros((len(inds)))
+        e_res_lower = np.zeros((len(inds)))
     
-
-
-
         for ind in inds:
 
             noise_row = self.df[self.noiseinds].iloc[self.traninds].iloc[ind]
@@ -1203,13 +1179,9 @@ class IVanalysis(object):
             s_ptot = np.zeros((nsamples, len(f)))
             s_psquid = np.zeros((nsamples, len(f)))
             s_psd = np.zeros((nsamples, len(f)))
-
-
-
             energy_res = []
 
             for ii in range(nsamples):
-
                 tesnoise = TESnoise(
                     freqs=f,
                     rload=rp[ii] + rshunt[ii],
@@ -1233,7 +1205,7 @@ class IVanalysis(object):
 
                 res = qp.sim.energy_res_estimate(freqs=f, tau_collect=tau_collect,
                                                   Sp=psd/(np.abs(tesnoise.dIdP(f))**2),
-                                                  collection_eff = collection_eff)
+                                                  collection_eff=collection_eff)
                 energy_res.append(res)
 
                 s_ites[ii] = tesnoise.s_ites()
@@ -1249,8 +1221,8 @@ class IVanalysis(object):
                 s_ptfn[ii] = tesnoise.s_ptfn()
                 #s_ptot[ii] = tesnoise.s_ptot()
                 #s_psquid[ii] = tesnoise.s_psquid()
-                s_isquid[ii] = self.normal_psd/(np.abs(tesnoise.dIdP(f))**2)
-                s_itot[ii] = tesnoise.s_ptes() + tesnoise.s_pload() +tesnoise.s_ptfn()+ self.normal_psd/(np.abs(tesnoise.dIdP(f))**2)
+                s_psquid[ii] = self.normal_psd/(np.abs(tesnoise.dIdP(f))**2)
+                s_ptot[ii] = tesnoise.s_ptes() + tesnoise.s_pload() +tesnoise.s_ptfn()+ self.normal_psd/(np.abs(tesnoise.dIdP(f))**2)
 
                 s_psd[ii] = psd/(np.abs(tesnoise.dIdP(f))**2)
 
@@ -1350,9 +1322,9 @@ class IVanalysis(object):
         """
 
         trandf = self.df.loc[self.noiseinds].iloc[self.traninds]
-        r0s = trandf.r0.values
-        energy_res = self.noise_model['energy_res'][0]
-        energy_res_err = np.concatenate((self.noise_model['energy_res'][1],self.noise_model['energy_res'][2]))
+        r0s = trandf.r0.values/self.rn_iv
+        energy_res = self.noise_model['energy_res'][0][:,0]
+        energy_res_err = np.vstack((self.noise_model['energy_res'][1][:,0],self.noise_model['energy_res'][2][:,0]))
         qets = trandf.qetbias.values
         taus = trandf.tau_eff.values
 
@@ -1366,7 +1338,7 @@ class IVanalysis(object):
         optimum_t = energy_res[tauminind]
 
         if lgcplot:
-            plot._plot_energy_res_vs_bias(r0s, energy_res, energy_ress_err, qets, taus,
+            plot._plot_energy_res_vs_bias(r0s, energy_res, energy_res_err, qets, taus,
                                 xlims, ylims, lgcoptimum=lgcoptimum,
                                  lgctau=lgctau, energyscale=energyscale)
         if lgctau:
@@ -1481,6 +1453,39 @@ class IVanalysis(object):
         """
 
         plot._plot_ztes_bias(self, xlims=xlims, ylims=ylims, cmap=cmap)
+        
+        
+        
+    def plot_noise_model(self, idx='all', xlims=(10, 2e5), ylims_current=None, 
+                         ylims_power=None):
+        """
+        Function to plot noise models with errors for IVanalysis object
+
+        Paramters
+        ---------
+        data : IVanalysis object
+            The IVanalysis object to plot
+        idx : range, str, optional
+            The range of indeces to plot
+            must be either a range() object
+            or 'all'. If 'all', it defaults
+            to all the transistion data
+        xlims : tuple, optional
+            The xlimits for all the plots
+        ylims_current : tuple, NoneType, optional
+            The ylimits for all the current
+            noise plots
+        ylims_power : tuple, NoneType, optional
+            The ylimits for all the power
+            noise plots
+
+        Returns
+        -------
+        None
+        """
+        
+        plot.plot_noise_model(self, idx=idx, xlims=xlims, ylims_current=ylims_current,
+                              ylims_power=ylims_power)
         
         
             
