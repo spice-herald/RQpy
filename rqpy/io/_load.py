@@ -4,6 +4,7 @@ import pandas as pd
 from scipy.io import loadmat
 import matplotlib.pyplot as plt
 from glob import glob
+import warnings
 import deepdish as dd
 
 from rqpy import HAS_SCDMSPYTOOLS
@@ -49,8 +50,9 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
         The factor that the traces should be multiplied by to convert ADC bins to Amperes.
     fs : float, optional
         The sample rate in Hz of the data.
-    ntraces : int, optional
-        The number of traces to randomly load from the data (with the cut, if specified)
+    ntraces : int, str, optional
+        The number of traces to randomly load from the data (with the cut, if specified). If all traces
+        from a specfied cut are desired, pass the string "all". Default is 1.
     lgcplot : bool, optional
         Logical flag on whether or not to plot the pulled traces.
     nplot : int, optional
@@ -101,9 +103,11 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
         
     if np.sum(cut) == 0:
         raise ValueError("The inputted cut has no events, cannot load any traces.")
-        
-    if ntraces > np.sum(cut):
+      
+    if ntraces == 'all' or ntraces > np.sum(cut):
         ntraces = np.sum(cut)
+        if ntraces > 1000:
+            warnings.warn(f"You are loading a large number of traces ({ntraces}). Be careful with your RAM usage.")
         
     inds = np.random.choice(np.flatnonzero(cut), size=ntraces, replace=False)
         
