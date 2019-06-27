@@ -310,14 +310,7 @@ def inrange(vals, lwrbnd, uprbnd, include_lwrbnd=True, include_uprbnd=True):
 
     """
 
-    if include_lwrbnd and include_uprbnd:
-        return (vals >= lwrbnd) & (vals <= uprbnd)
-    elif not include_lwrbnd and include_uprbnd:
-        return (vals > lwrbnd) & (vals <= uprbnd)
-    elif include_lwrbnd and not include_uprbnd:
-        return (vals >= lwrbnd) & (vals < uprbnd)
-    else:
-        return (vals > lwrbnd) & (vals < uprbnd)
+    return (vals >= lwrbnd if include_lwrbnd else vals > lwrbnd) & (vals <= uprbnd if include_uprbnd else vals < uprbnd)
 
 def passage_fraction(x, cut, basecut=None, nbins=100, lgcequaldensitybins=False):
     """
