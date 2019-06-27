@@ -652,6 +652,8 @@ class IVanalysis(object):
         self.rn_iv_err = ivobj.rnorm_err[0,0]
 
         self.vb = ivobj.vb
+        self.vb_err = ivobj.vb_err
+        self.ivobj = ivobj
 
 
         if lgcplot:
@@ -1323,8 +1325,8 @@ class IVanalysis(object):
 
         trandf = self.df.loc[self.noiseinds].iloc[self.traninds]
         r0s = trandf.r0.values/self.rn_iv
-        energy_res = self.noise_model['energy_res'][0][:,0]
-        energy_res_err = np.vstack((self.noise_model['energy_res'][1][:,0],self.noise_model['energy_res'][2][:,0]))
+        energy_res = self.noise_model['energy_res'][0]
+        energy_res_err = np.vstack((self.noise_model['energy_res'][1],self.noise_model['energy_res'][2]))
         qets = trandf.qetbias.values
         taus = trandf.tau_eff.values
 
@@ -1484,7 +1486,7 @@ class IVanalysis(object):
         None
         """
         
-        plot.plot_noise_model(self, idx=idx, xlims=xlims, ylims_current=ylims_current,
+        plot._plot_noise_model(data=self, idx=idx, xlims=xlims, ylims_current=ylims_current,
                               ylims_power=ylims_power)
         
         
