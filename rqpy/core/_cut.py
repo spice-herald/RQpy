@@ -278,19 +278,25 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgce
     
     return cbinned, cutobj
 
-def inrange(vals, lwrbnd, uprbnd):
+def inrange(vals, lwrbnd, uprbnd, include_lwrbnd=True, include_uprbnd=True):
     """
     Function for returning a boolean mask that specifies which values
     in an array are between the specified bounds (inclusive of the bounds).
     
     Parameters
     ----------
-    vals : array_like
-        A 1-d array of values.
+    vals : ndarray
+        A 1-d ndarray of values.
     lwrbnd : float
         The lower bound of the range that we are checking if vals is between.
     uprbnd : float
         The upper bound of the range that we are checking if vals is between.
+    include_lwrbnd : bool, optional
+        Boolean flag for including or excluding the lower bound in the range. Default is
+        True, meaning that we include the lower bound in the specified range.
+    include_uprbnd : bool, optional
+        Boolean flag for including or excluding the upper bound in the range. Default is
+        True, meaning that we include the upper bound in the specified range.
             
     Returns
     -------
@@ -300,9 +306,14 @@ def inrange(vals, lwrbnd, uprbnd):
     
     """
     
-    mask = (vals >= lwrbnd) & (vals <= uprbnd)
-    
-    return mask
+    if include_lwrbnd and include_uprbnd:
+        return (vals >= lwrbnd) & (vals <= uprbnd)
+    elif not include_lwrbnd and include_uprbnd:
+        return (vals > lwrbnd) & (vals <= uprbnd)
+    elif include_lwrbnd and not include_uprbnd:
+        return (vals >= lwrbnd) & (vals < uprbnd)
+    else:
+        return (vals > lwrbnd) & (vals < uprbnd)
 
 def passage_fraction(x, cut, basecut=None, nbins=100, lgcequaldensitybins=False):
     """
