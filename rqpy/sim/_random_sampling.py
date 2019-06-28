@@ -36,7 +36,12 @@ def pdf_sampling(function, xrange, nsamples=1000, npoints=10000):
     -------
     rvs : ndarray
         The random samples that were taken from the inputted PDF defined by
-        `function`. This is 1D array of length `nsamples`.
+        `function`. This is a 1D array of length `nsamples`.
+
+    Raises
+    ------
+    TypeError
+        If inputted `function` is not of FunctionType
 
     Notes
     -----
