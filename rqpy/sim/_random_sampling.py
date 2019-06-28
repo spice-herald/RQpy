@@ -1,5 +1,5 @@
 import numpy as np
-from scipy import integrate, interpolate, stats
+from scipy import integrate, interpolate
 import types
 from sklearn.neighbors import KernelDensity
 from sklearn.model_selection import GridSearchCV
