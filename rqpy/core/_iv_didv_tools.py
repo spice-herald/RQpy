@@ -591,7 +591,7 @@ class IVanalysis(object):
         self._fit_rn_didv(lgcplot, lgcsave, **kwargs)
         
         
-    def analyze_sweep(self, lgcplot=False, lgcsave=False):
+    def analyze_sweep(self, lgcplot=False, lgcsave=False, kwargs={}):
         """
         Function to correct for the offset in current and calculate
         R0, P0 and make plots of IV sweeps.
@@ -630,7 +630,7 @@ class IVanalysis(object):
                     chan_names=[f'{self.chname} Noise',f'{self.chname} dIdV'], fitsc=True, 
                     normalinds=self.norminds, scinds=self.scinds)
 
-        ivobj.calc_iv()
+        ivobj.calc_iv(**kwargs)
         self.df.loc[self.noiseinds, 'ptes'] =  ivobj.ptes[0,0]
         self.df.loc[self.didvinds, 'ptes'] =  ivobj.ptes[0,1]
         self.df.loc[self.noiseinds, 'ptes_err'] =  ivobj.ptes_err[0,0]
@@ -644,6 +644,11 @@ class IVanalysis(object):
         self.df.loc[self.didvinds, 'rp'] =  ivobj.rp[0,1]
         self.df.loc[self.noiseinds, 'rp_err'] =  ivobj.rp_err[0,0]
         self.df.loc[self.didvinds, 'rp_err'] =  ivobj.rp_err[0,1]
+        
+        self.df.loc[self.noiseinds, 'i0'] =  ivobj.ites[0,0]
+        self.df.loc[self.didvinds, 'i0'] =  ivobj.ites[0,1]
+        self.df.loc[self.noiseinds, 'i0_err'] =  ivobj.ites_err[0,0]
+        self.df.loc[self.didvinds, 'i0_err'] =  ivobj.ites_err[0,1]
         
         
         self.rp_iv = ivobj.rp[0,0]
@@ -710,6 +715,7 @@ class IVanalysis(object):
                                         savepath=self.figsavepath,
                                         savename=f'didv_{row.qetbias:.3e}')
             
+            #print('doing didv2 fit')
             #### Calculate correct errors
             didvobj2 = DIDV2(None, fs=row.fs, sgfreq=row.sgfreq, sgamp=row.sgamp,  npoles=2)
             didvobj2.tmean = didvobj.tmean
@@ -756,10 +762,10 @@ class IVanalysis(object):
             #return didvobj2
             
             didvobj2.dofit(guess)
-            
+            #print('saving....')
             self.df.iat[int(np.flatnonzero(self.didvinds)[ind]), self.df.columns.get_loc('didvobj2')] = didvobj2
             self.df.iat[int(np.flatnonzero(self.noiseinds)[ind]), self.df.columns.get_loc('didvobj2')] = didvobj2
-            
+            #print(didvobj2)
 
                 
     
