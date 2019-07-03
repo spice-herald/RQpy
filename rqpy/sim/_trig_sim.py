@@ -254,7 +254,7 @@ class TrigSim(object):
             The input array to run the FIR filter on. Should be a 1-d ndarray in units of 
             ADC bins.
         constraint_width : float
-            The width, in seconds, of this window that the constraint on the FIR amplitude will be set by.
+            The width, in seconds, of the window that the constraint on the FIR amplitude will be set by.
         k : int, optional
             The bin number to start the FIR filter at. Since the filter downsamples the data
             by a factor of 16, the starting bin has a small effect on the calculated amplitude.
