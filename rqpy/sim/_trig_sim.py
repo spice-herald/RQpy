@@ -288,7 +288,10 @@ class TrigSim(object):
 
         nconstrain = int(constraint_width * (self.fs / 16))
         if nconstrain == 0:
-            raise ValueError(f"The inputted constraint_width should be greater than {16 / self.fs}, so that")
+            raise ValueError(
+                f"The inputted constraint_width should be greater than {16 / self.fs}, "
+                "so that we include more than one bin of the trace."
+            )
 
         windowcenter_int = round(windowcenter * (self.fs / 16))
 
