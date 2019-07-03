@@ -242,3 +242,63 @@ class TrigSim(object):
         fir_nodelay = fir_out[len(fir_out)//2 - 1 + len(fir_out)%2]
 
         return triggeramp, triggertime, fir_nodelay, fir_out
+
+    def constrain_trigger(self, x, constraint_width, k=12, windowcenter=0, fir_out=None):
+        """
+        Method for calculating the FIR trigger amplitude in a specified region. This is no longer a
+        simulation of the trigger, as the maximum amplitude in the entire trace is no longer returned.
+
+        Parameters
+        ----------
+        x : ndarray
+            The input array to run the FIR filter on. Should be a 1-d ndarray in units of 
+            ADC bins.
+        constraint_width : float
+            The width, in seconds, of this window that the constraint on the FIR amplitude will be set by.
+        k : int, optional
+            The bin number to start the FIR filter at. Since the filter downsamples the data
+            by a factor of 16, the starting bin has a small effect on the calculated amplitude.
+        windowcenter : float, optional
+            The shift, in seconds, of the window of the constraint on the FIR amplitude will be moved by.
+            A negative value moves the window to the left, while a positive value moves the window to the
+            right. Default is 0.
+        fir_out : ndarray, NoneType, optional
+            If passed, this is the complete, filtered trace corresponding to the inputted trace, in the
+            arbitrary units of the filter. If not passed, then this will be calculated using the
+            `TrigSim.Trigger` method.
+
+        Returns
+        -------
+        max_amp_constrain : int
+            The maximum amplitude of the pulse as calculated by the FIR filter, in the arbitrary 
+            units of the filter, within the specified constraint window.
+        t0_constrain : float
+            The time at which `max_amp_constrain` was found, in units of seconds. This is in relation to
+            the inputted trace `x`.
+
+        Raises
+        ------
+        ValueError
+            If the constraint window length is 0.
+
+        """
+
+        if fir_out is None:
+            fir_out = self.Trigger(x, k=k)[-1]
+
+        nconstrain = int(constraint_width * (self.fs / 16))
+        if nconstrain == 0:
+            raise ValueError(f"The inputted constraint_width should be greater than {16 / self.fs}, so that")
+
+        windowcenter_int = round(windowcenter * (self.fs / 16))
+
+        trace_center = len(fir_out)//2 - 1 + len(fir_out) % 2
+        inds = np.arange(
+            trace_center - nconstrain//2 + windowcenter_int,
+            trace_center + nconstrain//2  + nconstrain % 2 + windowcenter_int,
+        )
+
+        max_amp_constrain = fir_out[inds].max()
+        t0_constrain = (inds[np.argmax(fir_out[inds])] + 513 + k / 16) / (self.fs / 16)
+
+        return max_amp_constrain, t0_constrain
