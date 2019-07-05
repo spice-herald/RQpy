@@ -422,7 +422,7 @@ class SetupRQ(object):
 
         self.do_ofamp_shifted = [False]*self.nchan
         self.do_ofamp_shifted_smooth = [False]*self.nchan
-        self.ofamp_shifted_lowfreqchi2 = [True]*self.nchan
+        self.ofamp_shifted_lowfreqchi2 = True
         self.ofamp_shifted_binshift = [0]*self.nchan
 
         self.do_baseline = [True]*self.nchan
@@ -1493,15 +1493,15 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
             if setup.do_ofamp_nodelay[chan_num]:
                 amp_nodelay[jj], chi2_nodelay[jj] = OF.ofamp_nodelay()
 
+                if setup.ofamp_nodelay_lowfreqchi2 and setup.do_chi2_lowfreq[chan_num]:
+                    chi2low_nodelay[jj] = OF.chi2_lowfreq(
+                        amp_nodelay[jj],
+                        0,
+                        fcutoff=setup.chi2_lowfreq_fcutoff[chan_num],
+                    )
+
             if setup.do_ofamp_nodelay_smooth[chan_num]:
                 amp_nodelay_smooth[jj], chi2_nodelay_smooth[jj] = OF_smooth.ofamp_nodelay()
-
-            if setup.ofamp_nodelay_lowfreqchi2 and setup.do_chi2_lowfreq[chan_num]:
-                chi2low_nodelay[jj] = OF.chi2_lowfreq(
-                    amp_nodelay[jj],
-                    0,
-                    fcutoff=setup.chi2_lowfreq_fcutoff[chan_num],
-                )
 
             if setup.do_ofamp_unconstrained[chan_num]:
                 amp_unconstrain[jj], t0_unconstrain[jj], chi2_unconstrain[jj] = OF.ofamp_withdelay()
@@ -1509,22 +1509,21 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                     amp_unconstrain_pcon[jj], t0_unconstrain_pcon[jj], chi2_unconstrain_pcon[jj] = OF.ofamp_withdelay(
                         pulse_direction_constraint=setup.ofamp_unconstrained_pulse_constraint[chan_num],
                     )
+                if setup.ofamp_unconstrained_lowfreqchi2 and setup.do_chi2_lowfreq[chan_num]:
+                    chi2low_unconstrain[jj] = OF.chi2_lowfreq(
+                        amp_unconstrain[jj],
+                        t0_unconstrain[jj],
+                        fcutoff=setup.chi2_lowfreq_fcutoff[chan_num],
+                    )
+                    if setup.ofamp_unconstrained_pulse_constraint[chan_num]!=0:
+                        chi2low_unconstrain_pcon[jj] = OF.chi2_lowfreq(
+                            amp_unconstrain_pcon[jj],
+                            t0_unconstrain_pcon[jj],
+                            fcutoff=setup.chi2_lowfreq_fcutoff[chan_num],
+                        )
 
             if setup.do_ofamp_unconstrained_smooth[chan_num]:
                 amp_unconstrain_smooth[jj], t0_unconstrain_smooth[jj], chi2_unconstrain_smooth[jj] = OF_smooth.ofamp_withdelay()
-
-            if setup.ofamp_unconstrained_lowfreqchi2 and setup.do_chi2_lowfreq[chan_num]:
-                chi2low_unconstrain[jj] = OF.chi2_lowfreq(
-                    amp_unconstrain[jj],
-                    t0_unconstrain[jj],
-                    fcutoff=setup.chi2_lowfreq_fcutoff[chan_num],
-                )
-                if setup.ofamp_unconstrained_pulse_constraint[chan_num]!=0:
-                    chi2low_unconstrain_pcon[jj] = OF.chi2_lowfreq(
-                        amp_unconstrain_pcon[jj],
-                        t0_unconstrain_pcon[jj],
-                        fcutoff=setup.chi2_lowfreq_fcutoff[chan_num],
-                    )
 
             if setup.do_ofamp_constrained[chan_num]:
                 amp_constrain[jj], t0_constrain[jj], chi2_constrain[jj] = OF.ofamp_withdelay(
@@ -1537,25 +1536,24 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                         pulse_direction_constraint=setup.ofamp_constrained_pulse_constraint[chan_num],
                         windowcenter=setup.ofamp_constrained_windowcenter[chan_num],
                     )
+                if setup.ofamp_constrained_lowfreqchi2 and setup.do_chi2_lowfreq[chan_num]:
+                    chi2low_constrain[jj] = OF.chi2_lowfreq(
+                        amp_constrain[jj],
+                        t0_constrain[jj],
+                        fcutoff=setup.chi2_lowfreq_fcutoff[chan_num],
+                    )
+                    if setup.ofamp_constrained_pulse_constraint[chan_num]!=0:
+                        chi2low_constrain_pcon[jj] = OF.chi2_lowfreq(
+                            amp_constrain_pcon[jj],
+                            t0_constrain_pcon[jj],
+                            fcutoff=setup.chi2_lowfreq_fcutoff[chan_num],
+                        )
 
             if setup.do_ofamp_constrained_smooth[chan_num]:
                 amp_constrain_smooth[jj], t0_constrain_smooth[jj], chi2_constrain_smooth[jj] = OF_smooth.ofamp_withdelay(
                     nconstrain=setup.ofamp_constrained_nconstrain[chan_num],
                     windowcenter=setup.ofamp_constrained_windowcenter[chan_num],
                 )
-
-            if setup.ofamp_constrained_lowfreqchi2 and setup.do_chi2_lowfreq[chan_num]:
-                chi2low_constrain[jj] = OF.chi2_lowfreq(
-                    amp_constrain[jj],
-                    t0_constrain[jj],
-                    fcutoff=setup.chi2_lowfreq_fcutoff[chan_num],
-                )
-                if setup.ofamp_constrained_pulse_constraint[chan_num]!=0:
-                    chi2low_constrain_pcon[jj] = OF.chi2_lowfreq(
-                        amp_constrain_pcon[jj],
-                        t0_constrain_pcon[jj],
-                        fcutoff=setup.chi2_lowfreq_fcutoff[chan_num],
-                    )
 
             if setup.do_ofamp_pileup[chan_num]:
                 if setup.do_ofamp_constrained[chan_num] and setup.which_fit_pileup=="constrained":
@@ -1634,12 +1632,12 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                     windowcenter=setup.ofamp_shifted_binshift[chan_num],
                 )
 
-            if setup.ofamp_shifted_lowfreqchi2 and setup.do_chi2_lowfreq[chan_num]:
-                chi2low_shifted[jj] = OF.chi2_lowfreq(
-                    amp_shifted[jj],
-                    setup.ofamp_shifted_binshift[chan_num] / fs,
-                    fcutoff=setup.chi2_lowfreq_fcutoff[chan_num],
-                )
+                if setup.ofamp_shifted_lowfreqchi2 and setup.do_chi2_lowfreq[chan_num]:
+                    chi2low_shifted[jj] = OF.chi2_lowfreq(
+                        amp_shifted[jj],
+                        setup.ofamp_shifted_binshift[chan_num] / fs,
+                        fcutoff=setup.chi2_lowfreq_fcutoff[chan_num],
+                    )
 
             if setup.do_ofamp_shifted_smooth[chan_num]:
                 amp_shifted_smooth[jj], chi2_shifted_smooth[jj] = OF_smooth.ofamp_nodelay(
