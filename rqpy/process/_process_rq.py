@@ -1933,10 +1933,10 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         rq_dict[f'ofamp_nodelay_sim_{chan}{det}'][readout_inds] = ofampnodelay_sim
 
         if setup.do_trigsim_constrained[chan_num]:
-            rq_dict[f'triggeramp_sim_constrained{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-            rq_dict[f'triggeramp_sim_constrained{chan}{det}'][readout_inds] = triggeramp_sim_constrained
-            rq_dict[f'triggertime_sim_constrained{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-            rq_dict[f'triggertime_sim_constrained{chan}{det}'][readout_inds] = triggertime_sim_constrained
+            rq_dict[f'triggeramp_sim_constrained_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f'triggeramp_sim_constrained_{chan}{det}'][readout_inds] = triggeramp_sim_constrained
+            rq_dict[f'triggertime_sim_constrained_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+            rq_dict[f'triggertime_sim_constrained_{chan}{det}'][readout_inds] = triggertime_sim_constrained
 
     if setup.do_ofamp_coinc[chan_num] and setup.trigger is not None and chan_num!=setup.trigger:
         rq_dict[f'ofamp_coinc_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
