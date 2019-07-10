@@ -17,7 +17,7 @@ __all__ = [
 ]
 
 
-def hist(arr, nbins='sqrt', xlims=None, cuts=None, lgcrawdata=True,
+def hist(arr, nbins='auto', xlims=None, cuts=None, lgcrawdata=True,
          lgceff=True, lgclegend=True, labeldict=None, ax=None, cmap="viridis"):
     """
     Function to plot histogram of RQ data with multiple cuts.
@@ -27,7 +27,9 @@ def hist(arr, nbins='sqrt', xlims=None, cuts=None, lgcrawdata=True,
     arr : array_like
         Array of values to be binned and plotted
     nbins : int, str, optional
-        This is the same as plt.hist() bins parameter. Defaults is 'sqrt'.
+        This is the same as `plt.hist` bins parameter, where the number of bins, an array of
+        bin edges, or a string can be passed. Default is 'auto'. See `numpy.histogram_bin_edges`
+        for more information for different strings that can be passed.
     xlims : list of float, optional
         The xlimits of the histogram. This is passed to plt.hist() range parameter.
     cuts : list, optional
@@ -94,20 +96,18 @@ def hist(arr, nbins='sqrt', xlims=None, cuts=None, lgcrawdata=True,
     else:
         fig = None
 
+    bins = None
+
     ax.set_title(labels['title'])
     ax.set_xlabel(labels['xlabel'])
     ax.set_ylabel(labels['ylabel'])
 
     if lgcrawdata:
-        if xlims is None:
-            hist, bins, _ = ax.hist(arr, bins=nbins, histtype='step',
-                                    label='Full data', linewidth=2, color=plt.cm.get_cmap(cmap)(0))
-            xlims = (bins.min(), bins.max())
-        else:
-            hist, bins, _ = ax.hist(arr, bins=nbins, range=xlims, histtype='step',
-                                    label='Full data', linewidth=2, color=plt.cm.get_cmap(cmap)(0))
-        if nbins=="sqrt":
-            nbins = len(bins)
+        if bins is None:
+            bins = np.histogram_bin_edges(arr, bins=nbins, range=xlims)
+
+        hist, _, _ = ax.hist(arr, bins=bins, histtype='step',
+                             label='Full data', linewidth=2, color=plt.cm.get_cmap(cmap)(0))
 
     colors = plt.cm.get_cmap(cmap)(np.linspace(0.1, 0.9, len(cuts)))
 
@@ -123,16 +123,12 @@ def hist(arr, nbins='sqrt', xlims=None, cuts=None, lgcrawdata=True,
         if lgceff:
             label+=f", Eff = {cuteff:.1f}%"
 
-        if xlims is None:
-            hist, bins, _  = ax.hist(arr[ctemp], bins=nbins, histtype='step',
-                                     label=label, linewidth=2, color=colors[ii])
-            xlims = (bins.min(), bins.max())
-        else:
-            hist, bins, _  = ax.hist(arr[ctemp], bins=nbins, range=xlims, histtype='step',
-                                     label=label, linewidth=2, color=colors[ii])
+        if bins is None:
+            bins = np.histogram_bin_edges(arr[ctemp], bins=nbins, range=xlims)
 
-        if nbins=="sqrt":
-            nbins = len(bins)
+        hist, _, _  = ax.hist(arr[ctemp], bins=bins, histtype='step',
+                              label=label, linewidth=2, color=colors[ii])
+
 
     ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
     ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
