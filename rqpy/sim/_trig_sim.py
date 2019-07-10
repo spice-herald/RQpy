@@ -111,7 +111,7 @@ class TrigSim(object):
         self.fs = fs
 
         raw_LC_coeffs = np.zeros((4,16))
-        which_channel = 0
+        raw_LC_coeffs[0, which_channel] = 1
         LC_coeffs = trigsim.scale_max(raw_LC_coeffs, bits=8, axis=1)
         TrL_requires = np.zeros((8,16), dtype=bool)
         TrL_vetos = np.zeros((8,16), dtype=bool)
