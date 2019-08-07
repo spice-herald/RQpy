@@ -255,7 +255,11 @@ class TrigSim(object):
 
         """
 
-        input_traces = [(xx[k:] - 32768).astype('int64') for xx in x]
+        if len(x.shape) > 1:
+            input_traces = [(xx[k:] - 32768).astype('int64') for xx in x]
+        else:
+            input_traces = [(x[k:] - 32768).astype('int64')]
+
         filled_channels = len(input_traces)
         input_traces += [np.zeros(x[..., k:].shape[-1],dtype='int64')] * (12 - filled_channels)
         input_traces += [np.zeros(4 * x[..., k:].shape[-1],dtype='int64')] * 4
@@ -316,7 +320,7 @@ class TrigSim(object):
         """
 
         if fir_out is None:
-            fir_out = self.Trigger(x, k=k)[-1]
+            fir_out = self.trigger(x, k=k)[-1]
 
         nconstrain = int(constraint_width * (self.fs / 16))
         if nconstrain == 0:
