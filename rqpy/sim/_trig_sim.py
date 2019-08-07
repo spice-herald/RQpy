@@ -89,7 +89,7 @@ class TrigSim(object):
             a 2D array containing the template for each channel that is being used in the trigger.
         fs : float
             The digitization rate of the data in Hz.
-        which_channel : int, array_like
+        which_channel : int, array_like, optional
             The index or array of indices that specify which channels will be used to
             trigger on. Default is zero, specifying just a single channel.
         fir_bits_out : int, optional
