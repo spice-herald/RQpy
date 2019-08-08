@@ -528,7 +528,7 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
     if ax is None:
         fig, ax = plt.subplots(figsize=(11, 6))
     else:
-        fig = None
+        fig = plt.gcf()
 
     ax.set_title(labels['title'])
     ax.set_xlabel(labels['xlabel'])
