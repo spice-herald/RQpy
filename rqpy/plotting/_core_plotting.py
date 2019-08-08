@@ -129,9 +129,6 @@ def hist(arr, nbins='auto', xlims=None, cuts=None, lgcrawdata=True,
         hist, _, _  = ax.hist(arr[ctemp], bins=bins, histtype='step',
                               label=label, linewidth=2, color=colors[ii])
 
-
-    ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
-    ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
     ax.tick_params(which="both", direction="in", right=True, top=True)
     ax.grid(linestyle="dashed")
 
@@ -292,8 +289,6 @@ def scatter(xvals, yvals, xlims=None, ylims=None, cuts=None, lgcrawdata=True, lg
     else:
         ax.set_ylim(ylims)
 
-    ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
-    ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
     ax.tick_params(which="both", direction="in", right=True, top=True)
     ax.grid(linestyle="dashed")
 
@@ -528,7 +523,7 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
     if ax is None:
         fig, ax = plt.subplots(figsize=(11, 6))
     else:
-        fig = None
+        fig = plt.gcf()
 
     ax.set_title(labels['title'])
     ax.set_xlabel(labels['xlabel'])
@@ -562,8 +557,6 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
                     norm=norm, cmap=cmap)
     cbar = fig.colorbar(cax[-1], label = 'Density of Data')
     cbar.ax.tick_params(which="both", direction="in")
-    ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
-    ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
     ax.tick_params(which="both", direction="in", right=True, top=True)
     ax.grid(linestyle="dashed")
 
