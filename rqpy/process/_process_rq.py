@@ -1332,33 +1332,39 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
 
     if setup.do_integral[chan_num]:
         if setup.do_baseline[chan_num]:
-            integral_subtract = np.concatenate((signal[:, :setup.indbasepre_integral],
-                                                signal[:, setup.indbasepost_integral:]),
-                                               axis=-1).mean(axis=-1)[:, np.newaxis]
+            integral_subtract = np.concatenate(
+                (signal[:, :setup.indbasepre_integral], signal[:, setup.indbasepost_integral:]),
+                axis=-1,
+            ).mean(axis=-1)[:, np.newaxis]
 
-            integral = np.trapz(signal[:, setup.indstart_integral[chan_num]:setup.indstop_integral[chan_num]]\
-                                - integral_subtract, axis=-1)/fs
+            integral = np.trapz(
+                signal[:, setup.indstart_integral[chan_num]:setup.indstop_integral[chan_num]] - integral_subtract,
+                axis=-1,
+            ) / fs
         rq_dict[f'integral_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'integral_{chan}{det}'][readout_inds] = integral
 
     if setup.do_energy_absorbed[chan_num]:
         if setup.do_baseline[chan_num]:
             energy_absorbed = qp.utils.energy_absorbed(
-                              signal[:, setup.indstart_energy_absorbed[chan_num]:setup.indstop_energy_absorbed[chan_num]],
-                                                       setup.ioffset[chan_num], 
-                                                       setup.qetbias[chan_num], 
-                                                       setup.rload[chan_num], 
-                                                       setup.rsh[chan_num],
-                                                       fs=fs,
-                                                       baseline=baseline[:, np.newaxis])
+                signal[:, setup.indstart_energy_absorbed[chan_num]:setup.indstop_energy_absorbed[chan_num]],
+                setup.ioffset[chan_num], 
+                setup.qetbias[chan_num],
+                setup.rload[chan_num],
+                setup.rsh[chan_num],
+                fs=fs,
+                baseline=baseline[:, np.newaxis],
+            )
         else:
-            energy_absorbed = qp.utils.energy_absorbed(signal[:, :setup.indstop_energy_absorbed[chan_num]],
-                                                       setup.ioffset[chan_num], 
-                                                       setup.qetbias[chan_num], 
-                                                       setup.rload[chan_num], 
-                                                       setup.rsh[chan_num],
-                                                       indbasepre=setup.indstart_energy_absorbed[chan_num],
-                                                       fs=fs)
+            energy_absorbed = qp.utils.energy_absorbed(
+                signal[:, :setup.indstop_energy_absorbed[chan_num]],
+                setup.ioffset[chan_num],
+                setup.qetbias[chan_num],
+                setup.rload[chan_num],
+                setup.rsh[chan_num],
+                indbasepre=setup.indstart_energy_absorbed[chan_num],
+                fs=fs,
+            )
         rq_dict[f'energy_absorbed_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'energy_absorbed_{chan}{det}'][readout_inds] = energy_absorbed
 
