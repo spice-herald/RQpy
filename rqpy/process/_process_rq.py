@@ -263,6 +263,12 @@ class SetupRQ(object):
     taurise : list of float, list of NoneType
         The fixed rise times for each channel, if specified. Default is None, which corresponds to letting
         the fall time parameter float. Each value in the list specifies this attribute for each channel.
+    tauriseguess : list of float, list of NoneType
+        The guess of the rise time for each channel, if specified. Each value in the list specifies
+        this attribute for each channel.
+    taufallguess : list of float, list of NoneType
+        The guess of the fall time for each channel, if specified. Each value in the list specifies
+        this attribute for each channel.
     do_optimumfilters : list of bool
         Boolean flag for whether or not any of the optimum filters will be calculated. If only
         calculating non-OF-related RQs, then this will be False, and processing time will not
@@ -457,6 +463,8 @@ class SetupRQ(object):
         self.do_ofnonlin = [False]*self.nchan
         self.ofnonlin_positive_pulses = [True]*self.nchan
         self.taurise = [None] * self.nchan
+        self.tauriseguess = [None] * self.nchan
+        self.taufallguess = [None] * self.nchan
 
         self.do_optimumfilters = [True]*self.nchan
         self.do_optimumfilters_smooth = [False]*self.nchan
@@ -1168,7 +1176,7 @@ class SetupRQ(object):
         self.indstart_maxmin = indstart
         self.indstop_maxmin = indstop
 
-    def adjust_ofnonlin(self, lgcrun=True, positive_pulses=True, taurise=None):
+    def adjust_ofnonlin(self, lgcrun=True, positive_pulses=True, taurise=None, tauriseguess=None, taufallguess=None):
         """
         Method for adjusting the calculation of the nonlinear optimum filter fit with rise and 
         fall time floating.
@@ -1183,11 +1191,21 @@ class SetupRQ(object):
         taurise : float, list of float, NoneType, optional
             If set, then this is the fixed rise time used for the nonlinear OF. Otherwise, the rise
             time is left as a floating parameter.
+        tauriseguess : float, list of float, NoneType, optional
+            If set, then this is the guess of the fitted rise time for the nonlinear OF, which is only
+            used if taurise is not None. If left as None, 20e-6 will be used.
+        taufallguess : float, list of float, NoneType, optional
+            If set, then this is the guess of the fitted fall time for the nonlinear OF. If left as None,
+            then the fall time will be guessed automatically, which may result in some inaccurate guesses.
 
         """
 
-        lgcrun, positive_pulses, taurise = self._check_arg_length(
-            lgcrun=lgcrun, positive_pulses=positive_pulses, taurise=taurise,
+        lgcrun, positive_pulses, taurise, tauriseguess, taufallguess = self._check_arg_length(
+            lgcrun=lgcrun,
+            positive_pulses=positive_pulses,
+            taurise=taurise,
+            tauriseguess=tauriseguess,
+            taufallguess=taufallguess,
         )
 
         if any(lgcrun):
@@ -1196,6 +1214,8 @@ class SetupRQ(object):
         self.do_ofnonlin = lgcrun
         self.ofnonlin_positive_pulses = positive_pulses
         self.taurise = taurise
+        self.tauriseguess = tauriseguess
+        self.taufallguess = taufallguess
 
     def adjust_trigsim(self, trigger_template, trigger_psd, k=12, constraint_width=None,
                        windowcenter=0, fir_bits_out=32, fir_discard_msbs=4):
@@ -1650,8 +1670,9 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                 else:
                     flip = -1
 
-                if setup.taurise[chan_num] is None:
-                    if setup.do_ofamp_constrained[chan_num]:
+                if setup.do_ofamp_constrained[chan_num]:
+                    # setup guesses for 1 and 2 pole cases
+                    if setup.taufallguess[chan_num] is None:
                         maxind = int(t0_constrain[jj] * setup.fs) + len(s)//2
                         tauval = np.abs(amp_constrain[jj]) / np.e
                         tauind = np.argmin(
@@ -1660,7 +1681,12 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                             ),
                         ) + maxind + 1
                         taufallguess = (tauind - maxind) / setup.fs
-                        tauriseguess = 20e-6
+                    else:
+                        taufallguess = setup.taufallguess[chan_num]
+
+                    if setup.taurise[chan_num] is None:
+                        tauriseguess = 20e-6 if setup.tauriseguess[chan_num] is None else setup.tauriseguess[chan_num]
+
                         guess = (
                             np.abs(amp_constrain[jj]),
                             tauriseguess,
@@ -1668,8 +1694,15 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                             t0_constrain[jj] + len(s)//2 / setup.fs,
                         )
                     else:
-                        guess = None
+                        guess = (
+                            np.abs(amp_constrain[jj]),
+                            taufallguess,
+                            t0_constrain[jj] + len(s)//2 / setup.fs,
+                        )
+                else:
+                    guess = None
 
+                if setup.taurise[chan_num] is None:
                     res_nlin = nlin.fit_falltimes(
                         flip * s, npolefit=2, lgcfullrtn=True, guess=guess,
                     )
@@ -1689,23 +1722,6 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                     chi2_nonlin[jj] = reducedchi2_nlin * (len(nlin.data) - nlin.dof)
                     success_nonlin[jj] = res_nlin[4]
                 else:
-                    if setup.do_ofamp_constrained[chan_num]:
-                        maxind = int(t0_constrain[jj] * setup.fs) + len(s)//2
-                        tauval = np.abs(amp_constrain[jj]) / np.e
-                        tauind = np.argmin(
-                            np.abs(
-                                flip * s[maxind + 1:maxind + 1 + int(300e-6 * setup.fs)] - tauval,
-                            ),
-                        ) + maxind + 1
-                        taufallguess = (tauind - maxind) / setup.fs
-                        guess = (
-                            np.abs(amp_constrain[jj]),
-                            taufallguess,
-                            t0_constrain[jj] + len(s)//2 / setup.fs,
-                        )
-                    else:
-                        guess = None
-
                     res_nlin = nlin.fit_falltimes(
                         flip * s, npolefit=1, lgcfullrtn=True, guess=guess, taurise=setup.taurise[chan_num],
                     )
