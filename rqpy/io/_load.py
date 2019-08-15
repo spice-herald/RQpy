@@ -237,7 +237,7 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
     return t, x, crand
 
 
-def get_trace_gain(path, chan, det, gainfactors = {'rfb': 5000, 'loopgain' : 2.4, 'adcpervolt' : 2**(16)/2}):
+def get_trace_gain(path, chan, det, gainfactors={'rfb': 5000, 'loopgain' : 2.4, 'adcpervolt' : 2**(16)/2, 'lowpassgain' : 2}):
     """
     Calculates the conversion from ADC bins to TES current for mid.gz files.
 
@@ -255,6 +255,9 @@ def get_trace_gain(path, chan, det, gainfactors = {'rfb': 5000, 'loopgain' : 2.4
             'rfb' : resistance of feedback resistor
             'loopgain' : gain of loop of the feedback amp
             'adcpervolt' : the bitdepth divided by the voltage range of the ADC
+            'lowpassgain' : the final gain of the low pass filter
+                            (Note, this is a specific value depending on the DCRC
+                            version used: RevD = 2, RevE = 4)
 
     Returns
     -------
@@ -278,7 +281,7 @@ def get_trace_gain(path, chan, det, gainfactors = {'rfb': 5000, 'loopgain' : 2.4
     settings = getDetectorSettings(path, series)
     qetbias = settings[det][chan]['qetBias']
     drivergain = settings[det][chan]['driverGain']
-    convtoamps = 1/(gainfactors['rfb'] * gainfactors['loopgain'] * drivergain *2 * gainfactors['adcpervolt'])
+    convtoamps = 1 / (gainfactors['rfb'] * gainfactors['loopgain'] * drivergain * gainfactors['lowpassgain'] * gainfactors['adcpervolt'])
 
     return convtoamps, drivergain, qetbias
 
