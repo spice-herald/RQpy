@@ -6,7 +6,12 @@ from skimage import measure
 
 from qetpy.cut import removeoutliers
 
-__all__ = ["binnedcut", "baselinecut", "inrange", "passage_fraction"]
+__all__ = [
+    "binnedcut",
+    "baselinecut",
+    "inrange",
+    "passage_fraction",
+]
 
 
 def baselinecut(arr, r0, i0, rload, dr=0.1e-3, cut=None):
@@ -14,7 +19,7 @@ def baselinecut(arr, r0, i0, rload, dr=0.1e-3, cut=None):
     Function to automatically generate the pre-pulse baseline cut. 
     The value where the cut is placed is set by dr, which is the user
     specified change in resistance from R0.
-    
+
     Parameters
     ----------
     arr : ndarray
@@ -26,37 +31,35 @@ def baselinecut(arr, r0, i0, rload, dr=0.1e-3, cut=None):
     rload : float
         The load resistance of the TES circuit, (Rp+Rsh)
     dr : float, optional
-        The change in operating resistance where the
-        cut should be placed
+        The change in operating resistance where the cut should be placed
     cut : ndarray, optional
-        Initial cut mask to use in the calculation of the pre-pulse
-        baseline cut
-            
+        Initial cut mask to use in the calculation of the pre-pulse baseline cut
+
     Returns:
     --------
     cbase : ndarray
         Array of type bool, corresponding to values which pass the 
         pre-pulse baseline cut
-            
+
     """
-    
+
     if cut is None:
         cut = np.ones_like(arr, dtype = bool)
-    
+
     base_inds = removeoutliers(arr[cut])
     meanval = np.mean(arr[cut][base_inds])
-    
+
     di = -(dr/(r0+dr+rload)*i0)
-    
+
     cbase = (arr < (meanval + di))
-    
+
     return cbase
 
 class GenericModel(object):
     """
     A generic model class to be used with `skimage.measure.ransac` to allow the user to 
     create their own model for the data.
-    
+
     Attributes
     ----------
     params : NoneType, ndarray
@@ -65,73 +68,74 @@ class GenericModel(object):
         A user-defined function to use as the model for the data.
     guess : tuple
         A guess for the best-fit parameters of the model.
-    
+
     """
-    
+
     def __init__(self, model, guess):
         """
         Initialization of the `GenericModel` object
-        
+
         Parameters
         ----------
         model : function
             A user-defined function to use as the model for the data.
         guess : tuple
             A guess for the best-fit parameters of the model.
-        
+
         """
-        
+
         self.params = None
         self.model = model
         self.guess = guess
-        
+
     def estimate(self, data):
         """
         Estimate the generic model from data using `scipy.optimize.curve_fit`.
-        
+
         Parameters
         ----------
         data : (N, 2) ndarray
             The x and y values of the data to be used to estimate the model.
-        
+
         Returns
         -------
         success : bool
             True, if model estimation succeeds.
-        
+
         """
+
         try:
             self.params, _ = optimize.curve_fit(self.model, data[:, 0], data[:, 1], p0=self.guess)
         except RuntimeError:
             self.params = self.guess
-        
+
         return True
-        
+
     def residuals(self, data):
         """
         Determine the residuals of data to the generic model.
-        
+
         Parameters
         ----------
         data : (N, 2) ndarray
             The x and y values of the data to be used to estimate the model.
-        
+
         Returns
         -------
         residuals : (N, ) ndarray
             The residuals for each data point.
-        
+
         """
-        
+
         return self.model(data[:, 0], *self.params) - data[:, 1]
-    
+
 
 def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgcequaldensitybins=False,
               xlwrlim=None, xuprlim=None, model=None, guess=None, residual_threshold=2, min_samples=None, 
               **kwargs):
     """
     Function for calculating a cut given a desired passage fraction, based on binning the data.
-    
+
     Parameters
     ----------
     x : array_like
@@ -139,7 +143,7 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgce
     y : array_like
         Array of y-values to cut.
     cut : array_like, optional
-        Boolean mask of values to keep for determination of the binned cut. Useful if 
+        Boolean mask of values to keep for determination of the binned cut. Useful if
         doing cut in a certain order. The binned cut will be added to this cut. Default is None.
     nbins : float, optional
         The number of bins to use in the cut. Default is 100.
@@ -162,43 +166,43 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgce
         The upper limit on `x` such that the cut at this value is applied to any values of `x`
         greater than this. Default is None, where no upper limit is applied.
     model : NoneType, str, function, optional
-        The model to use for determining the functional form of the cut. If set to None, the 
+        The model to use for determining the functional form of the cut. If set to None, the
         bins are used as the bounds for this cut. If set to "linear", then
-        `skimage.measure.LineModelND` is used as the model, which is a linear model, and 
-        `skimage.measure.ransac` is used to estimate the model parameters. Can also be set to a 
-        user-defined function, of the form f(x, *params), and `skimage.measure.ransac` is used 
+        `skimage.measure.LineModelND` is used as the model, which is a linear model, and
+        `skimage.measure.ransac` is used to estimate the model parameters. Can also be set to a
+        user-defined function, of the form f(x, *params), and `skimage.measure.ransac` is used
         to estimate the model parameters. If the user-defined function is used, then the `guess` 
         parameter also needs to be passed.
     guess : NoneType, tuple, optional
-        If model is set to a user-defined function, then a guess for the parameters must be 
+        If model is set to a user-defined function, then a guess for the parameters must be
         specified. This is only used if a user-defined function is passed to `model`.
     residual_threshold : float, optional
         Maximum distance for a data point to be classified as an inlier. This is passed directly
         to the `skimage.measure.ransac` function, of which this is a parameter. Default is 2.
     min_samples : NoneType, int, optional
-        The minumum number of data points to fit the model to. This is passed directly to the 
+        The minumum number of data points to fit the model to. This is passed directly to the
         `skimage.measure.ransac` function, of which this is a parameter. If left as None, then this
-        is set to the length of the guess for user-defined functions or set to two for the linear 
+        is set to the length of the guess for user-defined functions or set to two for the linear
         model.
     kwargs
         Keyword arguments passed to `skimage.measure.ransac`. See [1].
-        
+
     Returns
     -------
     cbinned : array_like
         A boolean mask indicating which data points passed the baseline cut.
     cutobj : object
-        An object that contains the parameters of the fitted model (if `model` is not None, otherwise 
+        An object that contains the parameters of the fitted model (if `model` is not None, otherwise
         this is None) and the function that generates the cut boundary, where the two attributes are
         `params` and `f_boundary`, respectively.
-        
+
     Notes
     -----
-    
+
     [1] http://scikit-image.org/docs/dev/api/skimage.measure.html#skimage.measure.ransac
-    
+
     """
-    
+
     if (cut_eff > 1) or (cut_eff < 0):
         raise ValueError("cut_eff must be a value between 0 and 1")
 
@@ -214,21 +218,21 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgce
         f = lambda var: st(y[cut])
     else:
         bin_cut = cut
-        
+
         if xlwrlim is not None:
             lwr_cut = x >= xlwrlim
             bin_cut = bin_cut & lwr_cut
-            
+
         if xuprlim is not None:
             upr_cut = x <= xuprlim
             bin_cut = bin_cut & upr_cut
-            
+
         if lgcequaldensitybins:
             histbins_equal = lambda var, nbin: np.interp(np.linspace(0, len(var), nbin + 1),
                                                          np.arange(len(var)),
                                                          np.sort(var))
             nbins = histbins_equal(x[bin_cut], nbins)
-        
+
         cutoffs, bin_edges, _ = stats.binned_statistic(x[bin_cut], y[bin_cut], bins=nbins,
                                                        statistic=st)
         if model is None:
@@ -244,16 +248,16 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgce
             else:
                 if guess is None:
                     raise ValueError("guess was not set, a guess is required to use the generic model.")
-                
+
                 if min_samples is None:
                     min_samples = len(guess)
-                
+
                 class ModelClass(GenericModel):
                     def __init__(self):
                         super().__init__(model, guess)
-                    
+
             cutoffs[np.isnan(cutoffs)] = 0
-            
+
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", category=optimize.OptimizeWarning)
                 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -265,44 +269,48 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgce
                 f = lambda var: ModelClass().predict_y(list(var), params=params)
             else:
                 f = lambda var: model(var, *params)
-                
+
     if keep_large_vals:
         f_cut = lambda var: (y > f(var)) & cut
     else:
         f_cut = lambda var: (y < f(var)) & cut
-    
+
     cbinned = f_cut(x)
-    
+
     cutobj = type('cutobj', (object,), {'params'     : params,
                                         'f_boundary' : f})
     
     return cbinned, cutobj
 
-def inrange(vals, lwrbnd, uprbnd):
+def inrange(vals, lwrbnd, uprbnd, include_lwrbnd=True, include_uprbnd=True):
     """
     Function for returning a boolean mask that specifies which values
     in an array are between the specified bounds (inclusive of the bounds).
-    
+
     Parameters
     ----------
-    vals : array_like
-        A 1-d array of values.
+    vals : ndarray
+        A 1-d ndarray of values.
     lwrbnd : float
         The lower bound of the range that we are checking if vals is between.
     uprbnd : float
         The upper bound of the range that we are checking if vals is between.
-            
+    include_lwrbnd : bool, optional
+        Boolean flag for including or excluding the lower bound in the range. Default is
+        True, meaning that we include the lower bound in the specified range.
+    include_uprbnd : bool, optional
+        Boolean flag for including or excluding the upper bound in the range. Default is
+        True, meaning that we include the upper bound in the specified range.
+
     Returns
     -------
     mask : ndarray
         A boolean array of the same shape as vals. True means that the
         value was between the bounds, False means that the value was not.
-    
+
     """
-    
-    mask = (vals >= lwrbnd) & (vals <= uprbnd)
-    
-    return mask
+
+    return (vals >= lwrbnd if include_lwrbnd else vals > lwrbnd) & (vals <= uprbnd if include_uprbnd else vals < uprbnd)
 
 def passage_fraction(x, cut, basecut=None, nbins=100, lgcequaldensitybins=False):
     """

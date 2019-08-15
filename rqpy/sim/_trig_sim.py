@@ -73,7 +73,7 @@ class TrigSim(object):
 
     """
 
-    def __init__(self, psd, template, fs, fir_bits_out=32, fir_discard_msbs=4):
+    def __init__(self, psd, template, fs, which_channel=0, fir_bits_out=32, fir_discard_msbs=4):
         """
         Initialization of the TrigSim class.
 
@@ -81,57 +81,101 @@ class TrigSim(object):
         ----------
         psd : ndarray
             The input power spectral density to use for the FIR filter. Should be in
-            units of ADC bins.
+            units of ADC bins. If different PSDs are used on different channels, this should be
+            a 2D array containing the PSD for each channel that is being used in the trigger.
         template : ndarray
             The pulse template to use for the FIR filter. Should be normalized to have a
-            height of 1.
+            height of 1. If different templates are used on different channels, this should be
+            a 2D array containing the template for each channel that is being used in the trigger.
         fs : float
             The digitization rate of the data in Hz.
+        which_channel : int, array_like, optional
+            The index or array of indices that specify which channels will be used to
+            trigger on. Default is zero, specifying just a single channel.
         fir_bits_out : int, optional
             The number of bits to use in the integer values of the FIR. Default is 32, corresponding
             to 32-bit integer trigger amplitudes. This is the recommended value, smaller values
             may result in saturation fo the trigger amplitude (where the true amplitude would be
             larger than the largest integer).
         fir_discard_msbs : int, optional
-            The FIR pre-truncation shift of the bits for the FIR module. Default is 4, which is the
-            recommended value.
+            The FIR pre-truncation shift of the bits for the FIR module. Default is 4, which may
+            change for different datasets.
 
         """
 
         if not HAS_TRIGSIM:
             raise ImportError("Cannot run the trigger simulation because trigsim is not installed.")
 
-        self.input_psds = [psd]*12 + [np.ones(4*len(psd))]*4
-        self.input_pulse_shapes = [template]*12 + [np.zeros(4*template.shape[0])]*4
+        self.input_psds = self._fill_list(psd, which_channel, 1)
+        self.input_pulse_shapes = self._fill_list(template, which_channel, 0)
         self.fs = fs
 
         raw_LC_coeffs = np.zeros((4,16))
-        which_channel = 0
-        raw_LC_coeffs[0, which_channel] = 1 # only one phonon channel
+        raw_LC_coeffs[0, which_channel] = 1
         LC_coeffs = trigsim.scale_max(raw_LC_coeffs, bits=8, axis=1)
         TrL_requires = np.zeros((8,16), dtype=bool)
         TrL_vetos = np.zeros((8,16), dtype=bool)
 
-        self._Trigger = trigsim.Trigger(bits_phonon=16, bits_charge=16,
-                                    phonon_DF_R=16, phonon_DF_N=3, phonon_DF_M=1, phonon_start=0,
-                                    charge_DF_R=64, charge_DF_N=3, charge_DF_M=1, charge_start=0,
-                                    LC_coeffs=LC_coeffs, LC_bits_out=46,
-                                    LC_bits_coeff=8, LC_discard_MSBs=[0,0,0,0],
-                                    FIR_coeffs=np.zeros((4,1024), 'i8'), FIR_bits_out=fir_bits_out, 
-                                    FIR_bits_coeff=16, FIR_discard_MSBs=[fir_discard_msbs,0,0,0],
-                                    ThL_selectors=np.array([0,1,2,3,1,1,2,3], dtype='uint'),
-                                    ThL_activation_thresholds   = (2**15 - 1)*np.ones(8, int),
-                                    ThL_deactivation_thresholds = np.zeros(8, int),
-                                    PS_max_window_lengths=(2**31 - 1)*np.ones(4, dtype='uint'),
-                                    PS_saturated_pulse_offsets=np.zeros(4, dtype='uint'),
-                                    TrL_selectors=np.array([0,1,2,3,1,1,2,3], dtype='uint'),
-                                    TrL_enables=np.array([1,0,0,0,0,0,0,0], dtype=bool),
-                                    TrL_requires=TrL_requires, TrL_vetos=TrL_vetos,
-                                    TrL_prescales=np.ones(8, dtype='float'))
+        self._Trigger = trigsim.Trigger(
+            bits_phonon=16,
+            bits_charge=16,
+            phonon_DF_R=16,
+            phonon_DF_N=3,
+            phonon_DF_M=1,
+            phonon_start=0,
+            charge_DF_R=64,
+            charge_DF_N=3,
+            charge_DF_M=1,
+            charge_start=0,
+            LC_coeffs=LC_coeffs,
+            LC_bits_out=46,
+            LC_bits_coeff=8,
+            LC_discard_MSBs=[0, 0, 0, 0],
+            FIR_coeffs=np.zeros((4, 1024), 'i8'),
+            FIR_bits_out=fir_bits_out,
+            FIR_bits_coeff=16,
+            FIR_discard_MSBs=[fir_discard_msbs, 0, 0, 0],
+            ThL_selectors=np.array([0, 1, 2, 3, 1, 1, 2, 3], dtype='uint'),
+            ThL_activation_thresholds=(2**15 - 1) * np.ones(8, dtype=int),
+            ThL_deactivation_thresholds=np.zeros(8, dtype=int),
+            PS_max_window_lengths=(2**31 - 1) * np.ones(4, dtype='uint'),
+            PS_saturated_pulse_offsets=np.zeros(4, dtype='uint'),
+            TrL_selectors=np.array([0, 1, 2, 3, 1, 1, 2, 3], dtype='uint'),
+            TrL_enables=np.array([1, 0, 0, 0, 0, 0, 0, 0], dtype=bool),
+            TrL_requires=TrL_requires,
+            TrL_vetos=TrL_vetos,
+            TrL_prescales=np.ones(8, dtype='float'),
+        )
 
         self.of_coeffs = self._Trigger.build_OF_coeffs(self.input_psds, self.input_pulse_shapes)
         self._Trigger.set_FIR_coeffs(self.of_coeffs)
         self.convtoadcbins = self._convtoadcbins(fir_bits_out, fir_discard_msbs)
+
+    @staticmethod
+    def _fill_list(arr, which_channel, fill_value, nphonon=12, ncharge=4):
+        """
+        Hidden helper method for filling the `input_psds` and `input_pulse_shapes` attributes, given
+        a boolean array `which_channel` that describes the order of the arrays.
+
+        """
+
+        which_channel = np.atleast_1d(which_channel)
+
+        if len(arr.shape) == 1:
+            arr = np.stack([arr] * len(which_channel), axis=0)
+
+        filled_list = [0] * nphonon
+
+        for ii, ind in enumerate(which_channel):
+            filled_list[ind] = arr[ii]
+
+        for ii in range(nphonon):
+            if ii not in which_channel:
+                filled_list[ii] = arr[0]
+
+        filled_list += [np.ones(4 * arr.shape[-1], dtype='int64') * np.int64(fill_value)] * ncharge
+
+        return filled_list
 
     def _convtoadcbins(self, fir_bits_out, fir_discard_msbs):
         """
@@ -200,8 +244,9 @@ class TrigSim(object):
         Parameters
         ----------
         x : ndarray
-            The input array to run the FIR filter on. Should be a 1-d ndarray in units of 
-            ADC bins.
+            The input array to run the FIR filter on. Can be a 1 or 2D ndarray in units of 
+            ADC bins. Should be 2D if multiple channels are being triggered on, where the ndarray
+            should be all of the available channels.
         k : int, optional
             The bin number to start the FIR filter at. Since the filter downsamples the data
             by a factor of 16, the starting bin has a small effect on the calculated amplitude.
@@ -225,13 +270,24 @@ class TrigSim(object):
 
         """
 
-        input_traces = [(x[k:] - 32768).astype('int64')] + [np.zeros(len(x[k:]),dtype='int64')]*11 + \
-                       [np.zeros(4*len(x[k:]),dtype='int64')]*4
+        if len(x.shape) > 1:
+            input_traces = [(xx[k:] - 32768).astype('int64') for xx in x]
+        else:
+            input_traces = [(x[k:] - 32768).astype('int64')]
+
+        filled_channels = len(input_traces)
+        input_traces += [np.zeros(x[..., k:].shape[-1],dtype='int64')] * (12 - filled_channels)
+        input_traces += [np.zeros(4 * x[..., k:].shape[-1],dtype='int64')] * 4
 
         self._Trigger.reset()
 
-        pipe = trigsim.pipeline(self._Trigger.DF, self._Trigger.LC, self._Trigger.LC_trunc, 
-                                self._Trigger.FIR, self._Trigger.FIR_trunc)
+        pipe = trigsim.pipeline(
+            self._Trigger.DF,
+            self._Trigger.LC,
+            self._Trigger.LC_trunc,
+            self._Trigger.FIR,
+            self._Trigger.FIR_trunc,
+        )
 
         bins_to_keep = (len(x) - k)//16 - 1024
 
@@ -242,3 +298,67 @@ class TrigSim(object):
         fir_nodelay = fir_out[len(fir_out)//2 - 1 + len(fir_out)%2]
 
         return triggeramp, triggertime, fir_nodelay, fir_out
+
+    def constrain_trigger(self, x, constraint_width, k=12, windowcenter=0, fir_out=None):
+        """
+        Method for calculating the FIR trigger amplitude in a specified region. This is no longer a
+        simulation of the trigger, as the maximum amplitude in the entire trace is no longer returned.
+
+        Parameters
+        ----------
+        x : ndarray
+            The input array to run the FIR filter on. Can be a 1- or 2-D ndarray in units of 
+            ADC bins. Should be 2D if multiple channels are being triggered on, where the ndarray
+            should be all of the available channels.
+        constraint_width : float
+            The width, in seconds, of the window that the constraint on the FIR amplitude will be set by.
+        k : int, optional
+            The bin number to start the FIR filter at. Since the filter downsamples the data
+            by a factor of 16, the starting bin has a small effect on the calculated amplitude.
+        windowcenter : float, optional
+            The shift, in seconds, of the window of the constraint on the FIR amplitude will be moved by.
+            A negative value moves the window to the left, while a positive value moves the window to the
+            right. Default is 0.
+        fir_out : ndarray, NoneType, optional
+            If passed, this is the complete, filtered trace corresponding to the inputted trace, in the
+            arbitrary units of the filter. If not passed, then this will be calculated using the
+            `TrigSim.Trigger` method.
+
+        Returns
+        -------
+        max_amp_constrain : int
+            The maximum amplitude of the pulse as calculated by the FIR filter, in the arbitrary 
+            units of the filter, within the specified constraint window.
+        t0_constrain : float
+            The time at which `max_amp_constrain` was found, in units of seconds. This is in relation to
+            the inputted trace `x`.
+
+        Raises
+        ------
+        ValueError
+            If the constraint window length is 0.
+
+        """
+
+        if fir_out is None:
+            fir_out = self.trigger(x, k=k)[-1]
+
+        nconstrain = int(constraint_width * (self.fs / 16))
+        if nconstrain == 0:
+            raise ValueError(
+                f"The inputted constraint_width should be greater than {16 / self.fs}, "
+                "so that we include more than one bin of the trace."
+            )
+
+        windowcenter_int = round(windowcenter * (self.fs / 16))
+
+        trace_center = len(fir_out)//2 - 1 + len(fir_out) % 2
+        inds = np.arange(
+            trace_center - nconstrain//2 + windowcenter_int,
+            trace_center + nconstrain//2  + nconstrain % 2 + windowcenter_int,
+        )
+
+        max_amp_constrain = fir_out[inds].max()
+        t0_constrain = (inds[np.argmax(fir_out[inds])] + 513 + k / 16) / (self.fs / 16)
+
+        return max_amp_constrain, t0_constrain
