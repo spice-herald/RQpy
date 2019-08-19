@@ -555,8 +555,8 @@ class SetupRQ(object):
         """
 
         for key, value in kwargs.items():
-            if np.isscalar(value):
-                kwargs[key] = [value]*self.nchan
+            if np.isscalar(value) or value is None:
+                kwargs[key] = [value] * self.nchan
 
             if key == "pulse_direction_constraint" and not all(x in [-1, 0, 1] for x in kwargs[key]):
                 raise ValueError(f"{key} should be set to 0, 1, or -1")
