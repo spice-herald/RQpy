@@ -420,11 +420,6 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
             if len(fc) == 0:
                 fc = np.asarray([0, 1])
 
-            cl = 0.9
-            if_bn = 1
-            mub = 0
-            iflag = 0
-
             uloutput = upperlim(fc)
             sigma[ii] = (sigma0 / tot_rate) * uloutput
 
@@ -755,11 +750,6 @@ def optimuminterval_2dsmear(eventenergies, masslist, exposure, cov, delta,
 
             if len(fc) == 0:
                 fc = np.asarray([0, 1])
-
-            cl = 0.9
-            if_bn = 1
-            mub = 0
-            iflag = 0
 
             uloutput = upperlim(fc)
             sigma[ii] = (sigma0 / tot_rate) * uloutput
