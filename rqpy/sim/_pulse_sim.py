@@ -135,12 +135,29 @@ class PulseSim(object):
         """
 
         if not isinstance(attr, str):
-            raise ValueError("The inputted attr is not a string.")
+            raise TypeError("The inputted attr is not a string.")
         if attr not in ["amplitudes", "tdelay", "taurises", "taufalls"]:
             raise ValueError(
                 "The inputted attr is not a valid option. "
                 "Please see the docstring for valid values."
             )
+
+    @staticmethod
+    def _check_basedumpnum(basedumpnum):
+        """
+        Helper method for checking if basedumpnum is a positive integer (inclusive of zero).
+
+        Parameters
+        ----------
+        basedumpnum : int
+            Value to check if it is a positive integer (zero-inclusive).
+
+        """
+
+        if not isinstance(basedumpnum, int):
+            raise TypeError("The inputted basedumpnum is not an int.")
+        if basedumpnum < 0:
+            raise ValueError("basedumpnum must be 0 or greater.")
 
     def _check_if_cut_set(self):
         """
@@ -154,8 +171,10 @@ class PulseSim(object):
         """
 
         if self.cut is None:
-            raise ValueError("The cut has not been set, consider setting it "
-                             "via the PulseSim.update_cut method.")
+            raise ValueError(
+                "The cut has not been set, consider setting it "
+                "via the PulseSim.update_cut method."
+            )
 
     def _check_sim_data(self):
         """
@@ -370,7 +389,7 @@ class PulseSim(object):
         val.append(sim_data)
 
     def run_sim(self, savefilepath, convtoamps=None, channel=None, det=None, 
-                relcal=None, neventsperdump=1000):
+                relcal=None, neventsperdump=1000, basedumpnum=0):
         """
         Method for running the pulse simulation after the data has been generated.
 
@@ -388,12 +407,17 @@ class PulseSim(object):
         neventsperdump : int, optional
             The number of events to be saved per dump file. Default is 1000. This should
             not be made much larger than 1000 to avoid loading too much data into RAM.
+        basedumpnum : int, optional
+            The base value for the `dumpnum` variable. When saving dumps, the first dump
+            will start with this value. Should be an integer of value zero or greater.
+            Default is 0.
 
         """
 
         self._check_if_cut_set()
         self._check_sim_data()
         self._check_channel_det(channel, det)
+        self._check_basedumpnum(basedumpnum)
         convtoamps_auto = self._check_convtoamps(convtoamps, channel, det)
 
         buildfakepulses(
@@ -414,12 +438,13 @@ class PulseSim(object):
             filetype=self.filetype,
             lgcsavefile=True,
             savefilepath=savefilepath,
+            basedumpnum=basedumpnum,
         )
 
 
 def buildfakepulses(rq, cut, templates, amplitudes, tdelay, basepath, taurises=None, taufalls=None,
                     channels="PDS1", det="Z1", relcal=None, convtoamps=1, fs=625e3, neventsperdump=1000,
-                    filetype="mid.gz", lgcsavefile=False, savefilepath=None):
+                    basedumpnum=0, filetype="mid.gz", lgcsavefile=False, savefilepath=None):
     """
     Function for building fake pulses by adding a template, scaled to certain amplitudes and
     certain time delays, to an existing trace (typically a random).
@@ -468,6 +493,10 @@ def buildfakepulses(rq, cut, templates, amplitudes, tdelay, basepath, taurises=N
         The sample rate in Hz of the data.
     neventsperdump : int, optional
         The number of events to be saved per dump file.
+    basedumpnum : int, optional
+        The base value for the `dumpnum` variable. When saving dumps, the first dump
+        will start with this value. Should be an integer of value zero or greater.
+        Default is 0.
     filetype : str, optional
         The string that corresponds to the file type that will be opened. Supports two
         types: "mid.gz" and "npz". "mid.gz" is the default.
@@ -577,7 +606,7 @@ def buildfakepulses(rq, cut, templates, amplitudes, tdelay, basepath, taurises=N
             det=det,
             convtoamps=convtoamps,
             fs=fs,
-            dumpnum=ii + 1,
+            dumpnum=ii + 1 + basedumpnum,
             filetype=filetype,
             lgcsavefile=lgcsavefile,
             savefilepath=savefilepath,
