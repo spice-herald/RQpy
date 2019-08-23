@@ -163,7 +163,7 @@ def drde(q, m_dm, sig0, tm='Si'):
         The dark matter mass at which to calculate the expected differential
         scattering rate. Expected units are GeV.
     sig0 : float
-        The dark matter cross section at which to calculated the expected differential
+        The dark matter cross section at which to calculate the expected differential
         scattering rate. Expected units are cm^2.
     tm : str, int, optional
         The target material of the detector. Can be passed as either the atomic symbol, the
@@ -269,7 +269,7 @@ def drde_max_q(m_dm, tm='Si'):
 
 def gauss_smear(x, f, res, nres=1e5, gauss_width=10):
     """
-    Function for smearing an array of values by a gaussian.
+    Function for smearing an array of values by a Gaussian.
 
     Parameters
     ----------
@@ -278,7 +278,7 @@ def gauss_smear(x, f, res, nres=1e5, gauss_width=10):
     f : array_like
         The array of value to smear via a Gaussian distribution.
     res : float
-        The width of the gaussian (1 standard deviation) that will be
+        The width of the Gaussian (1 standard deviation) that will be
         used to smear the inputted array. Should have the same units as `x`.
     nres : float, optional
         The size of the array that the Gaussian distribution will be saved to.
@@ -322,7 +322,7 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
     effs : ndarray
         Array of the efficiencies (unitless) corresponding to `effenergies`.
     masslist : ndarray
-        List of candidate DM masses (in GeV/c^2) to calculate sensitivity at.
+        List of candidate DM masses (in GeV/c^2) to calculate the sensitivity at.
     exposure : float
         The total exposure of the detector (kg*days).
     tm : str, int, optional
@@ -330,14 +330,14 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
         atomic number, or the full name of the element. Default is 'Si'.
     res : float, NoneType, optional
         The detector resolution in units of keV. If passed, then the differential scattering
-        rate of the dark matter is convoluted by a gaussian with width `res`, which results
+        rate of the dark matter is convoluted with a Gaussian with width `res`, which results
         in a smeared spectrum. If left as None, no smearing is performed.
     gauss_width : float, optional
         If `res` is not None, this is the number of standard deviations of the Gaussian
         distribution that the smearing will go out to. Default is 10.
     verbose : bool, optional
-        If True, then the algorithm prints out the number of mass that it is currently calculating
-        the limit for. If False, no information is printed. Default is False.
+        If True, then the algorithm prints out which mass is currently being used in the calculation.
+        If False, no information is printed. Default is False.
 
     Returns
     -------
@@ -419,11 +419,6 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
 
             if len(fc) == 0:
                 fc = np.asarray([0, 1])
-
-            cl = 0.9
-            if_bn = 1
-            mub = 0
-            iflag = 0
 
             uloutput = upperlim(fc)
             sigma[ii] = (sigma0 / tot_rate) * uloutput
@@ -561,7 +556,7 @@ def drde_gauss_smear2d(x, cov, delta, m_dm, sig0, nsig=3, tm="Si", subtract_zero
         The dark matter mass at which to calculate the expected differential
         scattering rate. Expected units are GeV.
     sig0 : float
-        The dark matter cross section at which to calculated the expected differential
+        The dark matter cross section at which to calculate the expected differential
         scattering rate. Expected units are cm^2.
     nsig : float, optional
         The number of sigma outside of which the PDF will be set to zero. This defines
@@ -663,11 +658,11 @@ def optimuminterval_2dsmear(eventenergies, masslist, exposure, cov, delta,
     nsig : float
         The number of sigma outside of which the two-dimensional normal PDF defined by the
         inputted covariance matrix will be set to zero. This defines an elliptical confidence
-        region. This is used to restrict the amount of smearing that is appiled to the DM spectrum
+        region. This is used to restrict the amount of smearing that is applied to the DM spectrum
         to avoid calculate artificially low upper limits.
     verbose : bool, optional
-        If True, then the algorithm prints out the number of mass that it is currently calculating
-        the limit for. If False, no information is printed. Default is False.
+        If True, then the algorithm prints out which mass is currently being used in the calculation.
+        If False, no information is printed. Default is False.
     npts : float, optional
         The number of energies at which to evaluate the smeared differential rate. Large values
         result in long computation times. Default is 1e3.
@@ -755,11 +750,6 @@ def optimuminterval_2dsmear(eventenergies, masslist, exposure, cov, delta,
 
             if len(fc) == 0:
                 fc = np.asarray([0, 1])
-
-            cl = 0.9
-            if_bn = 1
-            mub = 0
-            iflag = 0
 
             uloutput = upperlim(fc)
             sigma[ii] = (sigma0 / tot_rate) * uloutput
