@@ -616,6 +616,7 @@ def buildfakepulses(rq, cut, templates, amplitudes, tdelay, basepath, taurises=N
         _save_truth_info(
             savefilepath,
             basepath=basepath,
+            basedumpnum=basedumpnum,
             seriesnumber=rq.seriesnumber[cut],
             eventnumber=rq.eventnumber[cut],
             templates=templates,
@@ -822,6 +823,7 @@ def _save_truth_info(savefilepath, **kwargs):
     The expected kwargs are:
         savefilepath
         basepath
+        basedumpnum
         seriesnumber
         eventnumber
         templates
@@ -849,7 +851,8 @@ def _save_truth_info(savefilepath, **kwargs):
         savefilename = f"{seriesnumber:012}"
         savefilename = savefilename[:8] + '_' + savefilename[8:]
 
-    dd.io.save(f"{savefilepath}{savefilename}_truth_info.h5", kwargs)
+    basedumpnum = kwargs['basedumpnum']
+    dd.io.save(f"{savefilepath}{savefilename}_truth_info_{basedumpnum}.h5", kwargs)
 
 
 def _round_sig(x, sig=2):
