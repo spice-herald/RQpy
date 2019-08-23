@@ -137,8 +137,10 @@ class PulseSim(object):
         if not isinstance(attr, str):
             raise ValueError("The inputted attr is not a string.")
         if attr not in ["amplitudes", "tdelay", "taurises", "taufalls"]:
-            raise ValueError("The inputted attr is not a valid option. "
-                             "Please see the docstring for valid values.")
+            raise ValueError(
+                "The inputted attr is not a valid option. "
+                "Please see the docstring for valid values."
+            )
 
     def _check_if_cut_set(self):
         """
@@ -171,21 +173,29 @@ class PulseSim(object):
         """
 
         if len(self.amplitudes) != len(self.templates):
-            raise ValueError(f"There are {len(self.templates)} templates, but only "
-                             f"{len(self.amplitudes)} sets of amplitudes data. Consider "
-                             "adding more using PulseSim.generate_sim_data.")
+            raise ValueError(
+                f"There are {len(self.templates)} templates, but only "
+                f"{len(self.amplitudes)} sets of amplitudes data. Consider "
+                "adding more using PulseSim.generate_sim_data."
+            )
         elif len(self.tdelay) != len(self.templates):
-            raise ValueError(f"There are {len(self.templates)} templates, but only "
-                             f"{len(self.tdelay)} sets of tdelay data. Consider adding "
-                             "more using PulseSim.generate_sim_data.")
+            raise ValueError(
+                f"There are {len(self.templates)} templates, but only "
+                f"{len(self.tdelay)} sets of tdelay data. Consider adding "
+                "more using PulseSim.generate_sim_data."
+            )
         elif self.taurises is not None and len(self.taurises) != len(self.templates):
-            raise ValueError(f"There are {len(self.templates)} pulses specified, but only "
-                             f"{len(self.taurises)} sets of taurises data. Consider adding "
-                             "more using PulseSim.generate_sim_data.")
+            raise ValueError(
+                f"There are {len(self.templates)} pulses specified, but only "
+                f"{len(self.taurises)} sets of taurises data. Consider adding "
+                "more using PulseSim.generate_sim_data."
+            )
         elif self.taufalls is not None and len(self.taufalls) != len(self.templates):
-            raise ValueError(f"There are {len(self.templates)} pulses specified, but only "
-                             f"{len(self.taufalls)} sets of taufalls data. Consider adding "
-                             "more using PulseSim.generate_sim_data.")
+            raise ValueError(
+                f"There are {len(self.templates)} pulses specified, but only "
+                f"{len(self.taufalls)} sets of taufalls data. Consider adding "
+                "more using PulseSim.generate_sim_data."
+            )
 
     def _check_channel_det(self, channel, det):
         """
@@ -338,8 +348,10 @@ class PulseSim(object):
                 distribution = stats.uniform
 
             if "size" in kwargs.keys() and kwargs["size"]!=self.ntraces:
-                raise ValueError(f"The inputted size does not match the cut length ({self.ntraces}), "
-                                 "The size is automatically set, consider not passing it.")
+                raise ValueError(
+                    f"The inputted size does not match the cut length ({self.ntraces}), "
+                    "The size is automatically set, consider not passing it."
+                )
             else:
                 kwargs["size"] = self.ntraces
 
@@ -348,8 +360,10 @@ class PulseSim(object):
             sim_data = np.ones(self.ntraces) * values
         else:
             if len(values)!=self.ntraces:
-                raise ValueError("The length of the inputted values argument "
-                                 f"does not match the cut length ({self.ntraces})")
+                raise ValueError(
+                    "The length of the inputted values argument "
+                    f"does not match the cut length ({self.ntraces})"
+                )
             sim_data = values
 
         val = getattr(self, attr)
@@ -382,24 +396,25 @@ class PulseSim(object):
         self._check_channel_det(channel, det)
         convtoamps_auto = self._check_convtoamps(convtoamps, channel, det)
 
-        buildfakepulses(self.rq,
-                        self.cut,
-                        self.templates,
-                        self.amplitudes,
-                        self.tdelay,
-                        self.basepath,
-                        taurises=self.taurises,
-                        taufalls=self.taufalls,
-                        channels=channel,
-                        det=det,
-                        relcal=relcal,
-                        convtoamps=convtoamps_auto,
-                        fs=self.fs,
-                        neventsperdump=neventsperdump,
-                        filetype=self.filetype,
-                        lgcsavefile=True,
-                        savefilepath=savefilepath,
-                       )
+        buildfakepulses(
+            self.rq,
+            self.cut,
+            self.templates,
+            self.amplitudes,
+            self.tdelay,
+            self.basepath,
+            taurises=self.taurises,
+            taufalls=self.taufalls,
+            channels=channel,
+            det=det,
+            relcal=relcal,
+            convtoamps=convtoamps_auto,
+            fs=self.fs,
+            neventsperdump=neventsperdump,
+            filetype=self.filetype,
+            lgcsavefile=True,
+            savefilepath=savefilepath,
+        )
 
 
 def buildfakepulses(rq, cut, templates, amplitudes, tdelay, basepath, taurises=None, taufalls=None,
@@ -492,21 +507,28 @@ def buildfakepulses(rq, cut, templates, amplitudes, tdelay, basepath, taurises=N
         taufalls = [taufalls]
 
     if not len(tdelay) == len(amplitudes) == len(templates):
-        raise ValueError("The lists of tdelay, amplitudes, and templates must have the "
-                         "same number of ndarray.")
+        raise ValueError(
+            "The lists of tdelay, amplitudes, and templates must have the "
+            "same number of ndarray."
+        )
     elif taurises is not None and len(taurises) != len(tdelay):
-        raise ValueError("The lists of taurises, taufalls, tdelay, amplitudes, and templates "
-                         "must have the same number of ndarray.")
+        raise ValueError(
+            "The lists of taurises, taufalls, tdelay, amplitudes, and templates "
+            "must have the same number of ndarray."
+        )
     elif taufalls is not None and len(taufalls) != len(tdelay):
-        raise ValueError("The lists of taurises, taufalls, tdelay, amplitudes, and templates "
-                         "must have the same number of ndarray.")
+        raise ValueError(
+            "The lists of taurises, taufalls, tdelay, amplitudes, and templates "
+            "must have the same number of ndarray."
+        )
 
     if len(det)!=len(channels):
         raise ValueError("channels and det should have the same length.")
 
     if len(set(rq.seriesnumber[cut])) > 1:
-        raise ValueError("There cannot be multiple series numbers included in the "
-                         "inputted cut.")
+        raise ValueError(
+            "There cannot be multiple series numbers included in the inputted cut."
+        )
 
     if lgcsavefile and savefilepath is None:
         raise ValueError("In order to save the simulated data, you must specify savefilepath.")
@@ -541,42 +563,44 @@ def buildfakepulses(rq, cut, templates, amplitudes, tdelay, basepath, taurises=N
             split_taurises = None
             split_taufalls = None
 
-        _buildfakepulses_seg(rq,
-                             cut_seg,
-                             templates,
-                             split_amplitudes,
-                             split_tdelay,
-                             basepath,
-                             taurises=split_taurises,
-                             taufalls=split_taufalls,
-                             channels=channels,
-                             relcal=relcal,
-                             det=det,
-                             convtoamps=convtoamps,
-                             fs=fs,
-                             dumpnum=ii + 1,
-                             filetype=filetype,
-                             lgcsavefile=lgcsavefile,
-                             savefilepath=savefilepath,
-                            )
+        _buildfakepulses_seg(
+            rq,
+            cut_seg,
+            templates,
+            split_amplitudes,
+            split_tdelay,
+            basepath,
+            taurises=split_taurises,
+            taufalls=split_taufalls,
+            channels=channels,
+            relcal=relcal,
+            det=det,
+            convtoamps=convtoamps,
+            fs=fs,
+            dumpnum=ii + 1,
+            filetype=filetype,
+            lgcsavefile=lgcsavefile,
+            savefilepath=savefilepath,
+        )
 
     if lgcsavefile:
-        _save_truth_info(savefilepath,
-                         basepath=basepath,
-                         seriesnumber=rq.seriesnumber[cut],
-                         eventnumber=rq.eventnumber[cut],
-                         templates=templates,
-                         amplitudes=amplitudes,
-                         tdelay=tdelay,
-                         taurises=taurises,
-                         taufalls=taufalls,
-                         channels=channels,
-                         relcal=relcal,
-                         det=det,
-                         convtoamps=convtoamps,
-                         fs=fs,
-                         filetype=filetype,
-                        )
+        _save_truth_info(
+            savefilepath,
+            basepath=basepath,
+            seriesnumber=rq.seriesnumber[cut],
+            eventnumber=rq.eventnumber[cut],
+            templates=templates,
+            amplitudes=amplitudes,
+            tdelay=tdelay,
+            taurises=taurises,
+            taufalls=taufalls,
+            channels=channels,
+            relcal=relcal,
+            det=det,
+            convtoamps=convtoamps,
+            fs=fs,
+            filetype=filetype,
+        )
 
 
 def _buildfakepulses_seg(rq, cut, templates, amplitudes, tdelay, basepath, taurises=None, taufalls=None,
@@ -648,17 +672,18 @@ def _buildfakepulses_seg(rq, cut, templates, amplitudes, tdelay, basepath, tauri
     seriesnumber = list(set(rq.seriesnumber[cut]))[0]
 
     ntraces = np.sum(cut)
-    t, traces, _ = io.getrandevents(basepath,
-                                    rq.eventnumber,
-                                    rq.seriesnumber,
-                                    cut=cut, 
-                                    channels=channels,
-                                    det=det,
-                                    convtoamps=convtoamps,
-                                    fs=fs, 
-                                    ntraces=ntraces,
-                                    filetype=filetype,
-                                   )
+    t, traces, _ = io.getrandevents(
+        basepath,
+        rq.eventnumber,
+        rq.seriesnumber,
+        cut=cut,
+        channels=channels,
+        det=det,
+        convtoamps=convtoamps,
+        fs=fs,
+        ntraces=ntraces,
+        filetype=filetype,
+    )
 
     nchan = traces.shape[1]
     nbins = traces.shape[-1]
@@ -699,14 +724,15 @@ def _buildfakepulses_seg(rq, cut, templates, amplitudes, tdelay, basepath, tauri
             truthtdelay = np.stack(tdelay, axis=1)
             trigtypes = np.zeros((ntraces, 3), dtype=bool)
 
-            io.saveevents_npz(traces=fakepulses,
-                              trigtypes=trigtypes,
-                              truthamps=truthamps,
-                              truthtdelay=truthtdelay,
-                              savepath=savefilepath,
-                              savename=savefilename,
-                              dumpnum=dumpnum,
-                             )
+            io.saveevents_npz(
+                traces=fakepulses,
+                trigtypes=trigtypes,
+                truthamps=truthamps,
+                truthtdelay=truthtdelay,
+                savepath=savefilepath,
+                savename=savefilename,
+                dumpnum=dumpnum,
+            )
 
         elif filetype=="mid.gz":
             savefilename = f"{seriesnumber:012}"
@@ -728,22 +754,24 @@ def _buildfakepulses_seg(rq, cut, templates, amplitudes, tdelay, basepath, tauri
                 settings_dict[d]["phononPreTriggerLength"] = settings_dict[d]["phononTraceLength"]//2
                 settings_dict[d]["phononSampleRate"] = int(1/settings_dict[d][ch]["timePerBin"])
 
-            events_list = _create_events_list(tdelay[0],
-                                              amplitudes[0],
-                                              fakepulses,
-                                              channels, 
-                                              det,
-                                              convtoamps,
-                                              seriesnumber,
-                                              dumpnum,
-                                             )
+            events_list = _create_events_list(
+                tdelay[0],
+                amplitudes[0],
+                fakepulses,
+                channels,
+                det,
+                convtoamps,
+                seriesnumber,
+                dumpnum,
+            )
 
-            io.saveevents_midgz(events=events_list,
-                                settings=settings_dict, 
-                                savepath=savefilepath,
-                                savename=savefilename,
-                                dumpnum=dumpnum,
-                               )
+            io.saveevents_midgz(
+                events=events_list,
+                settings=settings_dict,
+                savepath=savefilepath,
+                savename=savefilename,
+                dumpnum=dumpnum,
+            )
         else:
             raise ValueError('Inputted filetype is not supported.')
 
@@ -858,35 +886,41 @@ def _create_events_list(pulsetimes, pulseamps, traces, channels, det, convtoamps
 
     for ii, (pulsetime, pulseamp, trace) in enumerate(zip(pulsetimes, pulseamps, traces)):
 
-        event_dict = {'SeriesNumber': seriesnumber,
-                      'EventNumber' : dumpnum*(10000)+ii,
-                      'EventTime'   : 0,
-                      'TriggerType' : 1,
-                      'SimAvgX'     : 0,
-                      'SimAvgY'     : _round_sig(pulseamp, sig=6),
-                      'SimAvgZ'     : 0}
+        event_dict = {
+            'SeriesNumber': seriesnumber,
+            'EventNumber' : dumpnum * (10000) + ii,
+            'EventTime'   : 0,
+            'TriggerType' : 1,
+            'SimAvgX'     : 0,
+            'SimAvgY'     : _round_sig(pulseamp, sig=6),
+            'SimAvgZ'     : 0,
+        }
 
-        trigger_dict = {'TriggerUnixTime1'  : 0,
-                        'TriggerTime1'      : 0, 
-                        'TriggerTimeFrac1'  : 0, 
-                        'TriggerDetNum1'    : 0, 
-                        'TriggerAmplitude1' : 0,
-                        'TriggerStatus1'    : 3,
-                        'TriggerUnixTime2'  : 0,
-                        'TriggerTime2'      : 0,
-                        'TriggerTimeFrac2'  : int(pulsetime/100e-9),
-                        'TriggerDetNum2'    : 1,
-                        'TriggerAmplitude2' : (pulseamp/convtoamps).astype(np.int32),
-                        'TriggerStatus2'    : 1,
-                        'TriggerUnixTime3'  : 0,
-                        'TriggerTime3'      : 0,
-                        'TriggerTimeFrac3'  : 0,
-                        'TriggerDetNum3'    : 0,
-                        'TriggerAmplitude3' : 0,
-                        'TriggerStatus3'    : 8}
+        trigger_dict = {
+            'TriggerUnixTime1'  : 0,
+            'TriggerTime1'      : 0,
+            'TriggerTimeFrac1'  : 0,
+            'TriggerDetNum1'    : 0,
+            'TriggerAmplitude1' : 0,
+            'TriggerStatus1'    : 3,
+            'TriggerUnixTime2'  : 0,
+            'TriggerTime2'      : 0,
+            'TriggerTimeFrac2'  : int(pulsetime/100e-9),
+            'TriggerDetNum2'    : 1,
+            'TriggerAmplitude2' : (pulseamp/convtoamps).astype(np.int32),
+            'TriggerStatus2'    : 1,
+            'TriggerUnixTime3'  : 0,
+            'TriggerTime3'      : 0,
+            'TriggerTimeFrac3'  : 0,
+            'TriggerDetNum3'    : 0,
+            'TriggerAmplitude3' : 0,
+            'TriggerStatus3'    : 8,
+        }
 
-        events_dict = {'event'   : event_dict,
-                       'trigger' : trigger_dict}
+        events_dict = {
+            'event'   : event_dict,
+            'trigger' : trigger_dict,
+        }
 
         for d in set(det):
             events_dict[d] = dict()
