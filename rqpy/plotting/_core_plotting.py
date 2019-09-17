@@ -454,7 +454,6 @@ def passageplot(arr, cuts, basecut=None, nbins=100, lgcequaldensitybins=False, x
 
     ax.set_xlim(xlims)
     ax.set_ylim(ylims)
-    ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
     ax.tick_params(which="both", direction="in", right=True, top=True)
     ax.grid(linestyle="dashed")
 
