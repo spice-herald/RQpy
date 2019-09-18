@@ -9,3 +9,7 @@ from . import sim
 from . import utils
 from . import limit
 from . import constants
+
+# load seaborn colormaps
+from seaborn import cm
+del cm
