@@ -852,7 +852,7 @@ def _save_truth_info(savefilepath, **kwargs):
         savefilename = savefilename[:8] + '_' + savefilename[8:]
 
     basedumpnum = kwargs['basedumpnum']
-    dd.io.save(f"{savefilepath}{savefilename}_truth_info_{basedumpnum}.h5", kwargs)
+    dd.io.save(f"{savefilepath}{savefilename}_truth_info_{basedumpnum:04d}.h5", kwargs)
 
 
 def _round_sig(x, sig=2):
