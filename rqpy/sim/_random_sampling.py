@@ -11,7 +11,7 @@ __all__ = [
 ]
 
 
-def pdf_sampling(function, xrange, nsamples=1000, npoints=10000):
+def pdf_sampling(function, xrange, nsamples=1000, npoints=10000, normalize_cdf=True):
     """
     Produces randomly sampled values based on the arbitrary PDF defined
     by `function`, done using inverse transform sampling.
@@ -31,6 +31,9 @@ def pdf_sampling(function, xrange, nsamples=1000, npoints=10000):
         The number of points to use in the numerical integration to evaluate
         the CDF of `function`. This is also the number of points used in the
         interpolation of the inverse of the CDF.
+    normalize_cdf : bool, optional
+        Boolean value to normalize the CDF or not. If True, the CDF is normalized
+        by the PDF area. If False, no normalization is done.
 
     Returns
     -------
@@ -57,9 +60,11 @@ def pdf_sampling(function, xrange, nsamples=1000, npoints=10000):
     pdf = function(x)
 
     cdf = integrate.cumtrapz(pdf, x=x, initial=0.0)
-    cdf_normed = cdf / cdf[-1]
 
-    inv_cdf = interpolate.interp1d(cdf_normed, x)
+    if normalize_cdf:
+        cdf /= cdf[-1]
+
+    inv_cdf = interpolate.interp1d(cdf, x)
 
     samples = np.random.rand(nsamples)
 
