@@ -152,19 +152,19 @@ def helmfactor(er, tm='Si'):
 
 def drde(q, m_dm, sig0, tm='Si'):
     """
-    The differential scattering rate of an expected WIMP.
+    The differential event rate of an expected WIMP.
 
     Parameters
     ----------
     q : array_like
         The recoil energies at which to calculate the dark matter differential
-        scattering rate. Expected units are keV.
+        event rate. Expected units are keV.
     m_dm : float
         The dark matter mass at which to calculate the expected differential
-        scattering rate. Expected units are GeV.
+        event rate. Expected units are GeV.
     sig0 : float
         The dark matter cross section at which to calculate the expected differential
-        scattering rate. Expected units are cm^2.
+        event rate. Expected units are cm^2.
     tm : str, int, optional
         The target material of the detector. Can be passed as either the atomic symbol, the
         atomic number, or the full name of the element. Default is 'Si'.
@@ -172,13 +172,13 @@ def drde(q, m_dm, sig0, tm='Si'):
     Returns
     -------
     rate : ndarray
-        The expected dark matter differential scattering cross section for the inputted recoil
-        energies, dark matter mass, and dark matter cross section. Units are events/keV/kg/day, 
+        The expected dark matter differential event rate for the inputted recoil energies,
+        dark matter mass, and dark matter cross section. Units are events/keV/kg/day, 
         or "DRU".
 
     Notes
     -----
-    The derivation of the expected dark matter differential scattering rate is done in Lewin and
+    The derivation of the expected dark matter differential event rate is done in Lewin and
     Smith's paper "Review of mathematics, numerical factors, and corrections dark matter experiments
     based on elastic nuclear recoil", which can be found here:
         - https://doi.org/10.1016/S0927-6505(96)00047-3
@@ -245,7 +245,7 @@ def drde_max_q(m_dm, tm='Si'):
     ----------
     m_dm : float, ndarray
         The dark matter mass at which to calculate the expected differential
-        scattering rate. Expected units are GeV.
+        event rate. Expected units are GeV.
     tm : str, int, optional
         The target material of the detector. Can be passed as either the atomic symbol, the
         atomic number, or the full name of the element. Default is 'Si'.
@@ -329,7 +329,7 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
         The target material of the detector. Can be passed as either the atomic symbol, the
         atomic number, or the full name of the element. Default is 'Si'.
     res : float, NoneType, optional
-        The detector resolution in units of keV. If passed, then the differential scattering
+        The detector resolution in units of keV. If passed, then the differential event
         rate of the dark matter is convoluted with a Gaussian with width `res`, which results
         in a smeared spectrum. If left as None, no smearing is performed.
     gauss_width : float, optional
@@ -547,17 +547,17 @@ def drde_gauss_smear2d(x, cov, delta, m_dm, sig0, nsig=3, tm="Si", subtract_zero
     Parameters
     ----------
     x : float, ndarray
-        The measured energies at which to calculate the differential scattering rate.
+        The measured energies at which to calculate the differential event rate.
     cov : ndarray
         The covariance matrix relating the measured energy and the trigger energy.
     delta : float
         The threshold value (in keV) for the trigger energy.
     m_dm : float
         The dark matter mass at which to calculate the expected differential
-        scattering rate. Expected units are GeV.
+        event rate. Expected units are GeV.
     sig0 : float
         The dark matter cross section at which to calculate the expected differential
-        scattering rate. Expected units are cm^2.
+        event rate. Expected units are cm^2.
     nsig : float, optional
         The number of sigma outside of which the PDF will be set to zero. This defines
         an elliptical confidence region, whose shape comes from the covariance matrix.
