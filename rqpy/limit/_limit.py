@@ -8,7 +8,7 @@ from scipy import stats, signal, interpolate, special, integrate
 
 import rqpy as rp
 from rqpy import constants
-from rqpy.limit import _upperlim
+from rqpy.limit import _upperlim, _upper
 import mendeleev
 
 
@@ -19,6 +19,7 @@ __all__ = [
     "drde_max_q",
     "helmfactor",
     "upperlim",
+    "upper",
     "drde_gauss_smear2d",
     "optimuminterval_2dsmear",
 ]
@@ -28,12 +29,12 @@ __all__ = [
 def _working_directory(path):
     """
     Changes working directory and returns to previous on exit.
-    
+
     Parameters
     ----------
     path : str
         The directory that the current working directory will temporarily be switched to.
-    
+
     """
 
     prev_cwd = Path.cwd()
@@ -42,6 +43,40 @@ def _working_directory(path):
         yield
     finally:
         os.chdir(prev_cwd)
+
+
+def upper(fc, cl=0.9):
+
+    file_path = os.path.dirname(os.path.realpath(__file__))
+
+    # make sure fc starts with 0 and ends with 1
+    fc_new = fc
+    if fc[0]!=0:
+        fc_new = np.concatenate(([0], fc_new))
+    if fc[-1]!=1:
+        fc_new = np.concatenate((fc_new, [1]))
+
+    method = 0
+    nexp = 1
+    maxp1 = len(fc_new) - 1
+    nevts = np.array([maxp1 - 1])
+    mu = 1
+    icode = 0
+
+    with _working_directory(f"{file_path}/_upper/"):
+        ulout = _upper.upper(
+            method=method,
+            cl=cl,
+            nexp=nexp,
+            maxp1=maxp1,
+            nevts=nevts,
+            mu=np.asarray([mu]),
+            fc=fc_new[:, np.newaxis],
+            icode=icode,
+        )
+
+    return ulout
+
 
 def upperlim(fc, cl=0.9, if_bn=1, mub=0, fb=None):
     """
@@ -90,11 +125,27 @@ def upperlim(fc, cl=0.9, if_bn=1, mub=0, fb=None):
 
     file_path = os.path.dirname(os.path.realpath(__file__))
 
+    
+    # make sure fc starts with 0 and ends with 1
+    fc_new = fc
+    if fc[0]!=0:
+        fc_new = np.concatenate(([0], fc_new))
+    if fc[-1]!=1:
+        fc_new = np.concatenate((fc_new, [1]))
+
     if fb is None:
-        fb = fc
+        fb = fc_new
 
     with _working_directory(f"{file_path}/_upperlim/"):
-        ulout = _upperlim.upperlim(cl, if_bn, fc, mub, fb, 0)
+        ulout = _upperlim.upperlim(
+            cl=cl,
+            if_bn=if_bn,
+            fc=fc_new,
+            mub=mub,
+            fb=fb,
+            iflag=0,
+            n=len(fc_new) - 2,
+        )
 
     return ulout
 
@@ -309,7 +360,7 @@ def gauss_smear(x, f, res, nres=1e5, gauss_width=10):
 
 
 def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
-                    tm="Si", res=None, gauss_width=10, verbose=False):
+                    tm="Si", cl=0.9, res=None, gauss_width=10, verbose=False):
     """
     Function for running Steve Yellin's Optimum Interval code on an inputted spectrum and efficiency curve.
 
@@ -414,13 +465,18 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
 
             cdf_max = 1 - 1e-6
             possiblewimp = fc <= cdf_max
-            nwimps = possiblewimp.sum()
             fc = fc[possiblewimp]
 
             if len(fc) == 0:
                 fc = np.asarray([0, 1])
 
-            uloutput = upperlim(fc)
+            if 0.8 <= cl <= 0.995:
+                uloutput = upperlim(fc, cl=cl)
+            else:
+                print("upper")
+                uloutput = upper(fc, cl=cl)
+                print(uloutput)
+
             sigma[ii] = (sigma0 / tot_rate) * uloutput
 
     return sigma
