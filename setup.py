@@ -6,34 +6,72 @@ from setuptools import find_packages, Command
 from numpy.distutils.core import Extension, setup
 
 
-upperlim_files = ['upperlim.pyf',
-                  'UpperLim.f',
-                  'y_vs_CLf.f',
-                  'CMaxinf.f',
-                  'ConfLev.f',
-                  'Cinf.f',
-                  'CERN_Stuff.f',
-                 ]
+upperlim_files = [
+    'upperlim.pyf',
+    'UpperLim.f',
+    'y_vs_CLf.f',
+    'CMaxinf.f',
+    'ConfLev.f',
+    'Cinf.f',
+    'CERN_Stuff.f',
+]
 
-f77_paths = []
+upperlim_f77_paths = []
 for fname in upperlim_files:
-    f77_paths.append(f"rqpy/limit/_upperlim/{fname}")
-    
-ext1 = Extension(name='rqpy.limit._upperlim.upperlim',
-                 sources=f77_paths,
-                )
+    upperlim_f77_paths.append(f"rqpy/limit/_upperlim/{fname}")
 
-data_files = ['CMaxf.in',
-              'CMaxfLow.in',
-              'ymintable.in',
-              'y_vs_CLf.in',
-              'CLtable.txt',
-             ]
+ext1 = Extension(
+    name='rqpy.limit._upperlim.upperlim',
+    sources=upperlim_f77_paths,
+)
 
-data_paths = []
-for fname in data_files:
-    data_paths.append(f"rqpy/limit/_upperlim/{fname}")
+upperlim_data_files = [
+    'CMaxf.in',
+    'CMaxfLow.in',
+    'ymintable.in',
+    'y_vs_CLf.in',
+    'CLtable.txt',
+]
 
+upperlim_data_paths = []
+for fname in upperlim_data_files:
+    upperlim_data_paths.append(f"rqpy/limit/_upperlim/{fname}")
+
+
+upper_files = [
+    'upper.pyf',
+    'Upper.f',
+    'UpperLim.f',
+    'C0.f',
+    'CnMax.f',
+    'CombConf.f',
+    'y_vs_CLf.f',
+    'CMaxinf.f',
+    'ConfLev.f',
+    'Cinf.f',
+    'CERN_Stuff.f',
+]
+
+upper_f77_paths = []
+for fname in upper_files:
+    upper_f77_paths.append(f"rqpy/limit/_upper/{fname}")
+
+ext2 = Extension(
+    name='rqpy.limit._upper.upper',
+    sources=upper_f77_paths,
+)
+
+upper_data_files = [
+    'CMaxf.txt',
+    'CMax.txt',
+    'Cm.txt',
+    'ymintable.txt',
+    'y_vs_CLf.txt',
+]
+
+upper_data_paths = []
+for fname in upper_data_files:
+    upper_data_paths.append(f"rqpy/limit/_upper/{fname}")
 
 class CleanCommand(Command):
     """Custom clean command to tidy up the project root."""
@@ -70,8 +108,14 @@ setup(
     packages=find_packages(), 
     zip_safe=False,
     cmdclass={
-            'clean': CleanCommand,
-            },
-    data_files=[('rqpy/limit/_upperlim/', data_paths)],
-    ext_modules=[ext1],
+        'clean': CleanCommand,
+    },
+    data_files=[
+        ('rqpy/limit/_upperlim/', upperlim_data_paths),
+        ('rqpy/limit/_upper/', upper_data_paths),
+    ],
+    ext_modules=[
+        ext1,
+        ext2,
+    ],
 )
