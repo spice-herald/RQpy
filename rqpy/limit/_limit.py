@@ -46,6 +46,49 @@ def _working_directory(path):
 
 
 def upper(fc, cl=0.9):
+    """
+    Fortran wrapper function for Steve Yellin's Optimum Interval code `Upper.f`. In this case,
+    it calls a version of `UpperLim.f` that allows a larger range of confidence levels.
+
+    Parameters
+    ----------
+    fc : array_like
+        Given the foreground distribution whose shape is known, but whose normalization is
+        to have its upper limit total expected number of events determined, fc(0) to fc(N+1),
+        with fc(0)=0, fc(N+1)=1, and with  fc(i) the increasing ordered set of cumulative
+        probabilities for the foreground distribution for event i, i=1 to N.
+    cl : float, optional
+        The confidence level desired for the upper limit. Default is 0.9. Can be any value
+        between 0.00001 and 0.99999. However, the algorithm requires less than 100 upper
+        limit events when outside the range 0.8 to 0.995 in order to work, so an error may
+        be raised.
+
+    Returns
+    -------
+    ulout : float
+        The output of the Upper Fortran code, corresponding to the upper limit expected number of
+        events. To convert to cross section, the output should be divided by the total rate of the
+        signal and multiplied by the expected cross section for that rate.
+
+    Raises
+    ------
+    ValueError
+        If routine CnMax fails. In other words, its return code is greater than 1. CnMax calculates
+        the maximum interval C_n.
+
+    Notes
+    -----
+    This is a wrapper around Steve Yellin's Optimum Interval Fortran code, which was compiled via f2py to
+    be callable by Python. Because the Fortran code expects look-up tables in the current working directory,
+    we need to use a context manager to switch directories to where the look-up tables are when running the
+    algorithm.
+
+    Read more about Steve Yellin's Optimum Interval code here:
+        - http://titus.stanford.edu/Upper/
+        - https://arxiv.org/abs/physics/0203002
+        - https://arxiv.org/abs/0709.2701
+
+    """
 
     file_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -75,12 +118,15 @@ def upper(fc, cl=0.9):
             icode=icode,
         )
 
+    if _upper.fupcom.istat > 1:
+        raise ValueError("Routine CnMax failed.")
+
     return ulout
 
 
 def upperlim(fc, cl=0.9, if_bn=1, mub=0, fb=None):
     """
-    Fortran wrapper function for Steve Yellin's Optimum Interval code.
+    Fortran wrapper function for Steve Yellin's Optimum Interval code `UpperLim.f`.
 
     Parameters
     ----------
@@ -90,7 +136,8 @@ def upperlim(fc, cl=0.9, if_bn=1, mub=0, fb=None):
         with fc(0)=0, fc(N+1)=1, and with  fc(i) the increasing ordered set of cumulative
         probabilities for the foreground distribution for event i, i=1 to N.
     cl : float, optional
-        The confidence level desired for the upper limit. Default is 0.9.
+        The confidence level desired for the upper limit. Default is 0.9. Can be any value
+        between 0.8 and 0.995.
     if_bn : int, optional
         Say which minimum fraction of the cumulative probability is allowed for seeking the
         optimum interval. `if_bn`=1, 2, 3, 4, 5, 6, 7 corresponds to minimum cumulative probability
@@ -108,6 +155,12 @@ def upperlim(fc, cl=0.9, if_bn=1, mub=0, fb=None):
         The output of the UpperLim Fortran code, corresponding to the upper limit expected number of
         events. To convert to cross section, the output should be divided by the total rate of the signal
         and multiplied by the expected cross section for that rate.
+
+    Raises
+    ------
+    ValueError
+        If routine CnMax fails. In other words, its return code is greater than 1. CnMax calculates
+        the maximum interval C_n.
 
     Notes
     -----
@@ -146,6 +199,9 @@ def upperlim(fc, cl=0.9, if_bn=1, mub=0, fb=None):
             iflag=0,
             n=len(fc_new) - 2,
         )
+
+    if _upperlim.fupcom.istat > 1:
+        raise ValueError("Routine CnMax failed.")
 
     return ulout
 
@@ -379,6 +435,11 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
     tm : str, int, optional
         The target material of the detector. Can be passed as either the atomic symbol, the
         atomic number, or the full name of the element. Default is 'Si'.
+    cl : float, optional
+        The confidence level desired for the upper limit. Default is 0.9. Can be any value
+        between 0.00001 and 0.99999. However, the algorithm requires less than 100 upper
+        limit events when outside the range 0.8 to 0.995 in order to work, so an error may
+        be raised.
     res : float, NoneType, optional
         The detector resolution in units of keV. If passed, then the differential event
         rate of the dark matter is convoluted with a Gaussian with width `res`, which results
@@ -473,9 +534,7 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
             if 0.8 <= cl <= 0.995:
                 uloutput = upperlim(fc, cl=cl)
             else:
-                print("upper")
                 uloutput = upper(fc, cl=cl)
-                print(uloutput)
 
             sigma[ii] = (sigma0 / tot_rate) * uloutput
 
@@ -690,7 +749,7 @@ def drde_gauss_smear2d(x, cov, delta, m_dm, sig0, nsig=3, tm="Si", subtract_zero
     return out
 
 def optimuminterval_2dsmear(eventenergies, masslist, exposure, cov, delta,
-                            tm="Si", nsig=3, verbose=False, npts=1e3, subtract_zero=False):
+                            tm="Si", cl=0.9, nsig=3, verbose=False, npts=1e3, subtract_zero=False):
     """
     Function for running Steve Yellin's Optimum Interval code on an inputted spectrum, using the
     two-dimensional normal distribution defined by the inputted covariance matrix to model the
@@ -711,6 +770,11 @@ def optimuminterval_2dsmear(eventenergies, masslist, exposure, cov, delta,
     tm : str, int, optional
         The target material of the detector. Can be passed as either the atomic symbol, the
         atomic number, or the full name of the element. Default is 'Si'.
+    cl : float, optional
+        The confidence level desired for the upper limit. Default is 0.9. Can be any value
+        between 0.00001 and 0.99999. However, the algorithm requires less than 100 upper
+        limit events when outside the range 0.8 to 0.995 in order to work, so an error may
+        be raised.
     nsig : float
         The number of sigma outside of which the two-dimensional normal PDF defined by the
         inputted covariance matrix will be set to zero. This defines an elliptical confidence
@@ -801,13 +865,16 @@ def optimuminterval_2dsmear(eventenergies, masslist, exposure, cov, delta,
 
             cdf_max = 1 - 1e-6
             possiblewimp = fc <= cdf_max
-            nwimps = possiblewimp.sum()
             fc = fc[possiblewimp]
 
             if len(fc) == 0:
                 fc = np.asarray([0, 1])
 
-            uloutput = upperlim(fc)
+            if 0.8 <= cl <= 0.995:
+                uloutput = upperlim(fc, cl=cl)
+            else:
+                uloutput = upper(fc, cl=cl)
+
             sigma[ii] = (sigma0 / tot_rate) * uloutput
 
     return sigma
