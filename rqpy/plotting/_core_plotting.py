@@ -10,8 +10,8 @@ import types
 __all__ = [
     "hist",
     "scatter",
-    "densityplot",
     "passageplot",
+    "densityplot",
     "RatePlot",
     "conf_ellipse",
 ]
@@ -106,8 +106,14 @@ def hist(arr, nbins='auto', xlims=None, cuts=None, lgcrawdata=True,
         if bins is None:
             bins = np.histogram_bin_edges(arr, bins=nbins, range=xlims)
 
-        hist, _, _ = ax.hist(arr, bins=bins, histtype='step',
-                             label='Full data', linewidth=2, color=plt.cm.get_cmap(cmap)(0))
+        hist, _, _ = ax.hist(
+            arr,
+            bins=bins,
+            histtype='step',
+            label='Full data',
+            linewidth=2,
+            color=plt.cm.get_cmap(cmap)(0),
+        )
 
     colors = plt.cm.get_cmap(cmap)(np.linspace(0.1, 0.9, len(cuts)))
 
@@ -126,8 +132,14 @@ def hist(arr, nbins='auto', xlims=None, cuts=None, lgcrawdata=True,
         if bins is None:
             bins = np.histogram_bin_edges(arr[ctemp], bins=nbins, range=xlims)
 
-        hist, _, _  = ax.hist(arr[ctemp], bins=bins, histtype='step',
-                              label=label, linewidth=2, color=colors[ii])
+        hist, _, _  = ax.hist(
+            arr[ctemp],
+            bins=bins,
+            histtype='step',
+            label=label,
+            linewidth=2,
+            color=colors[ii],
+        )
 
     ax.tick_params(which="both", direction="in", right=True, top=True)
     ax.grid(linestyle="dashed")
@@ -241,11 +253,23 @@ def scatter(xvals, yvals, xlims=None, ylims=None, cuts=None, lgcrawdata=True, lg
     limitcut = xlimitcut & ylimitcut
 
     if lgcrawdata and len(cuts) > 0: 
-        ax.scatter(xvals[limitcut & ~cuts[0]], yvals[limitcut & ~cuts[0]],
-                   label='Full Data', c='b', s=ms, alpha=a)
+        ax.scatter(
+            xvals[limitcut & ~cuts[0]], yvals[limitcut & ~cuts[0]],
+            label='Full Data',
+            c='b',
+            s=ms,
+            alpha=a,
+        )
+
     elif lgcrawdata:
-        ax.scatter(xvals[limitcut], yvals[limitcut],
-                   label='Full Data', c='b', s=ms, alpha=a)
+        ax.scatter(
+            xvals[limitcut],
+            yvals[limitcut],
+            label='Full Data',
+            c='b',
+            s=ms,
+            alpha=a,
+        )
 
     colors = plt.cm.get_cmap(cmap)(np.linspace(0.1, 0.9, len(cuts)))
 
@@ -266,26 +290,32 @@ def scatter(xvals, yvals, xlims=None, ylims=None, cuts=None, lgcrawdata=True, lg
         if ii+1<len(cuts):
             cplot = cplot & ~cuts[ii+1]
 
-        ax.scatter(xvals[cplot], yvals[cplot],
-                   label=label, c=colors[ii][np.newaxis,...], s=ms, alpha=a)
+        ax.scatter(
+            xvals[cplot],
+            yvals[cplot],
+            label=label,
+            c=colors[ii][np.newaxis,...],
+            s=ms,
+            alpha=a,
+        )
 
     if xlims is None:
         if lgcrawdata and len(cuts)==0:
-            xrange = xvals.max()-xvals.min()
-            ax.set_xlim([xvals.min()-0.05*xrange, xvals.max()+0.05*xrange])
+            xrange = xvals.max() - xvals.min()
+            ax.set_xlim([xvals.min() - 0.05 * xrange, xvals.max() + 0.05 * xrange])
         elif len(cuts)>0:
-            xrange = xvals[cuts[0]].max()-xvals[cuts[0]].min()
-            ax.set_xlim([xvals[cuts[0]].min()-0.05*xrange, xvals[cuts[0]].max()+0.05*xrange])
+            xrange = xvals[cuts[0]].max() - xvals[cuts[0]].min()
+            ax.set_xlim([xvals[cuts[0]].min() - 0.05 * xrange, xvals[cuts[0]].max() + 0.05 * xrange])
     else:
         ax.set_xlim(xlims)
 
     if ylims is None:
         if lgcrawdata and len(cuts)==0:
-            yrange = yvals.max()-yvals.min()
-            ax.set_ylim([yvals.min()-0.05*yrange, yvals.max()+0.05*yrange])
+            yrange = yvals.max() - yvals.min()
+            ax.set_ylim([yvals.min() - 0.05 * yrange, yvals.max() + 0.05 * yrange])
         elif len(cuts)>0:
-            yrange = yvals[cuts[0]].max()-yvals[cuts[0]].min()
-            ax.set_ylim([yvals[cuts[0]].min()-0.05*yrange, yvals[cuts[0]].max()+0.05*yrange])
+            yrange = yvals[cuts[0]].max() - yvals[cuts[0]].min()
+            ax.set_ylim([yvals[cuts[0]].min() - 0.05 * yrange, yvals[cuts[0]].max() + 0.05 * yrange])
     else:
         ax.set_ylim(ylims)
 
@@ -404,18 +434,20 @@ def passageplot(arr, cuts, basecut=None, nbins=100, lgcequaldensitybins=False, x
         oldsum = ctemp.sum()
 
         if ii==0:
-            passage_output = rp.passage_fraction(arr,
-                                                 cut,
-                                                 basecut=ctemp & xlimitcut,
-                                                 nbins=nbins,
-                                                 lgcequaldensitybins=lgcequaldensitybins,
-                                                )
+            passage_output = rp.passage_fraction(
+                arr,
+                cut,
+                basecut=ctemp & xlimitcut,
+                nbins=nbins,
+                lgcequaldensitybins=lgcequaldensitybins,
+            )
         else:
-            passage_output = rp.passage_fraction(arr,
-                                                 cut,
-                                                 basecut=ctemp & xlimitcut,
-                                                 nbins=x_binned,
-                                                )
+            passage_output = rp.passage_fraction(
+                arr,
+                cut,
+                basecut=ctemp & xlimitcut,
+                nbins=x_binned,
+            )
 
         x_binned = passage_output[0]
         passage_binned = passage_output[1]
@@ -436,8 +468,15 @@ def passageplot(arr, cuts, basecut=None, nbins=100, lgcequaldensitybins=False, x
 
         bin_centers = (x_binned[1:]+x_binned[:-1])/2
 
-        ax.hist(bin_centers, bins=x_binned, weights=passage_binned, histtype='step', 
-                color=colors[ii], label=label, linewidth=2)
+        ax.hist(
+            bin_centers,
+            bins=x_binned,
+            weights=passage_binned,
+            histtype='step',
+            color=colors[ii],
+            label=label,
+            linewidth=2,
+        )
 
         if showerrorbar:
             passage_binned_biased = passage_output[2]
@@ -449,8 +488,15 @@ def passageplot(arr, cuts, basecut=None, nbins=100, lgcequaldensitybins=False, x
             err_top = np.pad(err_top, (0, 1), mode='constant', constant_values=(0, err_top[-1]))
             err_bottom = np.pad(err_bottom, (0, 1), mode='constant', constant_values=(0, err_bottom[-1]))
 
-            ax.fill_between(x_binned, err_top, y2=err_bottom, step='post',
-                            linewidth=1, alpha=0.5, color=colors[ii])
+            ax.fill_between(
+                x_binned,
+                err_top,
+                y2=err_bottom,
+                step='post',
+                linewidth=1,
+                alpha=0.5,
+                color=colors[ii],
+            )
 
     ax.set_xlim(xlims)
     ax.set_ylim(ylims)
@@ -529,11 +575,11 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
     ax.set_ylabel(labels['ylabel'])
 
     if xlims is not None:
-        xlimitcut = (xvals>xlims[0]) & (xvals<xlims[1])
+        xlimitcut = (xvals > xlims[0]) & (xvals < xlims[1])
     else:
         xlimitcut = np.ones(len(xvals), dtype=bool)
     if ylims is not None:
-        ylimitcut = (yvals>ylims[0]) & (yvals<ylims[1])
+        ylimitcut = (yvals > ylims[0]) & (yvals < ylims[1])
     else:
         ylimitcut = np.ones(len(yvals), dtype=bool)
 
@@ -552,9 +598,15 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
     else:
         norm = clrs.Normalize()
 
-    cax = ax.hist2d(xvals[limitcut & cut], yvals[limitcut & cut], bins=nbins,
-                    norm=norm, cmap=cmap)
-    cbar = fig.colorbar(cax[-1], label = 'Density of Data')
+    cax = ax.hist2d(
+        xvals[limitcut & cut],
+        yvals[limitcut & cut],
+        bins=nbins,
+        norm=norm,
+        cmap=cmap,
+    )
+
+    cbar = fig.colorbar(cax[-1], label='Density of Data')
     cbar.ax.tick_params(which="both", direction="in")
     ax.tick_params(which="both", direction="in", right=True, top=True)
     ax.grid(linestyle="dashed")
@@ -645,8 +697,10 @@ class RatePlot(RQpyPlot):
         self.ax.set_xlim(self._energy_range)
         self.ax.set_ylabel("$\partial R/\partial E_r$ [evts/keV/kg/day]")
         self.ax.set_xlabel("Energy [keV]")
-        self.ax.set_title(f"Spectrum of Events from {self._energy_range[0]:.1f} to "
-                          f"{self._energy_range[1]:.1f} keV")
+        self.ax.set_title(
+            f"Spectrum of Events from {self._energy_range[0]:.1f} to "
+            f"{self._energy_range[1]:.1f} keV"
+        )
 
 
     def _update_colors(self, linestyle):
@@ -788,12 +842,13 @@ class RatePlot(RQpyPlot):
                 drde = rp.limit.gauss_smear(xvals, drde, res, gauss_width=gauss_width)
                 label += f"\nWith {gauss_width}$\sigma_E$ Smearing"
 
-            self.ax.plot(xvals,
-                         drde,
-                         linestyle='--',
-                         label=label,
-                         **kwargs,
-                        )
+            self.ax.plot(
+                xvals,
+                drde,
+                linestyle='--',
+                label=label,
+                **kwargs,
+            )
 
         self._update_colors("--")
 
