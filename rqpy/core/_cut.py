@@ -7,8 +7,8 @@ from skimage import measure
 from qetpy.cut import removeoutliers
 
 __all__ = [
-    "binnedcut",
     "baselinecut",
+    "binnedcut",
     "inrange",
     "passage_fraction",
 ]
@@ -212,10 +212,11 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgce
     if keep_large_vals:
         cut_eff = 1 - cut_eff
 
-    st = lambda var: np.partition(var, int(len(var)*cut_eff))[int(len(var)*cut_eff)]
+    st = lambda var: np.partition(var, int(len(var) * cut_eff))[int(len(var) * cut_eff)]
 
     if nbins==1:
         f = lambda var: st(y[cut])
+        params = None
     else:
         bin_cut = cut
 
@@ -228,17 +229,27 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgce
             bin_cut = bin_cut & upr_cut
 
         if lgcequaldensitybins:
-            histbins_equal = lambda var, nbin: np.interp(np.linspace(0, len(var), nbin + 1),
-                                                         np.arange(len(var)),
-                                                         np.sort(var))
+            histbins_equal = lambda var, nbin: np.interp(
+                np.linspace(0, len(var), nbin + 1),
+                np.arange(len(var)),
+                np.sort(var),
+            )
+
             nbins = histbins_equal(x[bin_cut], nbins)
 
-        cutoffs, bin_edges, _ = stats.binned_statistic(x[bin_cut], y[bin_cut], bins=nbins,
-                                                       statistic=st)
+        cutoffs, bin_edges, _ = stats.binned_statistic(
+            x[bin_cut], y[bin_cut], bins=nbins, statistic=st,
+        )
+
         if model is None:
-            f = interpolate.interp1d(bin_edges[1:-1], cutoffs[1:], kind='previous', 
-                                     bounds_error=False, fill_value=(cutoffs[0], cutoffs[-1]),
-                                     assume_sorted=True)
+            f = interpolate.interp1d(
+                bin_edges[1:-1],
+                cutoffs[1:],
+                kind='previous',
+                bounds_error=False,
+                fill_value=(cutoffs[0], cutoffs[-1]),
+                assume_sorted=True,
+            )
             params = None
         else: 
             if model=="linear":
@@ -261,9 +272,13 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgce
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", category=optimize.OptimizeWarning)
                 warnings.filterwarnings("ignore", category=RuntimeWarning)
-                model_robust, _ = measure.ransac(np.stack((bin_edges[1:-1], cutoffs[1:]), axis=1),
-                                                 ModelClass, min_samples, residual_threshold, 
-                                                 **kwargs)
+                model_robust, _ = measure.ransac(
+                    np.stack((bin_edges[1:-1], cutoffs[1:]), axis=1),
+                    ModelClass,
+                    min_samples,
+                    residual_threshold,
+                    **kwargs,
+                )
             params = model_robust.params
             if model=="linear":
                 f = lambda var: ModelClass().predict_y(list(var), params=params)
@@ -277,8 +292,7 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgce
 
     cbinned = f_cut(x)
 
-    cutobj = type('cutobj', (object,), {'params'     : params,
-                                        'f_boundary' : f})
+    cutobj = type('cutobj', (object,), {'params' : params, 'f_boundary' : f})
     
     return cbinned, cutobj
 
@@ -372,9 +386,11 @@ def passage_fraction(x, cut, basecut=None, nbins=100, lgcequaldensitybins=False)
         basecut = np.ones(len(x), dtype=bool)
 
     if lgcequaldensitybins:
-        histbins_equal = lambda var, nbin: np.interp(np.linspace(0, len(var), nbin + 1),
-                                                     np.arange(len(var)),
-                                                     np.sort(var))
+        histbins_equal = lambda var, nbin: np.interp(
+            np.linspace(0, len(var), nbin + 1),
+            np.arange(len(var)),
+            np.sort(var),
+        )
         nbins = histbins_equal(x[basecut], nbins)
 
     hist_vals_base, x_binned = np.histogram(x[basecut], bins=nbins)
