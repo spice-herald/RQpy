@@ -216,6 +216,7 @@ def binnedcut(x, y, cut=None, nbins=100, cut_eff=0.9, keep_large_vals=True, lgce
 
     if nbins==1:
         f = lambda var: st(y[cut])
+        params = None
     else:
         bin_cut = cut
 
