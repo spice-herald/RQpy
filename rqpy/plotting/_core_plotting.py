@@ -33,21 +33,21 @@ def hist(arr, nbins='auto', xlims=None, cuts=None, lgcrawdata=True,
     xlims : list of float, optional
         The xlimits of the histogram. This is passed to plt.hist() range parameter.
     cuts : list, optional
-        List of masks of values to be plotted. The cuts will be applied in the order that they are listed, 
+        List of masks of values to be plotted. The cuts will be applied in the order that they are listed,
         such that any number of cuts can be plotted
     lgcrawdata : bool, optional
         If True, the raw data is plotted
     lgceff : bool, optional
-        If True, the cut efficiencies are printed in the legend. 
+        If True, the cut efficiencies are printed in the legend.
     lgclegend : bool, optional
         If True, the legend is plotted.
     labeldict : dict, optional
-        Dictionary to overwrite the labels of the plot. defaults are: 
-            labels = {'title' : 'Histogram', 
-                      'xlabel' : 'variable', 
-                      'ylabel' : 'Count', 
-                      'cut0' : '1st', 
-                      'cut1' : '2nd', 
+        Dictionary to overwrite the labels of the plot. defaults are:
+            labels = {'title' : 'Histogram',
+                      'xlabel' : 'variable',
+                      'ylabel' : 'Count',
+                      'cut0' : '1st',
+                      'cut1' : '2nd',
                       ...}
         Ex: to change just the title, pass: labeldict = {'title' : 'new title'}, to hist()
     ax : axes.Axes object, optional
@@ -69,9 +69,11 @@ def hist(arr, nbins='auto', xlims=None, cuts=None, lgcrawdata=True,
     elif not isinstance(cuts, list):
         cuts = [cuts]
 
-    labels = {'title'  : 'Histogram',
-              'xlabel' : 'variable',
-              'ylabel' : 'Count'}
+    labels = {
+        'title' : 'Histogram',
+        'xlabel' : 'variable',
+        'ylabel' : 'Count',
+    }
 
     for ii in range(len(cuts)):
 
@@ -173,17 +175,17 @@ def scatter(xvals, yvals, xlims=None, ylims=None, cuts=None, lgcrawdata=True, lg
     lgcrawdata : bool, optional
         If True, the raw data is plotted
     lgceff : bool, optional
-        If True, the efficiencies of each cut, with respect to the data that survived 
-        the previous cut, are printed in the legend. 
+        If True, the efficiencies of each cut, with respect to the data that survived
+        the previous cut, are printed in the legend.
     lgclegend : bool, optional
         If True, the legend is included in the plot.
     labeldict : dict, optional
-        Dictionary to overwrite the labels of the plot. defaults are: 
-            labels = {'title' : 'Scatter Plot', 
-                      'xlabel' : 'x variable', 
-                      'ylabel' : 'y variable', 
-                      'cut0' : '1st', 
-                      'cut1' : '2nd', 
+        Dictionary to overwrite the labels of the plot. defaults are:
+            labels = {'title' : 'Scatter Plot',
+                      'xlabel' : 'x variable',
+                      'ylabel' : 'y variable',
+                      'cut0' : '1st',
+                      'cut1' : '2nd',
                       ...}
         Ex: to change just the title, pass: labeldict = {'title' : 'new title'}, to scatter()
     ms : float, optional
@@ -209,9 +211,11 @@ def scatter(xvals, yvals, xlims=None, ylims=None, cuts=None, lgcrawdata=True, lg
     elif not isinstance(cuts, list):
         cuts = [cuts]
 
-    labels = {'title'  : 'Scatter Plot',
-              'xlabel' : 'x variable', 
-              'ylabel' : 'y variable'}
+    labels = {
+        'title' : 'Scatter Plot',
+        'xlabel' : 'x variable',
+        'ylabel' : 'y variable',
+    }
 
     for ii in range(len(cuts)):
 
@@ -338,10 +342,10 @@ def passageplot(arr, cuts, basecut=None, nbins=100, lgcequaldensitybins=False, x
     arr : array_like
         Array of values to be binned and plotted
     cuts : list, optional
-        List of masks of values to be plotted. The cuts will be applied in the order that 
+        List of masks of values to be plotted. The cuts will be applied in the order that
         they are listed, such that any number of cuts can be plotted.
     basecut : NoneType, array_like, optional
-        The base cut for comparison of the first cut in `cuts`. If left as None, then the 
+        The base cut for comparison of the first cut in `cuts`. If left as None, then the
         passage fraction is calculated using all of the inputted data for the first cut.
     nbins : int, str, optional
         This is the same as plt.hist() bins parameter. Defaults is 'sqrt'.
@@ -349,20 +353,20 @@ def passageplot(arr, cuts, basecut=None, nbins=100, lgcequaldensitybins=False, x
         If set to True, the bin widths are set such that each bin has the same number
         of data points within it. If left as False, then a constant bin width is used.
     xlims : list of float, optional
-        The xlimits of the passage fraction plot. 
+        The xlimits of the passage fraction plot.
     ylims : list of float, optional
         This is passed to the plot as the y limits. Set to (0, 1) by default.
     lgceff : bool, optional
-        If True, the total cut efficiencies are printed in the legend. 
+        If True, the total cut efficiencies are printed in the legend.
     lgclegend : bool, optional
         If True, the legend is plotted.
     labeldict : dict, optional
-        Dictionary to overwrite the labels of the plot. defaults are: 
-            labels = {'title' : 'Passage Fraction Plot', 
-                      'xlabel' : 'variable', 
-                      'ylabel' : 'Passage Fraction', 
-                      'cut0' : '1st', 
-                      'cut1' : '2nd', 
+        Dictionary to overwrite the labels of the plot. defaults are:
+            labels = {'title' : 'Passage Fraction Plot',
+                      'xlabel' : 'variable',
+                      'ylabel' : 'Passage Fraction',
+                      'cut0' : '1st',
+                      'cut1' : '2nd',
                       ...}
         Ex: to change just the title, pass: labeldict = {'title' : 'new title'}, to hist()
     ax : axes.Axes object, optional
@@ -387,9 +391,11 @@ def passageplot(arr, cuts, basecut=None, nbins=100, lgcequaldensitybins=False, x
     if not isinstance(cuts, list):
         cuts = [cuts]
 
-    labels = {'title'  : 'Passage Fraction Plot',
-              'xlabel' : 'variable',
-              'ylabel' : 'Passage Fraction'}
+    labels = {
+        'title' : 'Passage Fraction Plot',
+        'xlabel' : 'variable',
+        'ylabel' : 'Passage Fraction',
+    }
 
     for ii in range(len(cuts)):
 
@@ -509,8 +515,8 @@ def passageplot(arr, cuts, basecut=None, nbins=100, lgcequaldensitybins=False, x
     return fig, ax
 
 
-def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=None,
-                labeldict=None, lgclognorm=True, ax=None, cmap='icefire'):
+def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=None, labeldict=None,
+                lgclognorm=True, ax=None, cmap='icefire', plot_cut_data=False, basecut=None):
     """
     Function to plot RQ data as a density plot.
 
@@ -531,16 +537,27 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
     cut : array of bool, optional
         Mask of values to be plotted
     labeldict : dict, optional
-        Dictionary to overwrite the labels of the plot. defaults are : 
-            labels = {'title' : 'Histogram', 'xlabel' : 'variable', 'ylabel' : 'Count'}
+        Dictionary to overwrite the labels of the plot. defaults are:
+            labels = {
+                'title' : 'Histogram',
+                'xlabel' : 'variable',
+                'ylabel' : 'Count',
+                'basecut' : '',
+            }
         Ex: to change just the title, pass: labeldict = {'title' : 'new title'}, to densityplot()
     lgclognorm : bool, optional
-        If True (default), the color normilization for the density will be log scaled, rather 
-        than linear
+        If True (default), the color normilization for the density will be log scaled, rather
+        than linear.
     ax : axes.Axes object, optional
         Option to pass an existing Matplotlib Axes object to plot over, if it already exists.
     cmap : str, optional
         The colormap to use for plotting each cut. Default is 'icefire'.
+    plot_cut_data : bool, optional
+        Boolean value for whether or not to plot the data cut by `cut`. If only a subset of the original
+        data is desired to be plotted, then use `basecut` to trim the plotted data.
+    basecut : array of bool, optional
+        The base cut for comparison of `cut`. If left as None, then this is set as an array of
+        Trues of the same length as the input data. Only used if `plot_cut_data` is True.
 
     Returns
     -------
@@ -557,9 +574,12 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
 
     """
 
-    labels = {'title'  : 'Density Plot',
-              'xlabel' : 'x variable',
-              'ylabel' : 'y variable'}
+    labels = {
+        'title'  : 'Density Plot',
+        'xlabel' : 'x variable',
+        'ylabel' : 'y variable',
+        'basecut' : '',
+    }
 
     if labeldict is not None:
         for key in labeldict:
@@ -576,6 +596,9 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
 
     if cut is None:
         cut = np.ones(shape=xvals.shape, dtype=bool)
+
+    if basecut is None:
+        basecut = np.ones(shape=xvals.shape, dtype=bool)
 
     if xlims is not None:
         xlimitcut = (xvals > xlims[0]) & (xvals < xlims[1])
@@ -608,6 +631,29 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
         norm=norm,
         cmap=cmap,
     )
+
+    if plot_cut_data:
+        cmap_grey_arr = np.ones((1, 4))
+        cmap_grey_arr[:, :-1] = 0.9
+        cmap_grey = clrs.ListedColormap(cmap_grey_arr)
+
+        ax.hist2d(
+            xvals[limitcut & basecut],
+            yvals[limitcut & basecut],
+            bins=nbins,
+            range=(xlims, ylims),
+            norm=norm,
+            cmap=cmap_grey,
+            zorder=0,
+        )
+
+        if len(labels['basecut']) > 0:
+            labels['basecut'] += ' '
+
+        ax.scatter(
+            [], [], color=cmap_grey(0), label=f"Data removed by {labels['basecut']}cut", marker='s',
+        )
+        ax.legend()
 
     cbar = fig.colorbar(cax[-1], label='Density of Data')
     cbar.ax.tick_params(which="both", direction="in")
