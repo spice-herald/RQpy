@@ -574,13 +574,18 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
     ax.set_xlabel(labels['xlabel'])
     ax.set_ylabel(labels['ylabel'])
 
+    if cut is None:
+        cut = np.ones(shape=xvals.shape, dtype=bool)
+
     if xlims is not None:
         xlimitcut = (xvals > xlims[0]) & (xvals < xlims[1])
     else:
+        xlims = (np.min(xvals[cut]), np.max(xvals[cut]))
         xlimitcut = np.ones(len(xvals), dtype=bool)
     if ylims is not None:
         ylimitcut = (yvals > ylims[0]) & (yvals < ylims[1])
     else:
+        ylims = (np.min(yvals[cut]), np.max(yvals[cut]))
         ylimitcut = np.ones(len(yvals), dtype=bool)
 
     if np.sum(xlimitcut)==0:
@@ -589,9 +594,6 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
         raise ValueError("There are no y values in the specified range.")
 
     limitcut = xlimitcut & ylimitcut
-
-    if cut is None:
-        cut = np.ones(shape=xvals.shape, dtype=bool)
 
     if lgclognorm:
         norm = clrs.LogNorm()
@@ -602,6 +604,7 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
         xvals[limitcut & cut],
         yvals[limitcut & cut],
         bins=nbins,
+        range=(xlims, ylims),
         norm=norm,
         cmap=cmap,
     )
