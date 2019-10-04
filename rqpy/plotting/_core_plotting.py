@@ -556,8 +556,9 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
         Boolean value for whether or not to plot the data cut by `cut`. If only a subset of the original
         data is desired to be plotted, then use `basecut` to trim the plotted data.
     basecut : array of bool, optional
-        The base cut for comparison of `cut`. If left as None, then this is set as an array of
-        Trues of the same length as the input data. Only used if `plot_cut_data` is True.
+        The base cut for comparison with `cut`. See Notes for an example use case. If left as None, then
+        this is set as an array of Trues of the same length as the input data. Only used if
+        `plot_cut_data` is True.
 
     Returns
     -------
@@ -571,6 +572,22 @@ def densityplot(xvals, yvals, xlims=None, ylims=None, nbins = (500,500), cut=Non
     ValueError
         If there are no `xvals` in the range specified by `xlims`.
         If there are no `yvals` in the range specified by `ylims`.
+
+    Notes
+    -----
+    An example case of plotting the data removed by cut is shown below.
+
+    Say we have two cuts, `cut1` and `cut2`, that correspond to different subsets of the data,
+    and we want to plot the events that pass the union of these two cuts, `cut1 & cut2`. Also, we
+    do want to use `plot_cut_data` and `basecut` to show the data that was removed when we added
+    `cut2` to cut1`.
+
+    >>> fig, ax = rqpy.densityplot(xvals, yvals, cut=cut1 & cut2, plot_cut_data=True, basecut=cut1)
+
+    The above code would show the data that passes `cut1 & cut2` as a density. It would also show
+    the data that passes `cut1`, but not `cut1 & cut2`, as a grey 2D histogram. If we had left
+    `basecut` as None, then all of the raw data would have been plotted as a grey 2D histogram,
+    which may not be desired.
 
     """
 
