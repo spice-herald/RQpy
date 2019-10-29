@@ -72,7 +72,7 @@ def upper(fc, cl=0.9):
     endpoints0 : int
         An integer giving the index of FC at which the optimum interval started.
     endpoints1 : int
-        An integer giving the index of FC at which the optimum interval ended.  
+        An integer giving the index of FC at which the optimum interval ended.
 
     Raises
     ------
@@ -463,6 +463,10 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
     -------
     sigma : ndarray
         The corresponding cross sections of the sensitivity curve (in cm^2).
+    oi_energy0 : ndarray
+        The energies in keV at which each optimum interval started.
+    oi_energy1 : ndarray
+        The energies in keV at which each optimum interval ended.
 
     Notes
     -----
@@ -540,19 +544,16 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
             if len(fc) == 0:
                 fc = np.asarray([0, 1])
 
-            if 0.8 <= cl <= 0.995:
-                uloutput = upperlim(fc, cl=cl)
-            else:
-                uloutput, endpoint0, endpoint1 = upper(fc, cl=cl)
-
-                oi_energy0[ii] = eventenergies[event_inds][possiblewimp][endpoint0]
-
-                if endpoint1 < len(fc):
-                    oi_energy1[ii] = eventenergies[event_inds][possiblewimp][endpoint1]
-                else:
-                    oi_energy1[ii] = eventenergies[event_inds][possiblewimp][-1]
+            uloutput, endpoint0, endpoint1 = upper(fc, cl=cl)
 
             sigma[ii] = (sigma0 / tot_rate) * uloutput
+
+            oi_energy0[ii] = eventenergies[event_inds][possiblewimp][endpoint0]
+
+            if endpoint1 < len(fc):
+                oi_energy1[ii] = eventenergies[event_inds][possiblewimp][endpoint1]
+            else:
+                oi_energy1[ii] = eventenergies[event_inds][possiblewimp][-1]
 
     return sigma, oi_energy0, oi_energy1
 
@@ -811,6 +812,10 @@ def optimuminterval_2dsmear(eventenergies, masslist, exposure, cov, delta,
     -------
     sigma : ndarray
         The corresponding cross sections of the sensitivity curve (in cm^2).
+    oi_energy0 : ndarray
+        The energies in keV at which each optimum interval started.
+    oi_energy1 : ndarray
+        The energies in keV at which each optimum interval ended.
 
     Notes
     -----
@@ -888,18 +893,15 @@ def optimuminterval_2dsmear(eventenergies, masslist, exposure, cov, delta,
             if len(fc) == 0:
                 fc = np.asarray([0, 1])
 
-            if 0.8 <= cl <= 0.995:
-                uloutput = upperlim(fc, cl=cl)
-            else:
-                uloutput, endpoint0, endpoint1 = upper(fc, cl=cl)
-
-                oi_energy0[ii] = eventenergies[event_inds][possiblewimp][endpoint0]
-
-                if endpoint1 < len(fc):
-                    oi_energy1[ii] = eventenergies[event_inds][possiblewimp][endpoint1]
-                else:
-                    oi_energy1[ii] = eventenergies[event_inds][possiblewimp][-1]
+            uloutput, endpoint0, endpoint1 = upper(fc, cl=cl)
 
             sigma[ii] = (sigma0 / tot_rate) * uloutput
+
+            oi_energy0[ii] = eventenergies[event_inds][possiblewimp][endpoint0]
+
+            if endpoint1 < len(fc):
+                oi_energy1[ii] = eventenergies[event_inds][possiblewimp][endpoint1]
+            else:
+                oi_energy1[ii] = eventenergies[event_inds][possiblewimp][-1]
 
     return sigma, oi_energy0, oi_energy1
