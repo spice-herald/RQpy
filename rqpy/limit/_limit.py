@@ -8,7 +8,7 @@ from scipy import stats, signal, interpolate, special, integrate
 
 import rqpy as rp
 from rqpy import constants
-from rqpy.limit import _upperlim, _upper
+from rqpy.limit import _upper
 import mendeleev
 
 
@@ -18,7 +18,6 @@ __all__ = [
     "drde",
     "drde_max_q",
     "helmfactor",
-    "upperlim",
     "upper",
     "drde_gauss_smear2d",
     "optimuminterval_2dsmear",
@@ -128,88 +127,6 @@ def upper(fc, cl=0.9):
     endpoints = _upper.upperlimcom.endpoints
 
     return ulout, endpoints[0], endpoints[1]
-
-
-def upperlim(fc, cl=0.9, if_bn=1, mub=0, fb=None):
-    """
-    Fortran wrapper function for Steve Yellin's Optimum Interval code `UpperLim.f`.
-
-    Parameters
-    ----------
-    fc : array_like
-        Given the foreground distribution whose shape is known, but whose normalization is
-        to have its upper limit total expected number of events determined, fc(0) to fc(N+1),
-        with fc(0)=0, fc(N+1)=1, and with  fc(i) the increasing ordered set of cumulative
-        probabilities for the foreground distribution for event i, i=1 to N.
-    cl : float, optional
-        The confidence level desired for the upper limit. Default is 0.9. Can be any value
-        between 0.8 and 0.995.
-    if_bn : int, optional
-        Say which minimum fraction of the cumulative probability is allowed for seeking the
-        optimum interval. `if_bn`=1, 2, 3, 4, 5, 6, 7 corresponds to minimum cumulative probability
-        interval = .00, .01, .02, .05, .10, .20, .50. Default is 1.
-    mub : int, optional
-        The total expected number of events from known background. Default is zero.
-    fb : array_like, NoneType, optional
-        Equivalent to `fc` but assuming the distribution shape from known background. The default
-        behavior is to simply pass `fc` as `fb` to the UpperLimit algorithm, which is done assuming
-        `mub` is zero.
-
-    Returns
-    -------
-    ulout : float
-        The output of the UpperLim Fortran code, corresponding to the upper limit expected number of
-        events. To convert to cross section, the output should be divided by the total rate of the signal
-        and multiplied by the expected cross section for that rate.
-
-    Raises
-    ------
-    ValueError
-        If routine CnMax fails. In other words, its return code is greater than 1. CnMax calculates
-        the maximum interval C_n.
-
-    Notes
-    -----
-    This is a wrapper around Steve Yellin's Optimum Interval Fortran code, which was compiled via f2py to
-    be callable by Python. Because the Fortran code expects look-up tables in the current working directory,
-    we need to use a context manager to switch directories to where the look-up tables are when running the
-    algorithm.
-
-    Read more about Steve Yellin's Optimum Interval code here:
-        - http://titus.stanford.edu/Upperlimit/
-        - https://arxiv.org/abs/physics/0203002
-        - https://arxiv.org/abs/0709.2701
-
-    """
-
-    file_path = os.path.dirname(os.path.realpath(__file__))
-
-    
-    # make sure fc starts with 0 and ends with 1
-    fc_new = fc
-    if fc[0]!=0:
-        fc_new = np.concatenate(([0], fc_new))
-    if fc[-1]!=1:
-        fc_new = np.concatenate((fc_new, [1]))
-
-    if fb is None:
-        fb = fc_new
-
-    with _working_directory(f"{file_path}/_upperlim/"):
-        ulout = _upperlim.upperlim(
-            cl=cl,
-            if_bn=if_bn,
-            fc=fc_new,
-            mub=mub,
-            fb=fb,
-            iflag=0,
-            n=len(fc_new) - 2,
-        )
-
-    if _upperlim.fupcom.istat > 1:
-        raise ValueError("Routine CnMax failed.")
-
-    return ulout
 
 
 def helmfactor(er, tm='Si'):
@@ -471,7 +388,7 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
     Notes
     -----
     This function is a wrapper for Steve Yellin's Optimum Interval code. His code can be found
-    here: titus.stanford.edu/Upperlimit/
+    here: titus.stanford.edu/Upper/
 
     Read more about the Optimum Interval code in these two papers:
         - https://arxiv.org/abs/physics/0203002
@@ -820,7 +737,7 @@ def optimuminterval_2dsmear(eventenergies, masslist, exposure, cov, delta,
     Notes
     -----
     This function is a wrapper for Steve Yellin's Optimum Interval code. His code can be found
-    here: titus.stanford.edu/Upperlimit/
+    here: titus.stanford.edu/Upper/
 
     Read more about the Optimum Interval code in these two papers:
         - https://arxiv.org/abs/physics/0203002
