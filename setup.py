@@ -6,38 +6,6 @@ from setuptools import find_packages, Command
 from numpy.distutils.core import Extension, setup
 
 
-upperlim_files = [
-    'upperlim.pyf',
-    'UpperLim.f',
-    'y_vs_CLf.f',
-    'CMaxinf.f',
-    'ConfLev.f',
-    'Cinf.f',
-    'CERN_Stuff.f',
-]
-
-upperlim_f77_paths = []
-for fname in upperlim_files:
-    upperlim_f77_paths.append(f"rqpy/limit/_upperlim/{fname}")
-
-ext1 = Extension(
-    name='rqpy.limit._upperlim.upperlim',
-    sources=upperlim_f77_paths,
-)
-
-upperlim_data_files = [
-    'CMaxf.in',
-    'CMaxfLow.in',
-    'ymintable.in',
-    'y_vs_CLf.in',
-    'CLtable.txt',
-]
-
-upperlim_data_paths = []
-for fname in upperlim_data_files:
-    upperlim_data_paths.append(f"rqpy/limit/_upperlim/{fname}")
-
-
 upper_files = [
     'upper.pyf',
     'Upper.f',
@@ -56,7 +24,7 @@ upper_f77_paths = []
 for fname in upper_files:
     upper_f77_paths.append(f"rqpy/limit/_upper/{fname}")
 
-ext2 = Extension(
+ext1 = Extension(
     name='rqpy.limit._upper.upper',
     sources=upper_f77_paths,
 )
@@ -111,11 +79,9 @@ setup(
         'clean': CleanCommand,
     },
     data_files=[
-        ('rqpy/limit/_upperlim/', upperlim_data_paths),
         ('rqpy/limit/_upper/', upper_data_paths),
     ],
     ext_modules=[
         ext1,
-        ext2,
     ],
 )
