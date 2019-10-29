@@ -69,6 +69,10 @@ def upper(fc, cl=0.9):
         The output of the Upper Fortran code, corresponding to the upper limit expected number of
         events. To convert to cross section, the output should be divided by the total rate of the
         signal and multiplied by the expected cross section for that rate.
+    endpoints0 : int
+        An integer giving the index of FC at which the optimum interval started.
+    endpoints1 : int
+        An integer giving the index of FC at which the optimum interval ended.  
 
     Raises
     ------
@@ -121,7 +125,9 @@ def upper(fc, cl=0.9):
     if _upper.fupcom.istat > 1:
         raise ValueError("Routine CnMax failed.")
 
-    return ulout
+    endpoints = _upper.upperlimcom.endpoints
+
+    return ulout, endpoints[0], endpoints[1]
 
 
 def upperlim(fc, cl=0.9, if_bn=1, mub=0, fb=None):
@@ -204,6 +210,7 @@ def upperlim(fc, cl=0.9, if_bn=1, mub=0, fb=None):
         raise ValueError("Routine CnMax failed.")
 
     return ulout
+
 
 def helmfactor(er, tm='Si'):
     """
@@ -342,6 +349,7 @@ def drde(q, m_dm, sig0, tm='Si'):
     rate[(vmin > vesc - ve) & (vmin < vesc + ve)] = rate_high_vmin[(vmin > vesc - ve) & (vmin < vesc + ve)]
 
     return rate
+
 
 def drde_max_q(m_dm, tm='Si'):
     """
@@ -488,12 +496,13 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
 
     exp = effs * exposure
 
-    curr_exp = interpolate.interp1d(effenergies, exp,
-                                    kind="linear",
-                                    bounds_error=False,
-                                    fill_value=(0, exp[-1]))
+    curr_exp = interpolate.interp1d(
+        effenergies, exp, kind="linear", bounds_error=False, fill_value=(0, exp[-1]),
+    )
 
     sigma = np.ones(len(masslist)) * np.inf
+    oi_energy0 = np.zeros(len(masslist))
+    oi_energy1 = np.zeros(len(masslist))
 
     for ii, mass in enumerate(masslist):
         if verbose:
@@ -534,11 +543,18 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
             if 0.8 <= cl <= 0.995:
                 uloutput = upperlim(fc, cl=cl)
             else:
-                uloutput = upper(fc, cl=cl)
+                uloutput, endpoint0, endpoint1 = upper(fc, cl=cl)
+
+                oi_energy0[ii] = eventenergies[event_inds][possiblewimp][endpoint0]
+
+                if endpoint1 < len(fc):
+                    oi_energy1[ii] = eventenergies[event_inds][possiblewimp][endpoint1]
+                else:
+                    oi_energy1[ii] = eventenergies[event_inds][possiblewimp][-1]
 
             sigma[ii] = (sigma0 / tot_rate) * uloutput
 
-    return sigma
+    return sigma, oi_energy0, oi_energy1
 
 def _norm2d(x0, x1, mu, cov, return_ellipse=False):
     """
@@ -827,6 +843,8 @@ def optimuminterval_2dsmear(eventenergies, masslist, exposure, cov, delta,
     inlim = rp.inrange(en_interp, elow, ehigh)
 
     sigma = np.ones(len(masslist)) * np.inf
+    oi_energy0 = np.zeros(len(masslist))
+    oi_energy1 = np.zeros(len(masslist))
 
     for ii, mass in enumerate(masslist):
         if verbose:
@@ -873,8 +891,15 @@ def optimuminterval_2dsmear(eventenergies, masslist, exposure, cov, delta,
             if 0.8 <= cl <= 0.995:
                 uloutput = upperlim(fc, cl=cl)
             else:
-                uloutput = upper(fc, cl=cl)
+                uloutput, endpoint0, endpoint1 = upper(fc, cl=cl)
+
+                oi_energy0[ii] = eventenergies[event_inds][possiblewimp][endpoint0]
+
+                if endpoint1 < len(fc):
+                    oi_energy1[ii] = eventenergies[event_inds][possiblewimp][endpoint1]
+                else:
+                    oi_energy1[ii] = eventenergies[event_inds][possiblewimp][-1]
 
             sigma[ii] = (sigma0 / tot_rate) * uloutput
 
-    return sigma
+    return sigma, oi_energy0, oi_energy1
