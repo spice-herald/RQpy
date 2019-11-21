@@ -810,15 +810,18 @@ def optimuminterval_2dsmear(eventenergies, masslist, exposure, cov, delta,
             if len(fc) == 0:
                 fc = np.asarray([0, 1])
 
-            uloutput, endpoint0, endpoint1 = upper(fc, cl=cl)
+            try:
+                uloutput, endpoint0, endpoint1 = upper(fc, cl=cl)
 
-            sigma[ii] = (sigma0 / tot_rate) * uloutput
+                sigma[ii] = (sigma0 / tot_rate) * uloutput
 
-            oi_energy0[ii] = eventenergies[event_inds][possiblewimp][endpoint0]
+                oi_energy0[ii] = eventenergies[event_inds][possiblewimp][endpoint0]
 
-            if endpoint1 < len(fc):
-                oi_energy1[ii] = eventenergies[event_inds][possiblewimp][endpoint1]
-            else:
-                oi_energy1[ii] = eventenergies[event_inds][possiblewimp][-1]
+                if endpoint1 < len(fc):
+                    oi_energy1[ii] = eventenergies[event_inds][possiblewimp][endpoint1]
+                else:
+                    oi_energy1[ii] = eventenergies[event_inds][possiblewimp][-1]
+            except ValueError:
+                pass
 
     return sigma, oi_energy0, oi_energy1
