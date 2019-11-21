@@ -205,7 +205,7 @@ class SensEst(object):
             The number of experiments to run - the median of the outputs will be taken.
             Recommended to set to 1 for diagnostics, which is default.
         npts : int, optional
-            The number of points to use whe interpolating the simulated background rates.
+            The number of points to use when interpolating the simulated background rates.
             Default is 1000.
         plot_bkgd : bool, optional
             Option to plot the background being used on top of the generated data, for diagnostic
@@ -228,7 +228,7 @@ class SensEst(object):
         en_interp = np.linspace(0, e_high, num=npts)
 
         for ii in range(nexp):
-            evts_sim = self.generate_background(
+            evts_sim = self._generate_background(
                 en_interp, plot_bkgd=plot_bkgd and ii==0,
             )
 
@@ -247,9 +247,44 @@ class SensEst(object):
 
         return m_dms, sig
 
-    def generate_background(self, en_interp, plot_bkgd=False):
+    def generate_background(self, e_high, e_low=0, npts=1000, plot_bkgd=False):
         """
         Method for generating events based on the inputted background.
+
+        Parameters
+        ----------
+        e_high : float
+            The high energy cutoff of the analysis range, as we need some cutoff to the
+            event energies that we generate.
+        e_low : float, optional
+            The low energy cutoff of the analysis range, default is 0.
+        npts : int, optional
+            The number of points to use when interpolating the simulated background rates.
+            Default is 1000.
+        plot_bkgd : bool, optional
+            Option to plot the background being used on top of the generated data, for diagnostic
+            purposes. If `nexp` is greater than 1, then only the first generated dataset is plotted.
+
+        Returns
+        -------
+        evts_sim : ndarray
+            The array of all the simulated events based on the inputted backgrounds. Units are keV.
+
+        Raises
+        ------
+        ValueError
+            If `self._backgrounds` is an empty list (no backgrounds have been added)
+
+        """
+
+        en_interp = np.linspace(0, e_high, num=npts)
+        evts_sim = self._generate_background(en_interp, plot_bkgd=plot_bkgd)
+
+        return evts_sim
+
+    def _generate_background(self, en_interp, plot_bkgd=False):
+        """
+        Hidden method for generating events based on the inputted background.
 
         Parameters
         ----------
@@ -341,4 +376,3 @@ class SensEst(object):
             item.set_fontsize(14)
 
         ratecomp.fig.tight_layout()
-
