@@ -73,12 +73,6 @@ def upper(fc, cl=0.9):
     endpoints1 : int
         An integer giving the index of FC at which the optimum interval ended.
 
-    Raises
-    ------
-    ValueError
-        If routine CnMax fails. In other words, its return code is greater than 1. CnMax calculates
-        the maximum interval C_n.
-
     Notes
     -----
     This is a wrapper around Steve Yellin's Optimum Interval Fortran code, which was compiled via f2py to
@@ -120,9 +114,6 @@ def upper(fc, cl=0.9):
             fc=fc_new[:, np.newaxis],
             icode=icode,
         )
-
-    if _upper.fupcom.istat > 1:
-        raise ValueError("Routine CnMax failed.")
 
     endpoints = _upper.upperlimcom.endpoints
 
@@ -472,7 +463,7 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
                     oi_energy1[ii] = eventenergies[event_inds][possiblewimp][endpoint1]
                 else:
                     oi_energy1[ii] = eventenergies[event_inds][possiblewimp][-1]
-            except ValueError:
+            except:
                 pass
 
     return sigma, oi_energy0, oi_energy1
@@ -824,7 +815,7 @@ def optimuminterval_2dsmear(eventenergies, masslist, exposure, cov, delta,
                     oi_energy1[ii] = eventenergies[event_inds][possiblewimp][endpoint1]
                 else:
                     oi_energy1[ii] = eventenergies[event_inds][possiblewimp][-1]
-            except ValueError:
+            except:
                 pass
 
     return sigma, oi_energy0, oi_energy1
