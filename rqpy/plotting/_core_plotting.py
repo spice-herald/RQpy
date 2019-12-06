@@ -26,7 +26,7 @@ def preview_greyscale(fig, dpi=100):
 
     Parameters
     ----------
-    fig : matplotlib.Figure
+    fig : matplotlib.figure.Figure
         Figure object from matplotlib to convert to greyscale.
     dpi : int, optional
         The dpi desired for the outputted image, default is 100.
