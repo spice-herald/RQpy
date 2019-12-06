@@ -232,7 +232,7 @@ class SensEst(object):
                 en_interp, plot_bkgd=plot_bkgd and ii==0,
             )
 
-            sig_temp = rp.limit.optimuminterval(
+            sig_temp, _, _ = rp.limit.optimuminterval(
                 evts_sim[evts_sim > threshold],
                 en_interp,
                 np.heaviside(en_interp - threshold, 0),
