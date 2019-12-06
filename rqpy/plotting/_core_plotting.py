@@ -1,4 +1,5 @@
 import numpy as np
+import io
 import matplotlib.pyplot as plt
 from matplotlib import colors as clrs
 from matplotlib.patches import Ellipse
@@ -8,6 +9,7 @@ import types
 
 
 __all__ = [
+    "preview_greyscale",
     "hist",
     "scatter",
     "passageplot",
@@ -15,6 +17,43 @@ __all__ = [
     "RatePlot",
     "conf_ellipse",
 ]
+
+
+def preview_greyscale(fig, dpi=100):
+    """
+    Function for converting an existing figure from RGBA to greyscale. Useful
+    for testing how functions would look if printed in black and white.
+
+    Parameters
+    ----------
+    fig : matplotlib.Figure
+        Figure object from matplotlib to convert to greyscale.
+    dpi : int, optional
+        The dpi desired for the outputted image, default is 100.
+
+    Returns
+    -------
+    None
+
+    """
+
+    # save figure as image to memory
+    fig.canvas.draw()
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=dpi)
+    buf.seek(0)
+    s = plt.imread(buf)
+    buf.close()
+
+    # remove alpha, convert to greyscale
+    grey = np.dot(s[..., :-1], [0.299, 0.587, 0.114])
+
+    # make new plot with same size
+    ff = plt.figure(figsize=fig.get_size_inches())
+    ax = plt.Axes(ff, [0., 0., 1., 1.])
+    ax.set_axis_off()
+    ff.add_axes(ax)
+    ax.imshow(grey, cmap=plt.get_cmap('gray'), interpolation='bilinear')
 
 
 def hist(arr, nbins='auto', xlims=None, cuts=None, lgcrawdata=True,
