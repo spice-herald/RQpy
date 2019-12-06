@@ -64,7 +64,7 @@ def trigger_pdf(x, sigma, n_win):
     normal_dist = lambda xx: stats.norm.pdf(xx, scale=sigma)
     erf_scale = lambda xx: special.erf(xx / np.sqrt(2 * sigma**2))
 
-    pdf = n_win * normal_dist(x) * (0.5 * (1 + erf_scale(x)))**(n_win - 1) * 1e-3
+    pdf = n_win * normal_dist(x) * (0.5 * (1 + erf_scale(x)))**(n_win - 1)
 
     return pdf
 
@@ -142,7 +142,7 @@ class SensEst(object):
 
         """
 
-        norm = sigma * self.m_det * n_win / fs / rp.constants.day
+        norm = self.m_det * n_win / fs / rp.constants.day
         noise_bkgd = lambda x: trigger_pdf(x, sigma, n_win) / norm
         self._backgrounds.append(noise_bkgd)
 
