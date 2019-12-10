@@ -9,7 +9,7 @@ import types
 
 
 __all__ = [
-    "preview_greyscale",
+    "previewgreyscale",
     "hist",
     "scatter",
     "passageplot",
@@ -19,7 +19,7 @@ __all__ = [
 ]
 
 
-def preview_greyscale(fig, dpi=100):
+def previewgreyscale(fig, dpi=100):
     """
     Function for converting an existing figure from RGBA to greyscale. Useful
     for testing how functions would look if printed in black and white.
