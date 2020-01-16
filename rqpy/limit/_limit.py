@@ -3,6 +3,7 @@ from glob import glob
 import time
 import os
 from pathlib import Path
+import types
 import contextlib
 from scipy import stats, signal, interpolate, special, integrate
 
@@ -694,6 +695,12 @@ def optimuminterval_2dsmear(eventenergies, masslist, passagefraction, exposure,
     masslist : ndarray
         List of candidate DM masses (in GeV/c^2) to calculate the upper
         limit at.
+    passagefraction : float, functionType
+        The passage fraction of the cuts being applied to the data.
+        Excludes the trigger efficiency, since that is wrapped up in the
+        2D smearing. If a float, then it should be a number between 0
+        and 1, meaning that the passage fraction is energy independent.
+        If a function, then the input should be in units of keV.
     exposure : float
         The total exposure of the detector (kg*days).
     cov : ndarray
@@ -792,7 +799,10 @@ def optimuminterval_2dsmear(eventenergies, masslist, passagefraction, exposure,
             subtract_zero=subtract_zero,
         )
 
-        rate = init_rate * exposure
+        if isinstance(passagefraction, types.FunctionType):
+            rate = init_rate * exposure * passagefraction(en_interp)
+        else:
+            rate = init_rate * exposure * passagefraction
 
         integ_rate = integrate.cumtrapz(
             rate[inlim], x=en_interp[inlim], initial=0,
@@ -823,11 +833,8 @@ def optimuminterval_2dsmear(eventenergies, masslist, passagefraction, exposure,
 
             try:
                 uloutput, endpoint0, endpoint1 = upper(fc, cl=cl)
-
                 sigma[ii] = (sigma0 / tot_rate) * uloutput
-
                 energies_used = eventenergies[event_inds][possiblewimp]
-
                 oi_energy0[ii] = energies_used[endpoint0]
 
                 if endpoint1 < len(fc):
