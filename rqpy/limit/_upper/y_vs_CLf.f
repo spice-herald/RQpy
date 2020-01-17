@@ -12,9 +12,8 @@ C   4    failure: fin > 1
 C   5    failure: fin > 0.01 but CLin < 0.8
 C   6    failure: unable to extrapolate for very low fin.
       Implicit None
-      Real CL,f,ylow,yhigh,table(425,100),xf,xCL,FNf,fbin,dfbin,
-     1 CLs(425),dCL,flog,ytemp,CLin,fin,f0/.01/,f0a/.1/,Ctop/.9999/,
-     2 Cbot/0.8/
+      Real CL,f,ylow,yhigh,table(425,100),xf,xCL,FNf,fbin,CLs(425),
+     1 dCL,flog,ytemp,CLin,fin,f0/.01/,f0a/.1/,Ctop/.9999/,Cbot/0.8/
 C As the program was written in 2004, the lowest value of f in the
 C y_vs_CLf.in table was 0.01. The table goes from CL=.8 to CL=.999.
 C Sometimes f0 is too small, in which case use f0a.
@@ -26,11 +25,13 @@ C      Real*8 PPND16,C,df
       Logical first/.true./
       If(first) Then
          first=.false.
-         open(20,file='y_vs_CLf.in',status='OLD',form='UNFORMATTED')
-         read(20) ylow,yhigh,Nmin,Nf,NTable,Ntrials
+         open(20,file='y_vs_CLf.txt',status='OLD',form='FORMATTED')
+         read(20,5) ylow,yhigh,Nmin,Nf,NTable,Ntrials
+ 5       Format(2F9.5,3I5,I9)
          FNf=float(Nf)
          Do If=1,Nf
-            Read(20) (table(J,If),J=1,425)
+            Read(20,10) (table(J,If),J=1,425)
+ 10         Format(10F9.5)
          EndDo
          Close(20)
          Do ICL=1,175

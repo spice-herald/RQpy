@@ -12,16 +12,18 @@ C   5    failure: fin > 1
 C   6    failure: fin < 1.E-10
       Implicit none
       Integer Nf,Nmin,Ntrials,Ntable,If,Ibin,Istat
-      Real y,ytemp,f,ytable,ylow,yhigh,flog,Table(2000,100),FNf,
+      Real y,ytemp,f,ylow,yhigh,flog,Table(2000,100),FNf,
      1 fbin,ybin,dfbin,dIbin,dy,fin,f0/.01/
       Logical first/.true./
       Common/Cinfcom/Nf,Ntable,ylow,yhigh,dy,FNf,Table
       If(first) Then
        first=.false.
-       Open(50,file='ymintable.in',status='OLD',form='UNFORMATTED')
-       Read(50) ylow,yhigh,Nmin,Nf,NTable,Ntrials
+       Open(50,file='ymintable.txt',status='OLD',form='FORMATTED')
+       Read(50,5) ylow,yhigh,Nmin,Nf,NTable,Ntrials
+ 5     Format(2F9.5,3I5,I9)
        Do If=1,Nf
-          Read(50) (Table(Ibin,If),Ibin=1,Ntable)
+          Read(50,10) (Table(Ibin,If),Ibin=1,Ntable)
+ 10       Format(10F9.6)
        EndDo
        dy=(yhigh-ylow)/float(Ntable)
        FNf=float(Nf)

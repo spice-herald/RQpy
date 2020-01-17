@@ -1,6 +1,6 @@
       Real Function UpperLim(CL,If,N,FC,muB,FB,Iflag)
-C Calls y_vs_CLf, which calls DGAUSN, and ConfLev, which calls GAMDIS,
-C both of CERNLIB (libmathlib and libkernlib).
+C Calls ForCnMax, CnMax, y_vs_CLf, and CMaxinf, along with CERNLIB routine
+C RZERO.
 C
 C Suppose you have a set of N events distributed in some 1-d variable
 C and want to know the CL confidence level upper limit on the mean of
@@ -35,11 +35,19 @@ C  16: The optimum interval had status 1.
 C  32: The optimum interval had status 2.
 C  64: Failure to solve CMax = CMaxbar.
 C 128: Couldn't solve CMax=CMaxbar because upperlim wants to be <0.
+C 256: More than one solution.  The other two are in Exclude_low, which gives
+C      the excluded range below the absolute upper limit.
 C If something goes wrong which prevents return of correct results, the
 C program prints an error message and stops.
+C  There is also a Common/UpperLimCom/EndPoints(2),Exclude_low(2).
+C  EndPoints(1) is an integer giving the I of FC(I) at which the optimum
+C  interval started and EndPoints(2) is the I at which the optimum interval
+C  ended.  When Iflag has bit 256 on, everything above UpperLim is excluded,
+C  as is everything between Exclude_low(1) and Exclude_low(2).  But between
+C  Exclude_low(2) and UpperLim is allowed.
       Implicit None
-      Integer N,If,Iflag,NMax,I,m,Niter,mdebug,Istat,IflagOpt,MaxF,
-     1 NMax1,N1,If1,NCalls,I1
+      Integer N,If,Iflag,NMax,I,m,Niter,Istat,IflagOpt,MaxF,
+     1 N1,If1,NCalls,I1,mmax,EndPoints
       Parameter (NMax=150000)
       Real MeanMax
 C The number of iteration, Niter, can be 5 and it only occasionally needs
@@ -47,18 +55,24 @@ C more for low mu and with lots of background.  Even then, 5 is enough to
 C almost always get almost exactly the same answer.
       Parameter (Niter=10)
       Real CL,FC(0:N+1),y_vs_CLf,CMaxinf,mu,mu0,f(0:NMax),y,y2,x,
-     1 CMax,fmin(7)/.00,.01,.02,.05,.1,.2,.5/,eps/.001/,mudebug,
+     1 CMaxLoc,fmin(7)/.00,.01,.02,.05,.1,.2,.5/,eps/.0001/,Cdbg,
      2 fdebug,ydebug,mutmp,R,Topmu,Botmu,CL1,muB,FB(0:N+1),FC1,FB1,muB1,
-     3 FUp,fmin1(7)
+     3 FUp,fmin1(7),mucand(3),TopNow,BotNow,FUPbot,FUPnow,Exclude_low,
+     4 fhigh,fdiff
       Common/Fupcom/f,N1,CL1,If1,MeanMax,NCalls,Istat,FC1(0:NMax),
-     1 FB1(0:NMax),muB1,fmin1
+     1 FB1(0:NMax),muB1,fmin1,Cdbg(0:10),mmax
+      Common/UpperLimcom/EndPoints(2),Exclude_low(2)
       Logical debug/.false./
       External FUp
       If(N.ge.NMax) Then
          Write(6,*) N,", the number of events, is above ",NMax-1
          Stop
       EndIf
-      MeanMax=54.5
+      Do I=1,3
+         mucand(I)=-1.
+      EndDo
+      MeanMax=99. ! Formerly 54.5
+      IflagOpt=0
       FC(0)=0.
       FC(N+1)=1.
       muB1=muB
@@ -79,7 +93,7 @@ C CMax=CMaxinf(CL,If,mu).  For each m, y=y_vs_CLf(CMax,f(m)), and x from
 C y=(m-x)/sqrt(x).  Find the smallest value of x/f(m) and call
 C it the new mu.  Iterate until the fractional change of mu < eps, at which
 C time take UpperLim=mu.
-      If(CL.lt.0.8 .or. CL.gt. 0.995) Then
+      If(CL.lt. 0.00001 .or. CL.gt. 0.99999) Then
          Write(6,*) CL,
      1    " is out of the permissible confidence level range."
          Stop
@@ -92,34 +106,33 @@ C time take UpperLim=mu.
       Iflag=0
       If(N.eq.0) Then
          UpperLim=log(1./(1.-CL))
+         EndPoints(1)=0
+         EndPoints(2)=0
          Return
       EndIf
+      I1=1
+      mu0=Float(N)
       If(muB.eq.0.) Then
-       Do m=0,N
-         f(m)=0.
-         Do I=0,N-m
-            f(m)=Max(f(m),FC(I+m+1)-FC(I))
-         EndDo
-       EndDo
-      EndIf
+         Call ForCnMax(N,FC,f,N)
+      Else
 C For some reason, the quick method of convergence sometimes fails
 C with muB>0.
-      If(muB.ne.0.) Go to 50
-      mu0=Float(N)
+         Go to 50
+      EndIf
       Do I=1,Niter
          If(mu0.lt.MeanMax) GoTo 50
-         CMax=CMaxinf(CL,If,mu0)
+         CMaxLoc=CMaxinf(CL,If,mu0)
          mu=1.E10
          Do m=0,N
-            If(muB.ne.0.) Then
-               f(m)=0.
-               Do I1=0,N-m
-                  f(m)=Max(f(m),(1.-(muB/mu0))*(FC(I1+m+1)-FC(I1))+
-     1                (muB/mu0)*(FB(I1+m+1)-FB(I1)))
-               EndDo
-            EndIf
+C            If(muB.ne.0.) Then
+C               f(m)=0.
+C               Do I2=0,N-m
+C                  f(m)=Max(f(m),(1.-(muB/mu0))*(FC(I2+m+1)-FC(I2))+
+C     1                (muB/mu0)*(FB(I2+m+1)-FB(I2)))
+C               EndDo
+C            EndIf
             If(f(m).gt.fmin(If)) Then
-               y=y_vs_CLf(CMax,f(m),Istat)
+               y=y_vs_CLf(CMaxLoc,f(m),Istat)
                If(Istat.gt.2) Then
                   Write(6,*) "y_vs_CLf returned with status",Istat
                   Go to 50
@@ -132,11 +145,9 @@ C with muB>0.
                   mu=mutmp
 C IflagOpt will have the status of the optimum interval
                   IflagOpt=Istat
-                  If(debug) Then
-                     mdebug=m
-                     fdebug=f(m)
-                     ydebug=y
-                  EndIf
+                  mmax=m
+                  fdebug=f(m)
+                  ydebug=y
                EndIf
              EndIf
          EndDo
@@ -152,8 +163,8 @@ C IflagOpt will have the status of the optimum interval
       Write(6,*) "UpperLim did the maximum number of iterations,",
      1 Niter
  50   Continue
-C Come here if it's starting to look like mu<54.5, or if convergence
-C fails for mu>54.5.
+C Come here if it's starting to look like mu<MeanMax, or if convergence
+C fails for mu>MeanMax.
       IflagOpt=0
       MAXF=500
       N1=N
@@ -169,61 +180,101 @@ C It looks like UpperLim wants to be negative
       EndIf
       Call RZERO(Botmu,Topmu,mu,R,EPS,MAXF,FUp)
       If(R.lt.0. .or. Istat.gt.4) Iflag=Iflag+64
+      If(mu .gt. 0.01 .and. mu .lt. Max(12.,15.*CL-1.5)) Then
+C      If(mu.gt.1.5 .and. mu.lt.Max(12.,15.*CL-1.5)) Then
+C For small mu look for multiple solutions.  CL=.8 has its first jump at
+C mu=3 and its 6th around 10.6; CL=.9 has its first jump at 3.9 and its
+C 6th at 12.01.  CL=.001 has its first jump at around mu=.05.
+C         BotNow=Min(2.5,mu-1.5)
+         BotNow=mu-1.5
+C The next line was added without checking that it's ok.  It makes bounds ok
+C for later when FUp calls CMaxInf.
+         BotNow=Max(BotNow,.01)+3.
+         BotNow=Min(BotNow,12.)
+         TopNow=BotNow
+         FUpbot=FUp(BotNow,1)
+         Do I=1,300
+C TopNow is below BotNow for historical reasons: originally the search
+C went from low to high, thereby possibly missing the highest one if there
+C were more than three solutions.
+            TopNow=TopNow-.01
+C            If(TopNow.lt.1.6) Go to 100
+            If(TopNow.lt. 0.01) Go to 100
+            FUpnow=FUp(TopNow,1)
+            If(FUpbot*FUpnow.lt.0.) Then
+               Call RZERO(BotNow,TopNow,mucand(I1),R,EPS,MAXF,FUp)
+               mucand(I1)=mucand(I1)-muB
+               BotNow=TopNow
+               FUpbot=FUpnow
+               I1=I1+1
+               If(I1.gt.3) Go to 100
+            EndIf
+         EndDo
+      EndIf
  100  UpperLim=mu-muB
+      If(I1.gt.2) Then
+         UpperLim=mucand(1)-muB
+         Exclude_low(1)=mucand(3)-muB
+         Exclude_low(2)=mucand(2)-muB
+         Iflag=Or(Iflag,256)
+      EndIf
       Iflag=Or(Iflag,16*IflagOpt)
+C mmax is now the number of events in the optimum interval.  Find the
+C endpoints of the optimum interval.
+      fhigh=-1.
+      Do I=0,N-mmax
+         fdiff=FC(I+mmax+1)-FC(I)
+         if(fdiff.gt.fhigh) Then
+            fhigh=fdiff
+            EndPoints(1)=I
+            EndPoints(2)=I+mmax+1
+         EndIf
+      EndDo
       If(debug) Then
-         Write(6,200) N,mdebug,fdebug,ydebug
- 200     Format('N, m, f(m), y_vs_CLf(CMax,f(m))', 2I5,2F9.5)
+          Write(6,200) N,mmax,mu,fdebug,ydebug,fhigh,EndPoints
+ 200     Format('N, m, mu, f(m), y_vs_CLf(CMaxLoc,f(m)), fhigh,
+     1  Endpoints',2I5,F12.2,3F9.5,2I6)
+C        Write(6,210) mmax,(FC(I),I=1,N)
+C 210     Format('m, FC: ',I4,(10F8.5))
+C         Write(6,215) (f(I),Cdbg(I),I=0,N)
+C 215     Format('f,C: ',10F8.5)
       EndIf
       Return
       End
       Real Function Fup(x,I)
       Implicit None
-      Integer N1,NMax,I,If1,Istat,Icode,m,NCalls,I1,mmax
+      Integer N1,NMax,I,If1,Istat,m,NCalls,I1,mmax
       Parameter (NMax=150000)
-      Real f(0:NMax),x,C,y,CMax,CL1,MeanMax,Cinf,CMaxinf,ConfLev,
-     1 CMxinf,FC1,FB1,muB1,fmin1(7)
+      Real f(0:NMax),x,CnMax,CL1,MeanMax,CMaxinf,
+     1 CMxinf,FC1,FB1,muB1,fmin1(7),Cdbg,CMaxLoc
       Common/Fupcom/f,N1,CL1,If1,MeanMax,NCalls,Istat,FC1(0:NMax),
-     1 FB1(0:NMax),muB1,fmin1
-      Logical Debug/.false./
+     1 FB1(0:NMax),muB1,fmin1,Cdbg(0:10),mmax
+      Logical Debug2/.false./
       Real FUpsave
       save FUpsave
       If(I.eq.1) NCalls=0
-      CMax=0.
+      CMaxLoc=0.
       CMxinf=CMaxinf(CL1,If1,x)
-      Do m=0,N1
-         If(muB1.ne.0.) Then
+      If(muB1.ne.0.) Then ! Separate this part out into its own m loop
+        Do m=0,N1
             f(m)=0.
             Do I1=0,N1-m
                f(m)=Max(f(m),(1.-(muB1/x))*(FC1(I1+m+1)-FC1(I1))+
      1             (muB1/x)*(FB1(I1+m+1)-FB1(I1)))
             EndDo
+        EndDo
+      EndIf
+ 10   CMaxLoc=CnMax(N1,f,x,MeanMax,fmin1(If1),mmax,Istat)
+      FUp=CMaxLoc-CMxinf
+      If(Istat.gt.1) Write(6,*) "Routine CnMax failed."
+      If(Debug2) Then
+         If(I.eq.3) Then
+            Write(6,*) "ncalls, mmax, f(mmax), CMax:",
+     1       ncalls,mmax,f(mmax),FUp
          EndIf
-         If(f(m).gt.fmin1(If1)) Then
-          If(x.le.MeanMax) Then
-            C=ConfLev(m,x*f(m),x,istat)
-            If(Istat.eq.2) Then
-C ConfLev failed.
-               Istat=5
-               Fup=0.
-               Return
-            EndIf
-          Else
-            y=(float(m)-x*f(m))/sqrt(x*f(m))
-            C=Cinf(y,f(m),Istat)
-          EndIf
-          If(C.gt.CMax) Then
-             CMax=C
-             mmax=m
-          EndIf
-          If(f(m).ge.1.) Go to 10
-         EndIf
-      EndDo
- 10   FUp=CMax - CMxinf
-      If(Debug) Then
          If(NCalls.eq.0) FUpsave=FUp
          If(NCalls.eq.1 .and. FUp*FUPsave.gt.0.) Then
-           Write(6,*) "RZERO will fail: ",x,muB1,CMax,mmax
+           Write(6,*) "RZERO will fail: ",x,muB1,CMaxLoc,mmax
          EndIf
       EndIf
       NCalls=NCalls+1

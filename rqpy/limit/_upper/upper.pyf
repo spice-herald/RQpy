@@ -1,0 +1,98 @@
+!    -*- f90 -*-
+! Note: the context of this file is case sensitive.
+
+python module upper ! in 
+    interface  ! in :upper
+        function upper(method,cl,nexp,maxp1,nevts,mu,fc,icode) ! in :upper:Upper.f
+            integer :: method
+            real :: cl
+            integer, optional,check(len(nevts)>=nexp),depend(nevts) :: nexp=len(nevts)
+            integer, optional,check((shape(fc,0)-1)==maxp1),depend(fc) :: maxp1=(shape(fc,0)-1)
+            integer dimension(nexp) :: nevts
+            real dimension(nexp),depend(nexp) :: mu
+            real dimension(maxp1 + 1,nexp),depend(nexp) :: fc
+            integer :: icode
+            integer :: method0
+            real :: cl0
+            integer :: nexp0
+            real dimension(20) :: xmax
+            real dimension(20) :: mu0
+            integer :: iflag0
+            real dimension(20001,2) :: f
+            integer dimension(2) :: nevts0
+            real :: p1
+            real :: p2
+            integer dimension(2) :: endpoints
+            real dimension(2) :: exclude_low
+            real :: clnow
+            real :: upper
+            common /uppercom/ method0,cl0,nexp0,xmax,mu0,iflag0,f,nevts0,p1,p2
+            common /upperlimcom/ endpoints,exclude_low,clnow
+        end function upper
+        function fupper(sigma,i) ! in :upper:Upper.f
+            real :: sigma
+            integer :: i
+            integer :: method0
+            real :: cl0
+            integer :: nexp0
+            real dimension(20) :: xmax
+            real dimension(20) :: mu0
+            integer :: iflag0
+            real dimension(20001,2) :: f
+            integer dimension(2) :: nevts0
+            real :: p1
+            real :: p2
+            real :: fupper
+            common /uppercom/ method0,cl0,nexp0,xmax,mu0,iflag0,f,nevts0,p1,p2
+        end function fupper
+        function upperlim(cl,if_bn,n,fc,mub,fb,iflag) ! in :upper:UpperLim.f
+            real :: cl
+            integer :: if_bn
+            integer, optional,check((len(fc)-2)>=n),depend(fc) :: n=(len(fc)-2)
+            real dimension(n + 2) :: fc
+            real :: mub
+            real dimension(n + 2),depend(n) :: fb
+            integer :: iflag
+            real dimension(150001) :: f
+            integer :: n1
+            real :: cl1
+            integer :: if1
+            real :: meanmax
+            integer :: ncalls
+            integer :: istat
+            real dimension(150001) :: fc1
+            real dimension(150001) :: fb1
+            real :: mub1
+            real dimension(7) :: fmin1
+            real dimension(11) :: cdbg
+            integer :: mmax
+            integer dimension(2) :: endpoints
+            real dimension(2) :: exclude_low
+            real :: upperlim
+            common /fupcom/ f,n1,cl1,if1,meanmax,ncalls,istat,fc1,fb1,mub1,fmin1,cdbg,mmax
+            common /upperlimcom/ endpoints,exclude_low
+        end function upperlim
+        function fup(x,i) ! in :upper:UpperLim.f
+            real :: x
+            integer :: i
+            real dimension(150001) :: f
+            integer :: n1
+            real :: cl1
+            integer :: if1
+            real :: meanmax
+            integer :: ncalls
+            integer :: istat
+            real dimension(150001) :: fc1
+            real dimension(150001) :: fb1
+            real :: mub1
+            real dimension(7) :: fmin1
+            real dimension(11) :: cdbg
+            integer :: mmax
+            real :: fup
+            common /fupcom/ f,n1,cl1,if1,meanmax,ncalls,istat,fc1,fb1,mub1,fmin1,cdbg,mmax
+        end function fup
+    end interface 
+end python module upper
+
+! This file was auto-generated with f2py (version:2).
+! See http://cens.ioc.ee/projects/f2py2e/

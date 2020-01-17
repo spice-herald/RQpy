@@ -3,12 +3,13 @@ from glob import glob
 import time
 import os
 from pathlib import Path
+import types
 import contextlib
 from scipy import stats, signal, interpolate, special, integrate
 
 import rqpy as rp
 from rqpy import constants
-from rqpy.limit import _upperlim
+from rqpy.limit import _upper
 import mendeleev
 
 
@@ -18,7 +19,7 @@ __all__ = [
     "drde",
     "drde_max_q",
     "helmfactor",
-    "upperlim",
+    "upper",
     "drde_gauss_smear2d",
     "optimuminterval_2dsmear",
 ]
@@ -28,12 +29,12 @@ __all__ = [
 def _working_directory(path):
     """
     Changes working directory and returns to previous on exit.
-    
+
     Parameters
     ----------
     path : str
         The directory that the current working directory will temporarily be switched to.
-    
+
     """
 
     prev_cwd = Path.cwd()
@@ -43,9 +44,11 @@ def _working_directory(path):
     finally:
         os.chdir(prev_cwd)
 
-def upperlim(fc, cl=0.9, if_bn=1, mub=0, fb=None):
+
+def upper(fc, cl=0.9):
     """
-    Fortran wrapper function for Steve Yellin's Optimum Interval code.
+    Fortran wrapper function for Steve Yellin's Optimum Interval code `Upper.f`. In this case,
+    it calls a version of `UpperLim.f` that allows a larger range of confidence levels.
 
     Parameters
     ----------
@@ -55,24 +58,21 @@ def upperlim(fc, cl=0.9, if_bn=1, mub=0, fb=None):
         with fc(0)=0, fc(N+1)=1, and with  fc(i) the increasing ordered set of cumulative
         probabilities for the foreground distribution for event i, i=1 to N.
     cl : float, optional
-        The confidence level desired for the upper limit. Default is 0.9.
-    if_bn : int, optional
-        Say which minimum fraction of the cumulative probability is allowed for seeking the
-        optimum interval. `if_bn`=1, 2, 3, 4, 5, 6, 7 corresponds to minimum cumulative probability
-        interval = .00, .01, .02, .05, .10, .20, .50. Default is 1.
-    mub : int, optional
-        The total expected number of events from known background. Default is zero.
-    fb : array_like, NoneType, optional
-        Equivalent to `fc` but assuming the distribution shape from known background. The default
-        behavior is to simply pass `fc` as `fb` to the UpperLimit algorithm, which is done assuming
-        `mub` is zero.
+        The confidence level desired for the upper limit. Default is 0.9. Can be any value
+        between 0.00001 and 0.99999. However, the algorithm requires less than 100 upper
+        limit events when outside the range 0.8 to 0.995 in order to work, so an error may
+        be raised.
 
     Returns
     -------
     ulout : float
-        The output of the UpperLim Fortran code, corresponding to the upper limit expected number of
-        events. To convert to cross section, the output should be divided by the total rate of the signal
-        and multiplied by the expected cross section for that rate.
+        The output of the Upper Fortran code, corresponding to the upper limit expected number of
+        events. To convert to cross section, the output should be divided by the total rate of the
+        signal and multiplied by the expected cross section for that rate.
+    endpoints0 : int
+        An integer giving the index of FC at which the optimum interval started.
+    endpoints1 : int
+        An integer giving the index of FC at which the optimum interval ended.
 
     Notes
     -----
@@ -82,7 +82,7 @@ def upperlim(fc, cl=0.9, if_bn=1, mub=0, fb=None):
     algorithm.
 
     Read more about Steve Yellin's Optimum Interval code here:
-        - http://titus.stanford.edu/Upperlimit/
+        - http://titus.stanford.edu/Upper/
         - https://arxiv.org/abs/physics/0203002
         - https://arxiv.org/abs/0709.2701
 
@@ -90,13 +90,36 @@ def upperlim(fc, cl=0.9, if_bn=1, mub=0, fb=None):
 
     file_path = os.path.dirname(os.path.realpath(__file__))
 
-    if fb is None:
-        fb = fc
+    # make sure fc starts with 0 and ends with 1
+    fc_new = fc
+    if fc[0]!=0:
+        fc_new = np.concatenate(([0], fc_new))
+    if fc[-1]!=1:
+        fc_new = np.concatenate((fc_new, [1]))
 
-    with _working_directory(f"{file_path}/_upperlim/"):
-        ulout = _upperlim.upperlim(cl, if_bn, fc, mub, fb, 0)
+    method = 0
+    nexp = 1
+    maxp1 = len(fc_new) - 1
+    nevts = np.array([maxp1 - 1])
+    mu = 1
+    icode = 0
 
-    return ulout
+    with _working_directory(f"{file_path}/_upper/"):
+        ulout = _upper.upper(
+            method=method,
+            cl=cl,
+            nexp=nexp,
+            maxp1=maxp1,
+            nevts=nevts,
+            mu=np.asarray([mu]),
+            fc=fc_new[:, np.newaxis],
+            icode=icode,
+        )
+
+    endpoints = _upper.upperlimcom.endpoints
+
+    return ulout, endpoints[0], endpoints[1]
+
 
 def helmfactor(er, tm='Si'):
     """
@@ -236,6 +259,7 @@ def drde(q, m_dm, sig0, tm='Si'):
 
     return rate
 
+
 def drde_max_q(m_dm, tm='Si'):
     """
     Function for calculating the energy corresponding to the largest nonzero value of the differential rate,
@@ -309,7 +333,7 @@ def gauss_smear(x, f, res, nres=1e5, gauss_width=10):
 
 
 def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
-                    tm="Si", res=None, gauss_width=10, verbose=False):
+                    tm="Si", cl=0.9, res=None, gauss_width=10, verbose=False):
     """
     Function for running Steve Yellin's Optimum Interval code on an inputted spectrum and efficiency curve.
 
@@ -328,6 +352,11 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
     tm : str, int, optional
         The target material of the detector. Can be passed as either the atomic symbol, the
         atomic number, or the full name of the element. Default is 'Si'.
+    cl : float, optional
+        The confidence level desired for the upper limit. Default is 0.9. Can be any value
+        between 0.00001 and 0.99999. However, the algorithm requires less than 100 upper
+        limit events when outside the range 0.8 to 0.995 in order to work, so an error may
+        be raised.
     res : float, NoneType, optional
         The detector resolution in units of keV. If passed, then the differential event
         rate of the dark matter is convoluted with a Gaussian with width `res`, which results
@@ -343,11 +372,15 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
     -------
     sigma : ndarray
         The corresponding cross sections of the sensitivity curve (in cm^2).
+    oi_energy0 : ndarray
+        The energies in keV at which each optimum interval started.
+    oi_energy1 : ndarray
+        The energies in keV at which each optimum interval ended.
 
     Notes
     -----
     This function is a wrapper for Steve Yellin's Optimum Interval code. His code can be found
-    here: titus.stanford.edu/Upperlimit/
+    here: titus.stanford.edu/Upper/
 
     Read more about the Optimum Interval code in these two papers:
         - https://arxiv.org/abs/physics/0203002
@@ -376,12 +409,13 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
 
     exp = effs * exposure
 
-    curr_exp = interpolate.interp1d(effenergies, exp,
-                                    kind="linear",
-                                    bounds_error=False,
-                                    fill_value=(0, exp[-1]))
+    curr_exp = interpolate.interp1d(
+        effenergies, exp, kind="linear", bounds_error=False, fill_value=(0, exp[-1]),
+    )
 
     sigma = np.ones(len(masslist)) * np.inf
+    oi_energy0 = np.zeros(len(masslist))
+    oi_energy1 = np.zeros(len(masslist))
 
     for ii, mass in enumerate(masslist):
         if verbose:
@@ -414,16 +448,26 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
 
             cdf_max = 1 - 1e-6
             possiblewimp = fc <= cdf_max
-            nwimps = possiblewimp.sum()
             fc = fc[possiblewimp]
 
             if len(fc) == 0:
                 fc = np.asarray([0, 1])
 
-            uloutput = upperlim(fc)
-            sigma[ii] = (sigma0 / tot_rate) * uloutput
+            try:
+                uloutput, endpoint0, endpoint1 = upper(fc, cl=cl)
 
-    return sigma
+                sigma[ii] = (sigma0 / tot_rate) * uloutput
+
+                oi_energy0[ii] = eventenergies[event_inds][possiblewimp][endpoint0]
+
+                if endpoint1 < len(fc):
+                    oi_energy1[ii] = eventenergies[event_inds][possiblewimp][endpoint1]
+                else:
+                    oi_energy1[ii] = eventenergies[event_inds][possiblewimp][-1]
+            except:
+                pass
+
+    return sigma, oi_energy0, oi_energy1
 
 def _norm2d(x0, x1, mu, cov, return_ellipse=False):
     """
@@ -633,53 +677,81 @@ def drde_gauss_smear2d(x, cov, delta, m_dm, sig0, nsig=3, tm="Si", subtract_zero
 
     return out
 
-def optimuminterval_2dsmear(eventenergies, masslist, exposure, cov, delta,
-                            tm="Si", nsig=3, verbose=False, npts=1e3, subtract_zero=False):
+def optimuminterval_2dsmear(eventenergies, masslist, passagefraction, exposure,
+                            cov, delta, tm="Si", cl=0.9, nsig=3, verbose=False,
+                            npts=1e3, subtract_zero=False):
     """
-    Function for running Steve Yellin's Optimum Interval code on an inputted spectrum, using the
-    two-dimensional normal distribution defined by the inputted covariance matrix to model the
-    trigger efficiency. This is a more complicated version of `rqpy.limit.optimuminterval`.
+    Function for running Steve Yellin's Optimum Interval code on an
+    inputted spectrum, using the two-dimensional normal distribution
+    defined by the inputted covariance matrix to model the trigger
+    efficiency. This is a more complicated version of
+    `rqpy.limit.optimuminterval`.
 
     Parameters
     ----------
     eventenergies : ndarray
-        Array of all of the event energies (in keV) to use for calculating the sensitivity.
+        Array of all of the event energies (in keV) to use for
+        calculating the sensitivity.
     masslist : ndarray
-        List of candidate DM masses (in GeV/c^2) to calculate sensitivity at.
+        List of candidate DM masses (in GeV/c^2) to calculate the upper
+        limit at.
+    passagefraction : float, functionType
+        The passage fraction of the cuts being applied to the data.
+        Excludes the trigger efficiency, since that is wrapped up in the
+        2D smearing. If a float, then it should be a number between 0
+        and 1, meaning that the passage fraction is energy independent.
+        If a function, then the input should be in units of keV.
     exposure : float
         The total exposure of the detector (kg*days).
     cov : ndarray
-        The covariance matrix relating the measured/reconstructed energy and the trigger energy.
+        The covariance matrix relating the measured/reconstructed energy
+        and the trigger energy (both in keV).
     delta : float
         The threshold value (in keV) for the trigger energy.
     tm : str, int, optional
-        The target material of the detector. Can be passed as either the atomic symbol, the
-        atomic number, or the full name of the element. Default is 'Si'.
+        The target material of the detector. Can be passed as either
+        the atomic symbol, the atomic number, or the full name of the
+        element. Default is 'Si'.
+    cl : float, optional
+        The confidence level desired for the upper limit. Default is
+        0.9. Can be any value between 0.00001 and 0.99999. However, the
+        algorithm requires less than 100 upper limit events when outside
+        the range 0.8 to 0.995 in order to work, so an error may be
+        raised.
     nsig : float
-        The number of sigma outside of which the two-dimensional normal PDF defined by the
-        inputted covariance matrix will be set to zero. This defines an elliptical confidence
-        region. This is used to restrict the amount of smearing that is applied to the DM spectrum
-        to avoid calculate artificially low upper limits.
+        The number of sigma outside of which the two-dimensional normal
+        PDF defined by the inputted covariance matrix will be set to
+        zero. This defines an elliptical confidence region. This is used
+        to restrict the amount of smearing that is applied to the DM
+        spectrum to avoid calculate artificially low upper limits.
     verbose : bool, optional
-        If True, then the algorithm prints out which mass is currently being used in the calculation.
-        If False, no information is printed. Default is False.
+        If True, then the algorithm prints out which mass is currently
+        being used in the calculation. If False, no information is
+        printed. Default is False.
     npts : float, optional
-        The number of energies at which to evaluate the smeared differential rate. Large values
-        result in long computation times. Default is 1e3.
+        The number of energies at which to evaluate the smeared
+        differential rate. Large values result in long computation
+        times. Default is 1e3.
     subtract_zero : bool, optional
-        Option to subtract out the zero-energy multivariate normal distribution in true energy for
-        a more conservative estimate of the 2D Gaussian smeared limit. This will have only a small
+        Option to subtract out the zero-energy multivariate normal
+        distribution in true energy for a more conservative estimate of
+        the 2D Gaussian smeared limit. This will have only a small
         effect. Default is False.
 
     Returns
     -------
     sigma : ndarray
-        The corresponding cross sections of the sensitivity curve (in cm^2).
+        The corresponding cross sections of the sensitivity curve (in
+        cm^2).
+    oi_energy0 : ndarray
+        The energies in keV at which each optimum interval started.
+    oi_energy1 : ndarray
+        The energies in keV at which each optimum interval ended.
 
     Notes
     -----
-    This function is a wrapper for Steve Yellin's Optimum Interval code. His code can be found
-    here: titus.stanford.edu/Upperlimit/
+    This function is a wrapper for Steve Yellin's Optimum Interval code.
+    His code can be found here: titus.stanford.edu/Upper/
 
     Read more about the Optimum Interval code in these two papers:
         - https://arxiv.org/abs/physics/0203002
@@ -695,7 +767,9 @@ def optimuminterval_2dsmear(eventenergies, masslist, exposure, cov, delta,
     elow = max(0.001, min(eventenergies))
     ehigh = max(eventenergies)
 
-    en_interp = np.logspace(np.log10(0.9 * elow), np.log10(1.1 * ehigh), npts)
+    en_interp = np.logspace(
+        np.log10(0.9 * elow), np.log10(1.1 * ehigh), npts,
+    )
 
     delta_e = np.concatenate(([(en_interp[1] - en_interp[0])/2],
                               (en_interp[2:] - en_interp[:-2])/2,
@@ -707,6 +781,8 @@ def optimuminterval_2dsmear(eventenergies, masslist, exposure, cov, delta,
     inlim = rp.inrange(en_interp, elow, ehigh)
 
     sigma = np.ones(len(masslist)) * np.inf
+    oi_energy0 = np.zeros(len(masslist))
+    oi_energy1 = np.zeros(len(masslist))
 
     for ii, mass in enumerate(masslist):
         if verbose:
@@ -723,9 +799,14 @@ def optimuminterval_2dsmear(eventenergies, masslist, exposure, cov, delta,
             subtract_zero=subtract_zero,
         )
 
-        rate = init_rate * exposure
+        if isinstance(passagefraction, types.FunctionType):
+            rate = init_rate * exposure * passagefraction(en_interp)
+        else:
+            rate = init_rate * exposure * passagefraction
 
-        integ_rate = integrate.cumtrapz(rate[inlim], x=en_interp[inlim], initial=0)
+        integ_rate = integrate.cumtrapz(
+            rate[inlim], x=en_interp[inlim], initial=0,
+        )
 
         tot_rate = integ_rate[-1]
 
@@ -745,13 +826,22 @@ def optimuminterval_2dsmear(eventenergies, masslist, exposure, cov, delta,
 
             cdf_max = 1 - 1e-6
             possiblewimp = fc <= cdf_max
-            nwimps = possiblewimp.sum()
             fc = fc[possiblewimp]
 
             if len(fc) == 0:
                 fc = np.asarray([0, 1])
 
-            uloutput = upperlim(fc)
-            sigma[ii] = (sigma0 / tot_rate) * uloutput
+            try:
+                uloutput, endpoint0, endpoint1 = upper(fc, cl=cl)
+                sigma[ii] = (sigma0 / tot_rate) * uloutput
+                energies_used = eventenergies[event_inds][possiblewimp]
+                oi_energy0[ii] = energies_used[endpoint0]
 
-    return sigma
+                if endpoint1 < len(fc):
+                    oi_energy1[ii] = energies_used[endpoint1]
+                else:
+                    oi_energy1[ii] = energies_used[-1]
+            except:
+                pass
+
+    return sigma, oi_energy0, oi_energy1
