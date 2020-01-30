@@ -406,6 +406,7 @@ class SetupRQ(object):
         self.ofamp_constrained_nconstrain = [80]*self.nchan
         self.ofamp_constrained_windowcenter = [0]*self.nchan
         self.ofamp_constrained_pulse_constraint = [0]*self.nchan
+        self.ofamp_constrained_usetrigsimcenter = [False] * self.nchan
 
         self.do_ofamp_pileup = [True]*self.nchan
         self.do_ofamp_pileup_smooth = [False]*self.nchan
@@ -1573,7 +1574,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                     triggertime_sim_constrained[jj] = res_trigsim_constrained[1]
 
             if setup.do_ofamp_constrained[chan_num]:
-                if setup.usetrigsimcenter:
+                if setup.ofamp_constrained_usetrigsimcenter:
                     windowcenter_constrain = triggertime_sim[jj] * setup.fs - (signal.shape[-1]//2)
                     if setup.indstart is not None:
                         windowcenter_constrain -= setup.indstart
