@@ -674,7 +674,8 @@ class SetupRQ(object):
         self._check_of()
 
     def adjust_ofamp_constrained(self, lgcrun=True, lgcrun_smooth=False, calc_lowfreqchi2=True,
-                                 nconstrain=80, windowcenter=0, pulse_direction_constraint=0):
+                                 nconstrain=80, windowcenter=0, pulse_direction_constraint=0,
+                                 usetrigsimcenter=False):
         """
         Method for adjusting the calculation of the optimum filter fit with constrained 
         time shifting.
@@ -712,12 +713,13 @@ class SetupRQ(object):
 
         """
 
-        lgcrun, lgcrun_smooth, nconstrain, windowcenter, pulse_direction_constraint = self._check_arg_length(
+        lgcrun, lgcrun_smooth, nconstrain, windowcenter, pulse_direction_constraint, usetrigsimcenter = self._check_arg_length(
             lgcrun=lgcrun,
             lgcrun_smooth=lgcrun_smooth,
             nconstrain=nconstrain,
             windowcenter=windowcenter,
             pulse_direction_constraint=pulse_direction_constraint,
+            usetrigsimcenter=usetrigsimcenter,
         )
 
         self.do_ofamp_constrained = lgcrun
@@ -726,6 +728,7 @@ class SetupRQ(object):
         self.ofamp_constrained_nconstrain = nconstrain
         self.ofamp_constrained_windowcenter = windowcenter
         self.ofamp_constrained_pulse_constraint = pulse_direction_constraint
+        self.ofamp_constrained_usetrigsimcenter = usetrigsimcenter
 
         self._check_of()
 
@@ -1551,16 +1554,40 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
             if setup.do_ofamp_unconstrained_smooth[chan_num]:
                 amp_unconstrain_smooth[jj], t0_unconstrain_smooth[jj], chi2_unconstrain_smooth[jj] = OF_smooth.ofamp_withdelay()
 
+            if setup.do_trigsim[chan_num] and setup.trigger == chan_num:
+                res_trigsim = setup.TS.trigger(setup.signal_full[jj, chan_num], k=setup.trigsim_k)
+                triggeramp_sim[jj] = res_trigsim[0]
+                triggertime_sim[jj] = res_trigsim[1]
+                ofampnodelay_sim[jj] = res_trigsim[2]
+
+                if setup.do_trigsim_constrained[chan_num]:
+                    res_trigsim_constrained = setup.TS.constrain_trigger(
+                        setup.signal_full[jj, chan_num],
+                        setup.trigsim_constraint_width,
+                        k=setup.trigsim_k,
+                        windowcenter=setup.trigsim_windowcenter,
+                        fir_out=res_trigsim[-1],
+                    )
+
+                    triggeramp_sim_constrained[jj] = res_trigsim_constrained[0]
+                    triggertime_sim_constrained[jj] = res_trigsim_constrained[1]
+
             if setup.do_ofamp_constrained[chan_num]:
+                if setup.usetrigsimcenter:
+                    windowcenter_constrain = triggertime_sim[jj] * setup.fs - (signal.shape[-1]//2)
+                    if setup.indstart is not None:
+                        windowcenter_constrain -= setup.indstart
+                else:
+                    windowcenter_constrain = setup.ofamp_constrained_windowcenter[chan_num]
                 amp_constrain[jj], t0_constrain[jj], chi2_constrain[jj] = OF.ofamp_withdelay(
                     nconstrain=setup.ofamp_constrained_nconstrain[chan_num],
-                    windowcenter=setup.ofamp_constrained_windowcenter[chan_num],
+                    windowcenter=windowcenter_constrain,
                 )
                 if setup.ofamp_constrained_pulse_constraint[chan_num]!=0:
                     amp_constrain_pcon[jj], t0_constrain_pcon[jj], chi2_constrain_pcon[jj] = OF.ofamp_withdelay(
                         nconstrain=setup.ofamp_constrained_nconstrain[chan_num],
                         pulse_direction_constraint=setup.ofamp_constrained_pulse_constraint[chan_num],
-                        windowcenter=setup.ofamp_constrained_windowcenter[chan_num],
+                        windowcenter=windowcenter_constrain,
                     )
                 if setup.ofamp_constrained_lowfreqchi2 and setup.do_chi2_lowfreq[chan_num]:
                     chi2low_constrain[jj] = OF.chi2_lowfreq(
@@ -1578,7 +1605,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
             if setup.do_ofamp_constrained_smooth[chan_num]:
                 amp_constrain_smooth[jj], t0_constrain_smooth[jj], chi2_constrain_smooth[jj] = OF_smooth.ofamp_withdelay(
                     nconstrain=setup.ofamp_constrained_nconstrain[chan_num],
-                    windowcenter=setup.ofamp_constrained_windowcenter[chan_num],
+                    windowcenter=windowcenter_constrain,
                 )
 
             if setup.do_ofamp_pileup[chan_num]:
@@ -1746,24 +1773,6 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                     t0_nonlin_err[jj] = errors_nlin[2]
                     chi2_nonlin[jj] = reducedchi2_nlin * (len(nlin.data) - nlin.dof)
                     success_nonlin[jj] = res_nlin[3]
-
-            if setup.do_trigsim[chan_num] and setup.trigger == chan_num:
-                res_trigsim = setup.TS.trigger(setup.signal_full[jj, chan_num], k=setup.trigsim_k)
-                triggeramp_sim[jj] = res_trigsim[0]
-                triggertime_sim[jj] = res_trigsim[1]
-                ofampnodelay_sim[jj] = res_trigsim[2]
-
-                if setup.do_trigsim_constrained[chan_num]:
-                    res_trigsim_constrained = setup.TS.constrain_trigger(
-                        setup.signal_full[jj, chan_num],
-                        setup.trigsim_constraint_width,
-                        k=setup.trigsim_k,
-                        windowcenter=setup.trigsim_windowcenter,
-                        fir_out=res_trigsim[-1],
-                    )
-
-                    triggeramp_sim_constrained[jj] = res_trigsim_constrained[0]
-                    triggertime_sim_constrained[jj] = res_trigsim_constrained[1]
 
     if any(setup.do_ofamp_coinc) and setup.trigger is not None and chan_num==setup.trigger:
         if setup.which_fit_coinc=="nodelay" and any(setup.do_ofamp_nodelay):
