@@ -1574,7 +1574,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                     triggertime_sim_constrained[jj] = res_trigsim_constrained[1]
 
             if setup.do_ofamp_constrained[chan_num]:
-                if setup.ofamp_constrained_usetrigsimcenter:
+                if setup.ofamp_constrained_usetrigsimcenter[chan_num]:
                     windowcenter_constrain = int(triggertime_sim[jj] * setup.fs - (signal.shape[-1]//2))
                     if setup.indstart is not None:
                         windowcenter_constrain -= setup.indstart
