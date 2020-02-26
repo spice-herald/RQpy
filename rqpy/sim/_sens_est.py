@@ -41,14 +41,15 @@ def calculate_substrate_mass(vol, tm):
 def trigger_pdf(x, sigma, n_win):
     """
     Function for calculating the expected PDF due to a finite trigger window, based
-    on the Optimum Filter method. Outputs in units of events/kg/keV/day.
+    on the Optimum Filter method. Outputs in units of 1 / [units of `sigma`].
 
     Parameters
     ----------
     x : ndarray
-        The energies at which the PDF will be evaluated, units of keV.
+        The values at which the PDF will be evaluated. Units are arbitrary,
+        but note that this function is usually used with regards to energy.
     sigma : float
-        The detector resolution in units of keV.
+        The detector resolution in the same units of `x`.
     n_win : float
         The number of independent samples in a trigger search window. If there
         is correlated noise, this value can be shorter than the number of samples
