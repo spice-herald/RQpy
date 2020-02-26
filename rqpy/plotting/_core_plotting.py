@@ -184,6 +184,7 @@ def hist(arr, nbins='auto', xlims=None, cuts=None, lgcrawdata=True,
 
     ax.tick_params(which="both", direction="in", right=True, top=True)
     ax.grid(linestyle="dashed")
+    ax.set_yscale('log')
 
     if lgclegend:
         ax.legend(loc="best")
