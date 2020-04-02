@@ -434,6 +434,7 @@ class SetupRQ(object):
 
         self.do_baseline = [True]*self.nchan
         self.baseline_indbasepre = [len(self.templates[0])//3]*self.nchan
+        self.baseline_indbasepost = [2 * len(self.templates[0])//3]*self.nchan
 
         self.do_integral = [True]*self.nchan
         self.indstart_integral = [len(self.templates[0])//3]*self.nchan
@@ -1012,7 +1013,7 @@ class SetupRQ(object):
 
         self._check_of()
 
-    def adjust_baseline(self, lgcrun=True, indbasepre=None):
+    def adjust_baseline(self, lgcrun=True, indbasepre=None, indbasepost=None):
         """
         Method for adjusting the calculation of the DC baseline.
 
@@ -1033,10 +1034,16 @@ class SetupRQ(object):
         if indbasepre is None:
             indbasepre = len(self.templates[0])//3
 
-        lgcrun, indbasepre = self._check_arg_length(lgcrun=lgcrun, indbasepre=indbasepre)
+        if indbasepost is None:
+            indbasepost = 2 * len(self.templates[0])//3
+
+        lgcrun, indbasepre = self._check_arg_length(
+            lgcrun=lgcrun, indbasepre=indbasepre, indbasepost=indbasepost,
+        )
 
         self.do_baseline = lgcrun
         self.baseline_indbasepre = indbasepre
+        self.baseline_indbasepost = indbasepost
 
     def adjust_integral(self, lgcrun=True, indstart=None, indstop=None, indbasepre=None, indbasepost=None):
         """
@@ -1332,7 +1339,11 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
     if setup.do_baseline[chan_num]:
         baseline = np.mean(signal[:, :setup.baseline_indbasepre[chan_num]], axis=-1)
         rq_dict[f'baseline_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'baseline_{chan}{det}'][readout_inds] = baseline
+        rq_dict[f'baseline_{chan}{det}'][readout_inds] = baseline]
+
+        baseline_post = np.mean(signal[:, setup.baseline_indbasepost[chan_num]:], axis=-1)
+        rq_dict[f'baseline_post_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'baseline_post_{chan}{det}'][readout_inds] = baseline_post
 
     if setup.do_integral[chan_num]:
         if setup.do_baseline[chan_num]:
