@@ -1339,7 +1339,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
     if setup.do_baseline[chan_num]:
         baseline = np.mean(signal[:, :setup.baseline_indbasepre[chan_num]], axis=-1)
         rq_dict[f'baseline_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
-        rq_dict[f'baseline_{chan}{det}'][readout_inds] = baseline]
+        rq_dict[f'baseline_{chan}{det}'][readout_inds] = baseline
 
         baseline_post = np.mean(signal[:, setup.baseline_indbasepost[chan_num]:], axis=-1)
         rq_dict[f'baseline_post_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
