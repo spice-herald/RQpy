@@ -1037,7 +1037,7 @@ class SetupRQ(object):
         if indbasepost is None:
             indbasepost = 2 * len(self.templates[0])//3
 
-        lgcrun, indbasepre = self._check_arg_length(
+        lgcrun, indbasepre, indbasepost = self._check_arg_length(
             lgcrun=lgcrun, indbasepre=indbasepre, indbasepost=indbasepost,
         )
 
