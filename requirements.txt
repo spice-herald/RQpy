@@ -10,3 +10,4 @@ qetpy>=1.1.0
 deepdish>=0.3.6
 scikit_learn>=0.20.2
 seaborn>=0.8.0
+iminuit>=1.3.0
