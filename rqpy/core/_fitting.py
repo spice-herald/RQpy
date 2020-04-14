@@ -8,6 +8,7 @@ __all__ = [
     "fit_multi_gauss",
     "fit_gauss",
     "ext_max_llhd",
+    "NormBackground",
 ]
 
 
