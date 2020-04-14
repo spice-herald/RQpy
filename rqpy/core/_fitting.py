@@ -1,11 +1,13 @@
 import numpy as np
 from scipy.optimize import curve_fit
 from rqpy import plotting, utils
+import iminuit
 
 
 __all__ = [
     "fit_multi_gauss",
     "fit_gauss",
+    "ext_max_llhd",
 ]
 
 
@@ -245,4 +247,143 @@ def fit_gauss(arr, xrange=None, nbins='sqrt', noiserange=None, lgcplot=False,
     return peakloc, peakerr, fitparams, errors
 
 
+def ext_max_llhd(x, func, guess, guess_err=None, limits=None):
+    """
+    Routine for finding the Extended Unbinned Maximum Likelihood of an
+    inputted spectrum, giving an inputted (arbitrary) function.
+
+    Parameters
+    ----------
+    x : array_like
+        The energies of each inputted event.
+    func : FunctionType
+        The negative log-likelihood for the normalized PDF, see Notes.
+    guess : array_like
+        Guesses for the true values of each parameter.
+    guess_err : array_like, optional
+        Guess for the errors of each parameter. Default is to
+        simply use the guesses.
+    limits : array_like, optional
+        The limits to set on each parameter. Default is to set no
+        limits. Should be of form:
+            [(lower0, upper0), (lower1, upper1), ...]
+
+    Returns
+    -------
+    m : iminuit.Minuit
+        The Minuit object that contains all information on the fit,
+        after the MINUIT algorithm has completed.
+
+    Notes
+    -----
+    For a normalized PDF of form f(x, p) / Norm(p), where p is a vector
+    of the fit parameters, the negative-log likelihood for the Extended
+    Unbinned Maximum Likelihood method is:
+
+        -log(L) = Norm(p) - sum(log(f(x, p)))
+
+    """
+
+    fit_dict = {f'p{ii}': g for ii, g in enumerate(guess)}
+
+    if guess_err is None:
+        err_dict = {f'error_p{ii}': g for ii, g in enumerate(guess)}
+    else:
+        err_dict = {f'error_p{ii}': g for ii, g in enumerate(guess_err)}
+
+    if limits is None:
+        limit_dict = {
+            f'limit_p{ii}': (None, None) for ii in range(len(guess))
+        }
+    else:
+        limit_dict = {f'limit_p{ii}': l for ii, l in enumerate(limits)}
+
+    input_dict = {**fit_dict, **err_dict, **limit_dict}
+
+    m = iminuit.Minuit(
+        lambda p: func(x, p),
+        use_array_call=True,
+        errordef=1,
+        forced_parameters=[f'p{ii}' for ii in range(len(guess))],
+        **input_dict,
+    )
+
+    m.migrad()
+    m.hesse()
+
+    return m
+
+
+class NormBackground(object):
+
+    def __init__(self, lwrbnd, uprbnd, flatbkgd=True, nexpbkgd=0, ngaussbkgd=0):
+
+        self.lwrbnd = lwrbnd
+        self.uprbnd = uprbnd
+        self.flatbkgd = flatbkgd
+        self.nexpbkgd = nexpbkgd
+        self.ngaussbkgd = ngaussbkgd
+
+        self.nparams = flatbkgd + nexpbkgd * 2 + ngaussbkgd * 3
+
+    def _flatbkgd(self, x, *p):
+
+        if np.isscalar(x):
+            return p[0]
+
+        return p[0] * np.ones(len(x))
+
+    def _expbkgd(self, x, *p):
+
+        return p[0] * np.exp(-x / p[1])
+
+    def _gaussbkgd(self, x, *p):
+
+        return p[0] * np.exp(-(x - p[1])**2 / (2 * p[2]**2))
+
+    def background(self, x, p):
+
+        if len(p) != self.nparams:
+            raise ValueError(
+                'Length of p does not match expected number of parameters'
+            )
+
+        output = np.zeros(len(x))
+        ii = 0
+
+        if self.flatbkgd:
+            output += self._flatbkgd(x, *(p[ii], ))
+            ii += 1
+
+        for jj in range(self.nexpbkgd):
+            output += self._expbkgd(x, *(p[ii], p[ii + 1]))
+            ii += 2
+
+        for jj in range(self.ngaussbkgd):
+            output += self._gaussbkgd(x, *(p[ii], p[ii + 1], p[ii + 2]))
+            ii += 3
+
+        return output
+
+    def _normalization(self, p):
+        norm = 0
+        ii = 0
+
+        if self.flatbkgd:
+            norm += self._flatbkgd(0, *(p[ii], )) * (self.uprbnd - self.lwrbnd)
+            ii += 1
+
+        for jj in range(self.nexpbkgd):
+            norm += p[ii + 1] * (self._expbkgd(self.lwrbnd, *(p[ii], p[ii + 1])) - self._expbkgd(self.uprbnd, *(p[ii], p[ii + 1])))
+            ii += 2
+
+        for jj in range(self.ngaussbkgd):
+            norm += p[ii] * np.sqrt(2 * np.pi * p[ii + 2]**2)
+            ii += 3
+
+        return norm
+
+    def neglogllhd(self, x, p):
+
+        return -sum(np.log(self.background(x, p))) + self._normalization(p)
 
