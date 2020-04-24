@@ -132,8 +132,8 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
             if len(det) != len(channels):
                 raise ValueError("channels and det should have the same length")
 
-            if np.issubdtype(type(snum), np.integer):
-                snum_str = f"{snum:012}"
+            if np.isscalar(snum):
+                snum_str = f"{int(snum):012}"
                 snum_str = snum_str[:8] + '_' + snum_str[8:]
             else:
                 snum_str = snum
