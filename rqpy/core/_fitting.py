@@ -387,7 +387,7 @@ class NormBackground(object):
             The energies at which the background will be calculated.
         p : array_like
             The parameters that determine the shape of each component
-            of the background.
+            of the background. See Notes for order of parameters.
 
         Returns
         -------
@@ -395,6 +395,19 @@ class NormBackground(object):
             The differential background spectrum at each `x` value,
             given the inputted shape parameters `p`. Units of
             1 / [energy].
+
+        Notes
+        -----
+        The order of parameters should be
+
+            1) The flat background rate (if there is one, otherwise
+                skip)
+            2) The exponential shape parameters for each exponential
+                background (if nonzero):
+                    (amplitude, exponential coefficient)
+            3) The Gaussian shape parameters for each Gaussian
+                background (if nonzero):
+                    (ampltiude, mean, standard deviation)
 
         """
 
@@ -464,13 +477,26 @@ class NormBackground(object):
             The energies at which the background will be calculated.
         p : array_like
             The parameters that determine the shape of each component
-            of the background.
+            of the background. See Notes for order of parameters.
 
         Returns
         -------
         out : float
             The extended maximum likelihood for inputted spectrum
             parameters.
+
+        Notes
+        -----
+        The order of parameters should be
+
+            1) The flat background rate (if there is one, otherwise
+                skip)
+            2) The exponential shape parameters for each exponential
+                background (if nonzero):
+                    (amplitude, exponential coefficient)
+            3) The Gaussian shape parameters for each Gaussian
+                background (if nonzero):
+                    (ampltiude, mean, standard deviation)
 
         """
 
