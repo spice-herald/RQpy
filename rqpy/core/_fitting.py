@@ -316,35 +316,89 @@ def ext_max_llhd(x, func, guess, guess_err=None, limits=None):
 
 
 class NormBackground(object):
+    """
+    Class for calculating a normalized spectrum from specified
+    background shapes.
 
-    def __init__(self, lwrbnd, uprbnd, flatbkgd=True, nexpbkgd=0, ngaussbkgd=0):
+    """
 
-        self.lwrbnd = lwrbnd
-        self.uprbnd = uprbnd
-        self.flatbkgd = flatbkgd
-        self.nexpbkgd = nexpbkgd
-        self.ngaussbkgd = ngaussbkgd
+    def __init__(self, lwrbnd, uprbnd, flatbkgd=True, nexpbkgd=0,
+                 ngaussbkgd=0):
+        """
+        Initalization of the NormBackground class.
 
-        self.nparams = flatbkgd + nexpbkgd * 2 + ngaussbkgd * 3
+        Parameters
+        ----------
+        lwrbnd : float
+            The lower bound of the background spectra, in energy.
+        uprbnd : float
+            The upper bound of the background spectra, in energy.
+        flatbkgd : bool, optional
+            If True, then the background spectrum will have a flat
+            background component. If False, there will not be one.
+            Default is True.
+        nexpbkgd : int, optional
+            The number of exponential spectra in the background
+            spectrum. Default is 0.
+        ngaussbkgd : int, optional
+            The number of Gaussian spectra in the background spectrum.
+            Default is 0.
 
-    def _flatbkgd(self, x, *p):
+        """
+
+        self._lwrbnd = lwrbnd
+        self._uprbnd = uprbnd
+        self._flatbkgd = flatbkgd
+        self._nexpbkgd = nexpbkgd
+        self._ngaussbkgd = ngaussbkgd
+
+        self._nparams = flatbkgd + nexpbkgd * 2 + ngaussbkgd * 3
+
+    @staticmethod
+    def _flatbkgd(x, *p):
+        """Hidden method to calculate a flat spectrum."""
 
         if np.isscalar(x):
             return p[0]
 
         return p[0] * np.ones(len(x))
 
-    def _expbkgd(self, x, *p):
+    @staticmethod
+    def _expbkgd(x, *p):
+        """Hidden method to calculate an exponential spectrum."""
 
         return p[0] * np.exp(-x / p[1])
 
-    def _gaussbkgd(self, x, *p):
+    @staticmethod
+    def _gaussbkgd(x, *p):
+        """Hidden method to calculate a Gaussian spectrum."""
 
         return p[0] * np.exp(-(x - p[1])**2 / (2 * p[2]**2))
 
     def background(self, x, p):
+        """
+        Method for calculating the differential background (in units of
+        1 / [energy]) given the inputted parameters and initialized
+        background shape.
 
-        if len(p) != self.nparams:
+        Parameters
+        ----------
+        x : ndarray
+            The energies at which the background will be calculated.
+        p : array_like
+            The parameters that determine the shape of each component
+            of the background.
+
+        Returns
+        -------
+        output : ndarray
+            The differential background spectrum at each `x` value,
+            given the inputted shape parameters `p`. Units of
+            1 / [energy].
+
+        """
+
+        if len(p) != self._nparams:
             raise ValueError(
                 'Length of p does not match expected number of parameters'
             )
@@ -352,39 +406,73 @@ class NormBackground(object):
         output = np.zeros(len(x))
         ii = 0
 
-        if self.flatbkgd:
+        if self._flatbkgd:
             output += self._flatbkgd(x, *(p[ii], ))
             ii += 1
 
-        for jj in range(self.nexpbkgd):
+        for jj in range(self._nexpbkgd):
             output += self._expbkgd(x, *(p[ii], p[ii + 1]))
             ii += 2
 
-        for jj in range(self.ngaussbkgd):
+        for jj in range(self._ngaussbkgd):
             output += self._gaussbkgd(x, *(p[ii], p[ii + 1], p[ii + 2]))
             ii += 3
 
         return output
 
     def _normalization(self, p):
+        """
+        Hidden method for calculating the normalization of the
+        background spectrum.
+
+        """
+
         norm = 0
         ii = 0
 
-        if self.flatbkgd:
-            norm += self._flatbkgd(0, *(p[ii], )) * (self.uprbnd - self.lwrbnd)
+        if self._flatbkgd:
+            norm += self._flatbkgd(
+                0, *(p[ii], ),
+            ) * (self._uprbnd - self._lwrbnd)
             ii += 1
 
-        for jj in range(self.nexpbkgd):
-            norm += p[ii + 1] * (self._expbkgd(self.lwrbnd, *(p[ii], p[ii + 1])) - self._expbkgd(self.uprbnd, *(p[ii], p[ii + 1])))
+        for jj in range(self._nexpbkgd):
+            norm += p[ii + 1] * (
+                self._expbkgd(
+                    self._lwrbnd, *(p[ii], p[ii + 1]),
+                ) - self._expbkgd(
+                    self._uprbnd, *(p[ii], p[ii + 1]),
+                )
+            )
             ii += 2
 
-        for jj in range(self.ngaussbkgd):
+        for jj in range(self._ngaussbkgd):
             norm += p[ii] * np.sqrt(2 * np.pi * p[ii + 2]**2)
             ii += 3
 
         return norm
 
     def neglogllhd(self, x, p):
+        """
+        Method for calculating the negative log-likelihood for use with
+        an extended maximum likelihood method, e.g.
+        `rqpy.ext_max_llhd`.
+
+        Parameters
+        ----------
+        x : ndarray
+            The energies at which the background will be calculated.
+        p : array_like
+            The parameters that determine the shape of each component
+            of the background.
+
+        Returns
+        -------
+        out : float
+            The extended maximum likelihood for inputted spectrum
+            parameters.
+
+        """
 
         return -sum(np.log(self.background(x, p))) + self._normalization(p)
 
