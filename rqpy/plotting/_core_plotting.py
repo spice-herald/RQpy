@@ -26,8 +26,10 @@ def previewgreyscale(fig, dpi=100):
 
     Parameters
     ----------
-    fig : matplotlib.figure.Figure
-        Figure object from matplotlib to convert to greyscale.
+    fig : matplotlib.figure.Figure, str
+        Figure object from matplotlib to convert to greyscale. If a path to
+        a file, then the function will open that image file and output a
+        greyscale version.
     dpi : int, optional
         The dpi desired for the outputted image, default is 100.
 
@@ -37,19 +39,24 @@ def previewgreyscale(fig, dpi=100):
 
     """
 
-    # save figure as image to memory
-    fig.canvas.draw()
-    buf = io.BytesIO()
-    fig.savefig(buf, format='png', dpi=dpi)
-    buf.seek(0)
-    s = plt.imread(buf)
-    buf.close()
+    if isinstance(fig, str):
+        s = plt.imread(fig)
+        figsize = (s.shape[1] / dpi, s.shape[0] / dpi)
+    else:
+        # save figure as image to memory
+        fig.canvas.draw()
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png', dpi=dpi)
+        buf.seek(0)
+        s = plt.imread(buf)
+        buf.close()
+        figsize = fig.get_size_inches()
 
     # remove alpha, convert to greyscale
     grey = np.dot(s[..., :-1], [0.299, 0.587, 0.114])
 
     # make new plot with same size
-    ff = plt.figure(figsize=fig.get_size_inches())
+    ff = plt.figure(figsize=figsize)
     ax = plt.Axes(ff, [0., 0., 1., 1.])
     ax.set_axis_off()
     ff.add_axes(ax)
