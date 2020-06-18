@@ -233,10 +233,16 @@ class SensEst(object):
                 en_interp, plot_bkgd=plot_bkgd and ii==0,
             )
 
+            min_evts_sim = evts_sim[evts_sim > threshold][0]
+            if min_evts_sim not in en_interp:
+                en_interp_new = np.sort(np.concatenate(
+                    (en_interp, [min_evts_sim]),
+                ))
+
             sig_temp, _, _ = rp.limit.optimuminterval(
-                evts_sim[evts_sim > threshold],
-                en_interp,
-                np.heaviside(en_interp - threshold, 0),
+                evts_sim[evts_sim >= min_evts_sim],
+                en_interp_new,
+                np.heaviside(en_interp_new - min_evts_sim, 1),
                 m_dms,
                 self.exposure,
                 tm=self.tm,
@@ -246,7 +252,7 @@ class SensEst(object):
 
         sig = np.median(np.stack(sigs, axis=1), axis=1)
 
-        return m_dms, sig
+        return m_dms, sig, sigs
 
     def generate_background(self, e_high, e_low=0, npts=1000, plot_bkgd=False):
         """
