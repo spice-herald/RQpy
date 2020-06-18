@@ -348,7 +348,7 @@ class NormBackground(object):
 
         self._lwrbnd = lwrbnd
         self._uprbnd = uprbnd
-        self._flatbkgd = flatbkgd
+        self._bool_flatbkgd = flatbkgd
         self._nexpbkgd = nexpbkgd
         self._ngaussbkgd = ngaussbkgd
 
@@ -419,7 +419,7 @@ class NormBackground(object):
         output = np.zeros(len(x))
         ii = 0
 
-        if self._flatbkgd:
+        if self._bool_flatbkgd:
             output += self._flatbkgd(x, *(p[ii], ))
             ii += 1
 
@@ -443,7 +443,7 @@ class NormBackground(object):
         norm = 0
         ii = 0
 
-        if self._flatbkgd:
+        if self._bool_flatbkgd:
             norm += self._flatbkgd(
                 0, *(p[ii], ),
             ) * (self._uprbnd - self._lwrbnd)
