@@ -744,6 +744,14 @@ class SetupRQ(object):
         self.ofamp_constrained_pulse_constraint = pulse_direction_constraint
         self.ofamp_constrained_usetrigsimcenter = usetrigsimcenter
 
+        if any(usetrigsimcenter) and not any(self.do_trigsim):
+            warnings.warn(
+                "usetrigsimcenter has been sent to True, but the trigger "
+                "simulation has not been set to run. Unless this is changed "
+                "later, the constrained OF will instead center on the "
+                "specified windowcenter"
+            )
+
         self._check_of()
 
     def adjust_ofamp_baseline(self, lgcrun=True, lgcrun_smooth=False,
