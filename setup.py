@@ -78,6 +78,19 @@ setup(
     cmdclass={
         'clean': CleanCommand,
     },
+    install_requires=[
+        'pandas',
+        'numpy',
+        'scipy',
+        'scikit_image',
+        'matplotlib',
+        'lmfit',
+        'mendeleev',
+        'qetpy',
+        'deepdish',
+        'scikit_learn',
+        'seaborn',
+    ],
     data_files=[
         ('rqpy/limit/_upper/', upper_data_paths),
     ],
