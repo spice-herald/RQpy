@@ -90,6 +90,7 @@ setup(
         'deepdish',
         'scikit_learn',
         'seaborn',
+        'iminuit',
     ],
     data_files=[
         ('rqpy/limit/_upper/', upper_data_paths),
