@@ -101,6 +101,10 @@ class SetupRQ(object):
         pulse direction is set. If 1, then a positive pulse constraint is set for all fits. 
         If -1, then a negative pulse constraint is set for all fits. If any other value, then
         an ValueError will be raised. Each value in the list specifies this attribute for each channel.
+    ofamp_constrained_usetrigsimcenter : list of bool
+        If True, and if the trigger simulation has been run on the
+        specified channel, then the constrained Optimum Filter will
+        be centered on the trigger time.
     do_ofamp_pileup : list of bool
         Boolean flag for whether or not to do the pileup optimum filter fit. Each value in the list specifies 
         this attribute for each channel.
@@ -188,6 +192,10 @@ class SetupRQ(object):
     baseline_indbasepre : list of int
         The number of indices up to which a trace should be averaged to determine the baseline. Each value
         in the list specifies this attribute for each channel.
+    baseline_indbasepost : list of int
+        The number of indices after to which a trace should be averaged
+        to determine the post baseline. Each value in the list
+        specifies this attribute for each channel.
     do_integral : list of bool
         Boolean flag for whether or not to calculate the baseline-subtracted integral of each trace. Each value
         in the list specifies this attribute for each channel.
@@ -712,6 +720,10 @@ class SetupRQ(object):
             pulse direction is set. If 1, then a positive pulse constraint is set for all fits.
             If -1, then a negative pulse constraint is set for all fits. If any other value, then
             an ValueError will be raised.
+        usetrigsimcenter : bool, list of bool, optional
+            If True, and if the trigger simulation has been run on the
+            specified channel, then the constrained Optimum Filter will
+            be centered on the trigger time.
 
         """
 
@@ -1025,9 +1037,17 @@ class SetupRQ(object):
             baseline can be subtracted.
         indbasepre : int, list of int, optional
             The number of indices up to which a trace should be averaged to determine the baseline.
-            Can be set to a list of values, if indbasepre should be different for each channel. 
+            Can be set to a list of values, if indbasepre should be different for each channel.
             The length of the list should be the same length as the number of channels. Default
             is one-third of the trace length.
+        indbasepost : list of int
+            The number of indices after to which a trace should be
+            averaged to determine the post baseline. Can be set to a
+            list of values, if `indbasepost` should be different for
+            each channel. The length of the list should be the same
+            length as the number of channels. Default is two-thirds of
+            the trace length, i.e. average over the final one-third of
+            each trace.
 
         """
 
