@@ -397,6 +397,8 @@ def get_traces_midgz(path, channels, det, convtoamps=None, lgcskip_empty=True, l
             "pollingendtime",
             "triggertime",
             "triggeramp",
+            "triggermask",
+            "triggerdetnum",
         ]
 
         columns_trigveto = [
@@ -425,6 +427,8 @@ def get_traces_midgz(path, channels, det, convtoamps=None, lgcskip_empty=True, l
             info_dict["triggeramp"].append(trig['TriggerAmplitude'])
             info_dict["pollingendtime"].append(ev["PollingEndTime"])
             info_dict["triggertime"].append(trig["TriggerTime"])
+            info_dict["triggermask"].append(trig["TriggerMask"])
+            info_dict["triggerdetnum"].append(trig["TriggerDetNum"])
 
             for d in set(det):
                 try:

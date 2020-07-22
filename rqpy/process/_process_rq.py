@@ -101,6 +101,10 @@ class SetupRQ(object):
         pulse direction is set. If 1, then a positive pulse constraint is set for all fits. 
         If -1, then a negative pulse constraint is set for all fits. If any other value, then
         an ValueError will be raised. Each value in the list specifies this attribute for each channel.
+    ofamp_constrained_usetrigsimcenter : list of bool
+        If True, and if the trigger simulation has been run on the
+        specified channel, then the constrained Optimum Filter will
+        be centered on the trigger time.
     do_ofamp_pileup : list of bool
         Boolean flag for whether or not to do the pileup optimum filter fit. Each value in the list specifies 
         this attribute for each channel.
@@ -188,6 +192,10 @@ class SetupRQ(object):
     baseline_indbasepre : list of int
         The number of indices up to which a trace should be averaged to determine the baseline. Each value
         in the list specifies this attribute for each channel.
+    baseline_indbasepost : list of int
+        The number of indices after to which a trace should be averaged
+        to determine the post baseline. Each value in the list
+        specifies this attribute for each channel.
     do_integral : list of bool
         Boolean flag for whether or not to calculate the baseline-subtracted integral of each trace. Each value
         in the list specifies this attribute for each channel.
@@ -406,6 +414,7 @@ class SetupRQ(object):
         self.ofamp_constrained_nconstrain = [80]*self.nchan
         self.ofamp_constrained_windowcenter = [0]*self.nchan
         self.ofamp_constrained_pulse_constraint = [0]*self.nchan
+        self.ofamp_constrained_usetrigsimcenter = [False] * self.nchan
 
         self.do_ofamp_pileup = [True]*self.nchan
         self.do_ofamp_pileup_smooth = [False]*self.nchan
@@ -433,6 +442,7 @@ class SetupRQ(object):
 
         self.do_baseline = [True]*self.nchan
         self.baseline_indbasepre = [len(self.templates[0])//3]*self.nchan
+        self.baseline_indbasepost = [2 * len(self.templates[0])//3]*self.nchan
 
         self.do_integral = [True]*self.nchan
         self.indstart_integral = [len(self.templates[0])//3]*self.nchan
@@ -674,7 +684,8 @@ class SetupRQ(object):
         self._check_of()
 
     def adjust_ofamp_constrained(self, lgcrun=True, lgcrun_smooth=False, calc_lowfreqchi2=True,
-                                 nconstrain=80, windowcenter=0, pulse_direction_constraint=0):
+                                 nconstrain=80, windowcenter=0, pulse_direction_constraint=0,
+                                 usetrigsimcenter=False):
         """
         Method for adjusting the calculation of the optimum filter fit with constrained 
         time shifting.
@@ -709,15 +720,20 @@ class SetupRQ(object):
             pulse direction is set. If 1, then a positive pulse constraint is set for all fits.
             If -1, then a negative pulse constraint is set for all fits. If any other value, then
             an ValueError will be raised.
+        usetrigsimcenter : bool, list of bool, optional
+            If True, and if the trigger simulation has been run on the
+            specified channel, then the constrained Optimum Filter will
+            be centered on the trigger time.
 
         """
 
-        lgcrun, lgcrun_smooth, nconstrain, windowcenter, pulse_direction_constraint = self._check_arg_length(
+        lgcrun, lgcrun_smooth, nconstrain, windowcenter, pulse_direction_constraint, usetrigsimcenter = self._check_arg_length(
             lgcrun=lgcrun,
             lgcrun_smooth=lgcrun_smooth,
             nconstrain=nconstrain,
             windowcenter=windowcenter,
             pulse_direction_constraint=pulse_direction_constraint,
+            usetrigsimcenter=usetrigsimcenter,
         )
 
         self.do_ofamp_constrained = lgcrun
@@ -726,6 +742,15 @@ class SetupRQ(object):
         self.ofamp_constrained_nconstrain = nconstrain
         self.ofamp_constrained_windowcenter = windowcenter
         self.ofamp_constrained_pulse_constraint = pulse_direction_constraint
+        self.ofamp_constrained_usetrigsimcenter = usetrigsimcenter
+
+        if any(usetrigsimcenter) and not any(self.do_trigsim):
+            warnings.warn(
+                "usetrigsimcenter has been sent to True, but the trigger "
+                "simulation has not been set to run. Unless this is changed "
+                "later, the constrained OF will instead center on the "
+                "specified windowcenter"
+            )
 
         self._check_of()
 
@@ -1008,7 +1033,7 @@ class SetupRQ(object):
 
         self._check_of()
 
-    def adjust_baseline(self, lgcrun=True, indbasepre=None):
+    def adjust_baseline(self, lgcrun=True, indbasepre=None, indbasepost=None):
         """
         Method for adjusting the calculation of the DC baseline.
 
@@ -1020,19 +1045,33 @@ class SetupRQ(object):
             baseline can be subtracted.
         indbasepre : int, list of int, optional
             The number of indices up to which a trace should be averaged to determine the baseline.
-            Can be set to a list of values, if indbasepre should be different for each channel. 
+            Can be set to a list of values, if indbasepre should be different for each channel.
             The length of the list should be the same length as the number of channels. Default
             is one-third of the trace length.
+        indbasepost : list of int
+            The number of indices after to which a trace should be
+            averaged to determine the post baseline. Can be set to a
+            list of values, if `indbasepost` should be different for
+            each channel. The length of the list should be the same
+            length as the number of channels. Default is two-thirds of
+            the trace length, i.e. average over the final one-third of
+            each trace.
 
         """
 
         if indbasepre is None:
             indbasepre = len(self.templates[0])//3
 
-        lgcrun, indbasepre = self._check_arg_length(lgcrun=lgcrun, indbasepre=indbasepre)
+        if indbasepost is None:
+            indbasepost = 2 * len(self.templates[0])//3
+
+        lgcrun, indbasepre, indbasepost = self._check_arg_length(
+            lgcrun=lgcrun, indbasepre=indbasepre, indbasepost=indbasepost,
+        )
 
         self.do_baseline = lgcrun
         self.baseline_indbasepre = indbasepre
+        self.baseline_indbasepost = indbasepost
 
     def adjust_integral(self, lgcrun=True, indstart=None, indstop=None, indbasepre=None, indbasepost=None):
         """
@@ -1330,6 +1369,10 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         rq_dict[f'baseline_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'baseline_{chan}{det}'][readout_inds] = baseline
 
+        baseline_post = np.mean(signal[:, setup.baseline_indbasepost[chan_num]:], axis=-1)
+        rq_dict[f'baseline_post_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
+        rq_dict[f'baseline_post_{chan}{det}'][readout_inds] = baseline_post
+
     if setup.do_integral[chan_num]:
         if setup.do_baseline[chan_num]:
             integral_subtract = np.concatenate(
@@ -1551,16 +1594,40 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
             if setup.do_ofamp_unconstrained_smooth[chan_num]:
                 amp_unconstrain_smooth[jj], t0_unconstrain_smooth[jj], chi2_unconstrain_smooth[jj] = OF_smooth.ofamp_withdelay()
 
+            if setup.do_trigsim[chan_num] and setup.trigger == chan_num:
+                res_trigsim = setup.TS.trigger(setup.signal_full[jj, chan_num], k=setup.trigsim_k)
+                triggeramp_sim[jj] = res_trigsim[0]
+                triggertime_sim[jj] = res_trigsim[1]
+                ofampnodelay_sim[jj] = res_trigsim[2]
+
+                if setup.do_trigsim_constrained[chan_num]:
+                    res_trigsim_constrained = setup.TS.constrain_trigger(
+                        setup.signal_full[jj, chan_num],
+                        setup.trigsim_constraint_width,
+                        k=setup.trigsim_k,
+                        windowcenter=setup.trigsim_windowcenter,
+                        fir_out=res_trigsim[-1],
+                    )
+
+                    triggeramp_sim_constrained[jj] = res_trigsim_constrained[0]
+                    triggertime_sim_constrained[jj] = res_trigsim_constrained[1]
+
             if setup.do_ofamp_constrained[chan_num]:
+                if setup.ofamp_constrained_usetrigsimcenter[chan_num] and (setup.do_trigsim[chan_num] and setup.trigger == chan_num):
+                    windowcenter_constrain = int(triggertime_sim[jj] * setup.fs - (signal.shape[-1]//2))
+                    if setup.indstart is not None:
+                        windowcenter_constrain -= setup.indstart
+                else:
+                    windowcenter_constrain = setup.ofamp_constrained_windowcenter[chan_num]
                 amp_constrain[jj], t0_constrain[jj], chi2_constrain[jj] = OF.ofamp_withdelay(
                     nconstrain=setup.ofamp_constrained_nconstrain[chan_num],
-                    windowcenter=setup.ofamp_constrained_windowcenter[chan_num],
+                    windowcenter=windowcenter_constrain,
                 )
                 if setup.ofamp_constrained_pulse_constraint[chan_num]!=0:
                     amp_constrain_pcon[jj], t0_constrain_pcon[jj], chi2_constrain_pcon[jj] = OF.ofamp_withdelay(
                         nconstrain=setup.ofamp_constrained_nconstrain[chan_num],
                         pulse_direction_constraint=setup.ofamp_constrained_pulse_constraint[chan_num],
-                        windowcenter=setup.ofamp_constrained_windowcenter[chan_num],
+                        windowcenter=windowcenter_constrain,
                     )
                 if setup.ofamp_constrained_lowfreqchi2 and setup.do_chi2_lowfreq[chan_num]:
                     chi2low_constrain[jj] = OF.chi2_lowfreq(
@@ -1578,7 +1645,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
             if setup.do_ofamp_constrained_smooth[chan_num]:
                 amp_constrain_smooth[jj], t0_constrain_smooth[jj], chi2_constrain_smooth[jj] = OF_smooth.ofamp_withdelay(
                     nconstrain=setup.ofamp_constrained_nconstrain[chan_num],
-                    windowcenter=setup.ofamp_constrained_windowcenter[chan_num],
+                    windowcenter=windowcenter_constrain,
                 )
 
             if setup.do_ofamp_pileup[chan_num]:
@@ -1746,24 +1813,6 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                     t0_nonlin_err[jj] = errors_nlin[2]
                     chi2_nonlin[jj] = reducedchi2_nlin * (len(nlin.data) - nlin.dof)
                     success_nonlin[jj] = res_nlin[3]
-
-            if setup.do_trigsim[chan_num] and setup.trigger == chan_num:
-                res_trigsim = setup.TS.trigger(setup.signal_full[jj, chan_num], k=setup.trigsim_k)
-                triggeramp_sim[jj] = res_trigsim[0]
-                triggertime_sim[jj] = res_trigsim[1]
-                ofampnodelay_sim[jj] = res_trigsim[2]
-
-                if setup.do_trigsim_constrained[chan_num]:
-                    res_trigsim_constrained = setup.TS.constrain_trigger(
-                        setup.signal_full[jj, chan_num],
-                        setup.trigsim_constraint_width,
-                        k=setup.trigsim_k,
-                        windowcenter=setup.trigsim_windowcenter,
-                        fir_out=res_trigsim[-1],
-                    )
-
-                    triggeramp_sim_constrained[jj] = res_trigsim_constrained[0]
-                    triggertime_sim_constrained[jj] = res_trigsim_constrained[1]
 
     if any(setup.do_ofamp_coinc) and setup.trigger is not None and chan_num==setup.trigger:
         if setup.which_fit_coinc=="nodelay" and any(setup.do_ofamp_nodelay):
