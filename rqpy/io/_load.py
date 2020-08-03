@@ -719,7 +719,7 @@ def _getchannels_singlefile(filename):
     ch1 = data[:,:,0] * convert
     ch2 = data[:,:,1] * convert
     try:
-        trig = data[:,:,2]
+        trig = data[:,:,2] * convert
     except IndexError:
         trig = np.array([])
 
