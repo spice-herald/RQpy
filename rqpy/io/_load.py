@@ -615,7 +615,7 @@ def load_h5_dump(path, lgcskip_empty=True, lgcreturndict=False):
     return traces
 
 
-def loadstanfordfile(f, convtoamps=1/1024, lgcfullrtn=False):
+def loadstanfordfile(f, convtoamps=1, lgcfullrtn=False):
     """
     Function that opens a Stanford .mat file and extracts the useful
     parameters. There is an option to return a dictionary that includes
@@ -710,19 +710,18 @@ def _getchannels_singlefile(filename):
     fs = float(prop['sample_rate'][0][0][0])
     minnum = min(len(gains), len(rfbs), len(turns))
 
-    ch1 = data[:,:,0]
-    ch2 = data[:,:,1]
+    if 'daqrange' in prop.dtype.names:
+        #The factor of 2 is because the range is +/-
+        convert = 2 * prop['daqrange'][0][0][0][0] / 2**12
+    else:
+        convert = 1
+
+    ch1 = data[:,:,0] * convert
+    ch2 = data[:,:,1] * convert
     try:
         trig = data[:,:,2]
     except IndexError:
         trig = np.array([])
-    ai0 = ch1[:]
-    ai1 = ch2[:]
-    ai2 = trig[:]
-    try:
-        ai3 = data[:, :, 3]
-    except:
-        pass
 
     try:
         ttable  = np.array([24*3600.0, 3600.0, 60.0, 1.0])
@@ -746,13 +745,7 @@ def _getchannels_singlefile(filename):
     res['filenum'] = 1
     res['time'] = timestamp
     res['exp_prop'] = exp_prop
-    res['ai0'] = ai0
-    res['ai1'] = ai1
-    res['ai2'] = ai2
-    try:
-        res['ai3'] = ai3
-    except:
-        pass
+
     return res
 
 def _getchannels(filelist):
