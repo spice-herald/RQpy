@@ -131,7 +131,7 @@ def saveevents_midgz(events, settings, savepath, savename, dumpnum):
     """
     
     if not HAS_SCDMSPYTOOLS:
-        raise ImportError("Cannot use save mid.gz files because scdmsPyTools is not installed.")
+        raise ImportError("Cannot use save mid.gz files because cdms rawio is not installed.")
     
     mywriter = DataWriter()
     

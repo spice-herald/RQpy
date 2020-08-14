@@ -11,7 +11,7 @@ from rqpy import io
 from rqpy import HAS_SCDMSPYTOOLS
 
 if HAS_SCDMSPYTOOLS:
-    from scdmsPyTools.BatTools.IO import getDetectorSettings
+    from rawio.IO import getDetectorSettings
 
 pd.io.pytables._tables()
 
@@ -512,7 +512,7 @@ def buildfakepulses(rq, cut, templates, amplitudes, tdelay, basepath, taurises=N
     """
 
     if filetype == "mid.gz" and not HAS_SCDMSPYTOOLS:
-        raise ImportError("Cannot use filetype mid.gz because scdmsPyTools is not installed.")
+        raise ImportError("Cannot use filetype mid.gz because cdms rawio is not installed.")
 
     if isinstance(channels, str):
         channels = [channels]

@@ -293,7 +293,7 @@ def process_ivsweep(ivfilepath, chans, detectorid="Z1", rfb=5000, loopgain=2.4, 
     
     """
     if not HAS_SCDMSPYTOOLS:
-        raise ImportError("""Cannot use this IV processing because scdmsPyTools is not installed. 
+        raise ImportError("""Cannot use this IV processing because cdms rawio is not installed. 
                           More file types will be supported in future releases of RQpy.""")
     
     if isinstance(ivfilepath, str):
