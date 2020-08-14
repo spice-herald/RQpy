@@ -8,7 +8,7 @@ import warnings
 import rqpy as rp
 from rqpy import io
 import qetpy as qp
-from rqpy import HAS_SCDMSPYTOOLS, HAS_TRIGSIM
+from rqpy import HAS_TRIGSIM
 
 __all__ = ["SetupRQ", "rq"]
 
@@ -2121,9 +2121,6 @@ def _rq(file, channels, det, setup, convtoamps, savepath, lgcsavedumps, filetype
 
     """
 
-    if filetype == "mid.gz" and not HAS_SCDMSPYTOOLS:
-        raise ImportError("Cannot use filetype mid.gz because scdmsPyTools is not installed.")
-
     if filetype == "npz" and any(setup.do_trigsim):
         raise ValueError("setup.do_trigsim was set to True for filetype npz. " +\
                          "The trigger simulation is only meant for filetype mid.gz")
@@ -2225,9 +2222,6 @@ def rq(filelist, channels, setup, det="Z1", savepath='', lgcsavedumps=False, npr
         A pandas DataFrame object that contains all of the RQs for each dataset in filelist.
 
     """
-
-    if filetype == "mid.gz" and not HAS_SCDMSPYTOOLS:
-        raise ImportError("Cannot use filetype mid.gz because scdmsPyTools is not installed.")
 
     if isinstance(filelist, str):
         filelist = [filelist]
