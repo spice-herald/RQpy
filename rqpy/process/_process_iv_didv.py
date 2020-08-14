@@ -11,8 +11,8 @@ from qetpy import calc_psd, autocuts, DIDV
 from qetpy.utils import calc_offset
 
 if HAS_SCDMSPYTOOLS:
-    from scdmsPyTools.BatTools.IO import getRawEvents, getDetectorSettings
-    from scdmsPyTools.BatTools import rawdata_reader as rawdata
+    from rawio.IO import getRawEvents, getDetectorSettings
+    from rawio import DataReader
 
 __all__ = ["process_ivsweep"]
 
@@ -94,7 +94,7 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
         seriesnum = filepath[:-1].split('/')[-1]
     else:
         seriesnum = filepath.split('/')[-1]
-    reader = rawdata.DataReader()
+    reader = DataReader()
     settings_path = glob(f"{filepath}*")[0]
     reader.set_filename(settings_path)
 

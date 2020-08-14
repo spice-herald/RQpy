@@ -10,7 +10,7 @@ import deepdish as dd
 from rqpy import HAS_SCDMSPYTOOLS
 
 if HAS_SCDMSPYTOOLS:
-    from scdmsPyTools.BatTools.IO import getRawEvents, getDetectorSettings
+    from rawio.IO import getRawEvents, getDetectorSettings
 
 
 __all__ = [
