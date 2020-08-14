@@ -80,8 +80,8 @@ setup(
     },
     install_requires=[
         'pandas',
-        'numpy',
-        'scipy',
+        'numpy>=1.18',
+        'scipy>=1.2',
         'scikit_image',
         'matplotlib',
         'lmfit',
