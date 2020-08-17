@@ -10,7 +10,7 @@ import deepdish as dd
 from rqpy import HAS_SCDMSPYTOOLS
 
 if HAS_SCDMSPYTOOLS:
-    from scdmsPyTools.BatTools.IO import getRawEvents, getDetectorSettings
+    from rawio.IO import getRawEvents, getDetectorSettings
 
 
 __all__ = [
@@ -28,7 +28,7 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
                   filetype="mid.gz"):
     """
     Function for loading (and plotting) random events from a datasets. Has functionality to pull
-    randomly from a specified cut. For use with `scdmsPyTools.BatTools.IO.getRawEvents`
+    randomly from a specified cut. For use with `rawio.IO.getRawEvents`
 
     Parameters
     ----------
@@ -86,7 +86,7 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
     """
 
     if filetype == "mid.gz" and not HAS_SCDMSPYTOOLS:
-        raise ImportError("Cannot use filetype mid.gz because scdmsPyTools is not installed.")
+        raise ImportError("Cannot use filetype mid.gz because cdms rawio is not installed.")
 
     if seed is not None:
         np.random.seed(seed)
@@ -271,7 +271,7 @@ def get_trace_gain(path, chan, det, gainfactors={'rfb': 5000, 'loopgain' : 2.4, 
     """
 
     if not HAS_SCDMSPYTOOLS:
-        raise ImportError("Cannot use get_trace_gain because scdmsPyTools is not installed.")
+        raise ImportError("Cannot use get_trace_gain because cdms rawio is not installed.")
 
     series = path.split('/')[-1]
 
@@ -338,7 +338,7 @@ def get_traces_midgz(path, channels, det, convtoamps=None, lgcskip_empty=True, l
     """
 
     if not HAS_SCDMSPYTOOLS:
-        raise ImportError("Cannot use get_traces_midgz because scdmsPyTools is not installed.")
+        raise ImportError("Cannot use get_traces_midgz because cdms rawio is not installed.")
 
     if not isinstance(path, list):
         path = [path]

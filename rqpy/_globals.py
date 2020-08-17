@@ -1,7 +1,7 @@
 from importlib.util import find_spec
 import sys
 
-package_req = 'scdmsPyTools'
+package_req = 'rawio'
 spec = find_spec(package_req)
 
 if spec is None:
