@@ -88,8 +88,10 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
     nchan = len(chans)
     
 
-    # Data list
+    # Initialize data list
     data_list = []
+
+    # serie number (a bit sketchy...)
     if filepath[-1] == '/':
         seriesnum = filepath[:-1].split('/')[-1]
     else:
@@ -152,8 +154,7 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
             if lgcverbose:
                 print(f'Processing channel ' + chan + ' (ndarray index = ' + str(chan_index) + ')')
                 
-            continue
-
+         
             # settings
             qetbias = detector_settings[chan]['qetBias']
             fs = 1/detector_settings[chan]['timePerBin']
