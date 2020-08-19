@@ -18,7 +18,7 @@ __all__ = ["process_ivsweep"]
 
 
 def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts, 
-                    rshunt, rbias, fixdrivergain, lgcverbose):
+                    rshunt, rbias, lowpassgain, lgcverbose):
     """
     Helper function to process data from noise or dIdV series as part of an IV/dIdV sweep. See Notes for 
     more details on what parameters are calculated
@@ -41,7 +41,7 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
         The value of the shunt resistor in the TES circuit
     rbias : int
         The value of the bias resistor on the test signal line
-    fixdrivergain: int
+    lowpassgain: int
         The value of fix low pass filter driver gain (DCRC RevD = 2, DCRC RevE = 4)
     lgcverbose : bool
         If True, the series number being processed will be displayed
@@ -150,7 +150,7 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
             fs = 1/detector_settings[chan]['timePerBin']
                   
             # conversion factors
-            drivergain = fixdrivergain * detector_settings[chan]['driverGain']
+            drivergain = lowpassgain * detector_settings[chan]['driverGain']
             convtoamps = 1/(drivergain * rfb * loopgain * binstovolts)
 
             # normalize traces
@@ -211,7 +211,7 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
             fs = 1/detector_settings[chan]['timePerBin']
                   
             # conversion factors
-            drivergain = fixdrivergain * detector_settings[chan]['driverGain']
+            drivergain = lowpassgain * detector_settings[chan]['driverGain']
             convtoamps = 1/(drivergain * rfb * loopgain * binstovolts)
 
             # normalize traces
@@ -266,7 +266,7 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
 
 
 def process_ivsweep(ivfilepath, chans, detectorid="Z1", rfb=5000, loopgain=2.4, binstovolts=65536/8, 
-                    rshunt=0.005, rbias=20000, fixdrivergain=4, lgcverbose=False, lgcsave=True,
+                    rshunt=0.005, rbias=20000, lowpassgain=4, lgcverbose=False, lgcsave=True,
                     nprocess=1, savepath='', savename='IV_dIdV_DF'):
     """
     Function to process data for an IV/dIdV sweep. See Notes for 
@@ -291,7 +291,7 @@ def process_ivsweep(ivfilepath, chans, detectorid="Z1", rfb=5000, loopgain=2.4, 
         The value of the shunt resistor in the TES circuit
     rbias : int, optional
         The value of the bias resistor on the test signal line
-    fixdrivergain: int, optional
+    lowpassgain: int, optional
          The value of fix low pass filter driver gain (DCRC RevD = 2, DCRC RevE = 4)
     lgcverbose : bool, optional
         If True, the series number being processed will be displayed
@@ -351,11 +351,11 @@ def process_ivsweep(ivfilepath, chans, detectorid="Z1", rfb=5000, loopgain=2.4, 
         results = []
         for filepath in files:
             results.append(_process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts, 
-                 rshunt, rbias, fixdrivergain, lgcverbose))
+                 rshunt, rbias, lowpassgain, lgcverbose))
     else:
         pool = multiprocessing.Pool(processes = int(nprocess))
         results = pool.starmap(_process_ivfile, zip(files, repeat(chans, detectorid, rfb, loopgain, binstovolts, 
-                 rshunt, rbias, fixdrivergain, lgcverbose))) 
+                 rshunt, rbias, lowpassgain, lgcverbose))) 
         pool.close()
         pool.join()
         
