@@ -77,8 +77,9 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
     """
     
     if lgcverbose:
-        print(f'------------------\n Processing dumps in file: {filepath} \n------------------')
-    
+        print(f'\n\n============================')
+        print(f'Processing dumps in file: {filepath}')
+        print(f'============================\n')
     
     if isinstance(chans, str):
         chans = [chans]
@@ -138,12 +139,20 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
         # =====================
         # IV processing
         # =====================
-
+        if lgcverbose:
+            print(f'--------------\nIV processing\n--------------')
+    
         # LOOP channels
         for chan in channels:
-
-            # channel index
+            
+            # channel array index
             chan_index = channels.index(chan)
+            
+
+            if lgcverbose:
+                print(f'Processing channel ' + chan + ' (ndarray index = ' + str(chan_index) + ')')
+                
+            continue
 
             # settings
             qetbias = detector_settings[chan]['qetBias']
@@ -152,7 +161,7 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
             # conversion factors
             drivergain = lowpassgain * detector_settings[chan]['driverGain']
             convtoamps = 1/(drivergain * rfb * loopgain * binstovolts)
-
+        
             # normalize traces
             traces_temp = traces[:,chan_index]*convtoamps
 
@@ -171,7 +180,7 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
 
             # Offset calculation
             offset, offset_err = calc_offset(traces_temp[cut], fs=fs)
-            
+        
 
             # Pulse average
             avgtrace = np.mean(traces_temp[cut], axis = 0)
@@ -194,17 +203,23 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
         # =====================
         # dIdV processing
         # =====================
-
-
+        if lgcverbose:
+            print(f'--------------\ndIdV processing\n--------------')
+          
         # LOOP channels
         for chan in channels:
             
             # check if signal generator enabled on that channel
-            if  not signal_gen_settings['QETConnection']:
+            if  not signal_gen_settings[chan]['QETConnection']:
                 continue
                 
-            # channel index
+            # channel array index
             chan_index = channels.index(chan)
+
+
+            if lgcverbose:
+                print(f'Processing channel ' + chan + ' (ndarray index = ' + str(chan_index) +')')
+            
 
             # settings
             qetbias = detector_settings[chan]['qetBias']
@@ -214,14 +229,15 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
             drivergain = lowpassgain * detector_settings[chan]['driverGain']
             convtoamps = 1/(drivergain * rfb * loopgain * binstovolts)
 
+
             # normalize traces
             traces_temp = traces[:,chan_index]*convtoamps
 
 
             # signal generator conversion, from mV and Amps
-            sgamp = signal_gen_settings['Amplitude']*1e-3/rbias
-            sgfreq = int(signal_gen_settings['Frequency'])
-                
+            sgamp = signal_gen_settings[chan]['Amplitude']*1e-3/rbias
+            sgfreq = int(signal_gen_settings[chan]['Frequency'])
+         
 
             # get rid of traces that are all zero
             zerocut = np.all(traces_temp!=0, axis=1)
@@ -239,6 +255,7 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
 
             # Offset calculation
             offset, offset_err = calc_offset(traces_temp[cut], fs=fs, sgfreq=sgfreq, is_didv=True)
+         
 
             # Average pulse
             avgtrace = np.mean(traces_temp[cut], axis = 0)
