@@ -237,7 +237,7 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
     return t, x, crand
 
 
-def get_trace_gain(path, chan, det, gainfactors={'rfb': 5000, 'loopgain' : 2.4, 'adcpervolt' : 2**(16)/2, 'lowpassgain' : 2}):
+def get_trace_gain(path, chan, det, gainfactors={'rfb': 5000, 'loopgain' : 2.4, 'adcpervolt' : 2**(16)/8, 'lowpassgain' : 4}):
     """
     Calculates the conversion from ADC bins to TES current for mid.gz files.
 
