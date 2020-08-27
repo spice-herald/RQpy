@@ -239,7 +239,7 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
     return t, x, crand
 
 
-def get_trace_gain(path, chan, det, gainfactors={'rfb': 5000, 'loopgain' : 2.4, 'adcpervolt' : 2**(16)/8, 'lowpassgain' : 4}):
+def get_trace_gain(path, chan, det, rfb=5000, loopgain=2.4, adcpervolt=2**(16)/8, lowpassgain=4):
     """
     Calculates the conversion from ADC bins to TES current for mid.gz files.
 
@@ -248,18 +248,25 @@ def get_trace_gain(path, chan, det, gainfactors={'rfb': 5000, 'loopgain' : 2.4, 
     path : str, list of str
         Absolute path, or list of paths, to the dump to open.
     chan : str
-        Channel name, i.e. 'PDS1'
+        Channel name, i.e. 'PDS1'.
     det : str
-        Detector name, i.e. 'Z1'. 
-    gainfactors : dict, optional
-        Dictionary containing phonon amp parameters.
-        The keys for dictionary are as follows.
-            'rfb' : resistance of feedback resistor
-            'loopgain' : gain of loop of the feedback amp
-            'adcpervolt' : the bitdepth divided by the voltage range of the ADC
-            'lowpassgain' : the final gain of the low pass filter
-                            (Note, this is a specific value depending on the DCRC
-                            version used: RevD = 2, RevE = 4)
+        Detector name, i.e. 'Z1'.
+    rfb : float, optional
+        Resistance of the feedback resistor in Ohms. Default is 5000.
+    loopgain : float, optional
+        Gain of the feedback amplifier loop. Default is 2.4.
+    adcpervolt : float, optional
+        The bit depth divided by the voltage range of the ADC. 
+        This a DCRC-dependent value:
+            For RevD, this is 2**(16)/2
+            For RevE, this is 2**(16)/8
+        This parameter defaults to RevE.
+    lowpassgain : float, optional
+        The final gain of the low pass filter.
+        This a DCRC-dependent value:
+            For RevD, this is 2
+            For RevE, this is 4
+        This parameter defaults to RevE.
 
     Returns
     -------
@@ -283,7 +290,7 @@ def get_trace_gain(path, chan, det, gainfactors={'rfb': 5000, 'loopgain' : 2.4, 
     settings = getDetectorSettings(path, series)
     qetbias = settings[det][chan]['qetBias']
     drivergain = settings[det][chan]['driverGain']
-    convtoamps = 1 / (gainfactors['rfb'] * gainfactors['loopgain'] * drivergain * gainfactors['lowpassgain'] * gainfactors['adcpervolt'])
+    convtoamps = 1 / (rfb * loopgain * drivergain * lowpassgain * adcpervolt)
 
     return convtoamps, drivergain, qetbias
 
