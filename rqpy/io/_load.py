@@ -7,10 +7,12 @@ from glob import glob
 import warnings
 import deepdish as dd
 
-from rqpy import HAS_SCDMSPYTOOLS
+from rqpy import HAS_RAWIO, HAS_SCDMSPYTOOLS
 
-if HAS_SCDMSPYTOOLS:
+if HAS_RAWIO:
     from rawio.IO import getRawEvents, getDetectorSettings
+elif HAS_SCDMSPYTOOLS:
+    from scdmsPyTools.BatTools.IO import getRawEvents, getDetectorSettings
 
 
 __all__ = [
@@ -85,7 +87,7 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
 
     """
 
-    if filetype == "mid.gz" and not HAS_SCDMSPYTOOLS:
+    if filetype == "mid.gz" and not HAS_SCDMSPYTOOLS and not HAS_RAWIO:
         raise ImportError("Cannot use filetype mid.gz because cdms rawio is not installed.")
 
     if seed is not None:
@@ -270,7 +272,7 @@ def get_trace_gain(path, chan, det, gainfactors={'rfb': 5000, 'loopgain' : 2.4, 
 
     """
 
-    if not HAS_SCDMSPYTOOLS:
+    if not HAS_SCDMSPYTOOLS and not HAS_RAWIO:
         raise ImportError("Cannot use get_trace_gain because cdms rawio is not installed.")
 
     series = path.split('/')[-1]
@@ -337,7 +339,7 @@ def get_traces_midgz(path, channels, det, convtoamps=None, lgcskip_empty=True, l
 
     """
 
-    if not HAS_SCDMSPYTOOLS:
+    if not HAS_SCDMSPYTOOLS and not HAS_RAWIO:
         raise ImportError("Cannot use get_traces_midgz because cdms rawio is not installed.")
 
     if not isinstance(path, list):

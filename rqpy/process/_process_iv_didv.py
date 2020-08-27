@@ -6,12 +6,14 @@ from itertools import repeat
 from glob import glob
 
 from rqpy import io
-from rqpy import HAS_SCDMSPYTOOLS
+from rqpy import HAS_RAWIO, HAS_SCDMSPYTOOLS
 from qetpy import calc_psd, autocuts, DIDV
 from qetpy.utils import calc_offset
 
-if HAS_SCDMSPYTOOLS:
-    import rawio.IO  as midasio
+if HAS_RAWIO:
+    import rawio.IO as midasio
+elif HAS_SCDMSPYTOOLS:
+    import scdmsPyTools.BatTools.IO as midasio
 
 
 __all__ = ["process_ivsweep"]
@@ -101,8 +103,9 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
     # Load traces for user provided detector and channels
     events = []
     try:
-        events = midasio.getRawEvents(filepath, "", channelList=chans, detectorList=[detnum], 
-                                      outputFormat=3)
+        events = midasio.getRawEvents(
+            filepath, "", channelList=chans, detectorList=[detnum], outputFormat=3,
+        )
     except:
         print('ERROR in process_iv_didv: Unable to get traces!')
         return

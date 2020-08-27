@@ -1,11 +1,15 @@
 import numpy as np
 from rqpy.io import get_traces_midgz
-from rqpy import HAS_SCDMSPYTOOLS
+from rqpy import HAS_RAWIO, HAS_SCDMSPYTOOLS
 import deepdish as dd
 
-if HAS_SCDMSPYTOOLS:
+if HAS_RAWIO:
     from rawio import DataWriter
     from rawio.IO import getRawEvents
+elif HAS_SCDMSPYTOOLS:
+    from scdmsPyTools.BatTools import rawdata_writer as writer
+    DataWriter = writer.DataWriter()
+    from scdmsPyTools.BatTools.IO import getRawEvents
 
 
 __all__ = ["saveevents_npz", "saveevents_midgz", "convert_midgz_to_h5"]
