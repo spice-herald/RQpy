@@ -11,8 +11,9 @@ from scipy.signal import savgol_filter
 from lmfit import Model
 
 import rqpy as rp
-from rqpy.plotting import _plot_rload_rn_qetbias, _make_iv_noiseplots, _plot_energy_res_vs_bias
-from qetpy import IV, DIDV, Noise, didvinitfromdata, autocuts
+import rqpy.plotting as plot 
+import qetpy as qp
+from qetpy import IBIS, DIDV, Noise, didvinitfromdata, autocuts
 from qetpy.sim import TESnoise, loadfromdidv, energy_res_estimate
 from qetpy.plotting import plot_noise_sim
 from qetpy.utils import align_traces, make_decreasing
@@ -82,7 +83,6 @@ def _remove_bad_series(df):
     ----------
     df : Pandas.core.DataFrame
         DataFrame of processed IV/dIdV sweep data
-
     Returns
     -------
     newdf : Pandas.core.DataFrame
@@ -106,7 +106,6 @@ def _sort_df(df):
     ----------
     df : Pandas.core.DataFrame
         DataFrame of processed IV/dIdV sweep data
-
     Returns
     -------
     sorteddf : Pandas.core.DataFrame
@@ -155,7 +154,6 @@ def _normal_noise(freqs, squiddc, squidpole, squidn, rload, tload, rn, tc, induc
     the johnson noise for the load resistor, the johnson 
     noise for the TES, and the SQUID + downstream electronics 
     noise. See qetpy.sim.TESnoise class for more info.
-
     Parameters
     ----------
     freqs : array
@@ -177,13 +175,11 @@ def _normal_noise(freqs, squiddc, squidpole, squidn, rload, tload, rn, tc, induc
         The SC transistion temperature of the TES
     inductance : float
         The inductance of the TES line
-
     Returns
     -------
     s_tot : array
         Array of values corresponding to the theortical 
         normal state noise. 
-
     """
     
     omega = 2.0*np.pi*freqs
@@ -202,7 +198,6 @@ def _sc_noise(freqs, tload, squiddc, squidpole, squidn, rload, inductance):
     Functional form of the Super Conducting state noise. Including
     the johnson noise for the load resistor and the SQUID + downstream 
     electronics noise. See qetpy.sim.TESnoise class for more info.
-
     Parameters
     ----------
     freqs : array
@@ -220,13 +215,11 @@ def _sc_noise(freqs, tload, squiddc, squidpole, squidn, rload, inductance):
         Value of the load resistor in Ohms
     inductance : float
         The inductance of the TES line
-
     Returns
     -------
     s_tot : array
         Array of values corresponding to the theortical 
         SC state noise. 
-
     """
     
     omega = 2.0*np.pi*freqs
@@ -280,6 +273,8 @@ class IVanalysis(object):
         in Ohms
     rload : float
         The value of the load resistor (rshunt + rp)
+    rload_err : float
+        The uncertainty in the fitted load resistance
     rp : float
         The parasitic resistance in the TES line
     rn_didv : float
@@ -295,6 +290,10 @@ class IVanalysis(object):
         Array of bias voltages
     vb_err : ndarray
         Array of uncertainties in the bais voltage
+    ibias : ndarray
+        Array of bias currents
+    ibias_err : ndarray,
+        Array of uncertainties in the bias current
     dites : ndarray
         Array of DC offsets for IV/didv data
     dites : ndarray
@@ -315,11 +314,29 @@ class IVanalysis(object):
         The power of the 1/f^n noise for the squid
     inductance : float
         The inductance of the TES line
+    noise_model : dict
+        dictionary of arrays of the components of the 
+        nosie modeling. defined as:
+            noise_model = {}
+            noise_model['ites'] = (ites_mu, ites_upper, ites_lower)
+            noise_model['iload'] = (iload_mu, iload_upper, iload_lower)
+            noise_model['itfn'] = (itfn_mu, itfn_upper, itfn_lower)
+            noise_model['isquid'] = (isquid_mu, isquid_upper, isquid_lower)
+            noise_model['itot'] = (itot_mu, itot_upper, itot_lower)
+            noise_model['ptes'] = (ptes_mu, ptes_upper, ptes_lower)
+            noise_model['pload'] = (pload_mu, pload_upper, pload_lower)
+            noise_model['ptfn'] = (ptfn_mu, ptfn_upper, ptfn_lower)
+            noise_model['psquid'] = (psquid_mu, psquid_upper, psquid_lower)
+            noise_model['ptot'] = (ptot_mu, ptot_upper, ptot_lower)
+            noise_model['energy_res'] = e_res
+            noise_model['energy_res_err'] = e_res_err
+        where each element of the tuple is an array of shape (bias point, #freq bins)
         
     """
     
-    def __init__(self, df, nnorm, nsc, channels=None, channelname='', rshunt=5e-3, 
-                 rshunt_err = 0.05*5e-3, tbath=0, tc=0, Gta=0, lgcremove_badseries = True, figsavepath=''):
+    def __init__(self, df, nnorm, nsc, ntran=None, channels=None, channelname='', rshunt=5e-3, 
+                 rshunt_err = 0.05*5e-3, tbath=0, tbath_err=0, tc=0, tc_err=0, Gta=0, 
+                 Gta_err=0, ib_err=None, lgcremove_badseries = True, figsavepath=''):
         """
         Initialization of IVanalysis object. Note, currently only single channel analysis is supported
         
@@ -334,6 +351,9 @@ class IVanalysis(object):
         nsc : int
             Number of bias values where the TES was Super Conducting,
             Note: count only one per noise and didv point (don't double count!)
+        ntran : range object, NoneType, optional
+            The range of the transition data points.
+            If ntran is None, then it is left as the total-(nnorm+nsc)
         channels : list, optional
             A list of strings correponding to the channels to analyze. 
             Note, currently only single channel analysis is supported
@@ -346,11 +366,19 @@ class IVanalysis(object):
             The unccertainty in the value of the shunt resistor
         tbath : float, optional
             The temperature of the detector stack in Kelvin
+        tbath_err : float, optional
+            The unccertainty in the temperature of the detector 
+            stack in Kelvin
         tc : float, optional
             The temperature of the SC transition for the TES
+        tc_err : float, optional
+            The unccertainty in the temperature of the SC transition 
+            for the TES
         Gta : float, optional
             The theremal conductance between the TES and the 
             absorber
+        ib_err : float, optional
+            The error in the bias current
         lgcremove_badseries : bool, optional
             If True, series where the SQUID lost lock, or the amplifier railed 
             are removed
@@ -390,12 +418,17 @@ class IVanalysis(object):
         self.didvinds = (self.df.datatype == "didv")
         self.norminds = range(nnorm)
         self.scinds = range(len(self.df)//2-nsc, len(self.df)//2)
-        self.traninds = range(self.norminds[-1]+1, self.scinds[0])
-    
-        vb = np.zeros((1,2,self.noiseinds.sum()))
-        vb_err = np.zeros(vb.shape)
-        vb[0,0,:] = self.df[self.noiseinds].qetbias.values * rshunt
-        vb[0,1,:] = (self.df[self.didvinds].qetbias.values) * rshunt
+        if ntran is None:
+            self.traninds = range(self.norminds[-1]+1, self.scinds[0])
+        else:
+            self.traninds = ntran
+        ibias = np.zeros((1,2,self.noiseinds.sum()))
+        if ib_err is None:
+            ibias_err = np.zeros(ibias.shape)
+        else: 
+            ibias_err[0,:,:] = ib_err
+        ibias[0,0,:] = self.df[self.noiseinds].qetbias.values
+        ibias[0,1,:] = self.df[self.didvinds].qetbias.values
         dites = np.zeros((1,2,self.noiseinds.sum()))
         dites_err = np.zeros((1,2,self.noiseinds.sum()))
         dites[0,0,:] = self.df[self.noiseinds].offset.values
@@ -403,18 +436,23 @@ class IVanalysis(object):
         dites[0,1,:] = self.df[self.didvinds].offset.values
         dites_err[0,1,:] = self.df[self.didvinds].offset_err.values
         
-        self.vb = vb
-        self.vb_err = vb_err
+        self.vb = None
+        self.ibias = ibias
+        self.ibias_err = ibias_err
         self.dites = dites
         self.dites_err = dites_err
         
         self.tbath = tbath
+        self.tbath_err = tbath_err
         self.tc = tc
+        self.tc_err = tc_err
         self.Gta = Gta
+        self.Gta_err = Gta_err
+        self.rload_err = None
         
         tempdidv = DIDV(1,1,1,1,1)
         self.df = self.df.assign(didvobj = tempdidv)
-        
+        self.noise_model = None
     
     def _fit_rload_didv(self, lgcplot=False, lgcsave=False, **kwargs):
         """
@@ -447,7 +485,8 @@ class IVanalysis(object):
                                          didvsc.fs, didvsc.sgfreq, didvsc.sgamp, 
                                          rshunt = self.rshunt, **kwargs)
             didvobjsc.dofit(1)
-            rload_list.append(didvobjsc.get_irwinparams_dict(1)["rtot"])
+            rload_list.append(didvobjsc.fitresult(1)['smallsignalparams']['rp'] + self.rshunt)
+            
             
             self.df.iat[int(np.flatnonzero(self.didvinds)[ind]), self.df.columns.get_loc('didvobj')] = didvobjsc
             self.df.iat[int(np.flatnonzero(self.noiseinds)[ind]), self.df.columns.get_loc('didvobj')] = didvobjsc
@@ -460,6 +499,7 @@ class IVanalysis(object):
         
         self.rload = np.mean(rload_list)
         self.rload_list = rload_list
+        self.rload_err = np.std(rload_list)
         self.rp = self.rload - self.rshunt
         
         
@@ -470,7 +510,6 @@ class IVanalysis(object):
         Note, if the fit is not good, you may need to speficy an initial
         time offset using the **kwargs. Pass {'dt0' : 1.5e-6} (or other value) 
         or additionally try {'add180phase' : False}
-
         Parameters
         ----------
         lgcplot : bool, optional
@@ -480,7 +519,6 @@ class IVanalysis(object):
             Avetrace_noise/ within the user specified directory
         **kwargs : dict
             Additional key word arguments to be passed to didvinitfromdata()
-
         Returns
         -------
         None
@@ -497,7 +535,7 @@ class IVanalysis(object):
                                          didvn.fs, didvn.sgfreq, didvn.sgamp, 
                                          rshunt = self.rshunt, rload=self.rload, **kwargs)
             didvobjn.dofit(1)
-            rtot=didvobjn.fitparams1[0]
+            rtot = didvobjn.fitresult(1)['smallsignalparams']['rp'] + self.rshunt
             rtot_list.append(rtot)
 
             self.df.iat[int(np.flatnonzero(self.didvinds)[ind]), self.df.columns.get_loc('didvobj')] = didvobjn
@@ -521,7 +559,6 @@ class IVanalysis(object):
         Note, if the fit is not good, you may need to speficy an initial
         time offset using the **kwargs. Pass {'dt0' : 1.5e-6}# (or other value)
         or additionally try {'add180phase' : False}
-
         Parameters
         ----------
         lgcplot : bool, optional
@@ -531,7 +568,6 @@ class IVanalysis(object):
             Avetrace_noise/ within the user specified directory
         **kwargs : dict
             Additional key word arguments to be passed to didvinitfromdata()
-
         Returns
         -------
         None
@@ -542,7 +578,7 @@ class IVanalysis(object):
         self._fit_rn_didv(lgcplot, lgcsave, **kwargs)
         
         
-    def analyze_sweep(self, lgcplot=False, lgcsave=False):
+    def analyze_sweep(self, lgcplot=False, lgcsave=False, fitsc=True, kwargs={}):
         """
         Function to correct for the offset in current and calculate
         R0, P0 and make plots of IV sweeps.
@@ -563,6 +599,9 @@ class IVanalysis(object):
         lgcsave : bool, optional
             If True, all the plots will be saved in the a folder
             Avetrace_noise/ within the user specified directory
+        fitsc : bool, optional
+            If True, the SC data will be fit to get a more robust 
+            estimate of Rp
         
         Returns
         -------
@@ -570,12 +609,14 @@ class IVanalysis(object):
         
         """
         
-        ivobj = IV(dites = self.dites, dites_err = self.dites_err, vb = self.vb, vb_err = self.vb_err, 
-                   rload = self.rload, rload_err = self.rshunt_err, 
-                   chan_names = [f'{self.chname} Noise',f'{self.chname} dIdV'], 
-                   normalinds = self.norminds)
-        ivobj.calc_iv()
-        
+
+        ivobj = IV2(dites=self.dites, dites_err=self.dites_err,ibias=self.ibias, 
+                    ibias_err=self.ibias_err, rsh=self.rshunt, rsh_err=self.rshunt_err,
+                    rp_guess=5e-3, rp_err_guess=0, 
+                    chan_names=[f'{self.chname} Noise',f'{self.chname} dIdV'], fitsc=fitsc, 
+                    normalinds=self.norminds, scinds=self.scinds)
+
+        ivobj.calc_iv(**kwargs)
         self.df.loc[self.noiseinds, 'ptes'] =  ivobj.ptes[0,0]
         self.df.loc[self.didvinds, 'ptes'] =  ivobj.ptes[0,1]
         self.df.loc[self.noiseinds, 'ptes_err'] =  ivobj.ptes_err[0,0]
@@ -585,15 +626,30 @@ class IVanalysis(object):
         self.df.loc[self.noiseinds, 'r0_err'] =  ivobj.r0_err[0,0]
         self.df.loc[self.didvinds, 'r0_err'] =  ivobj.r0_err[0,1]
         
+        self.df.loc[self.noiseinds, 'rp'] =  ivobj.rp[0,0]
+        self.df.loc[self.didvinds, 'rp'] =  ivobj.rp[0,1]
+        self.df.loc[self.noiseinds, 'rp_err'] =  ivobj.rp_err[0,0]
+        self.df.loc[self.didvinds, 'rp_err'] =  ivobj.rp_err[0,1]
+        
+        self.df.loc[self.noiseinds, 'i0'] =  ivobj.ites[0,0]
+        self.df.loc[self.didvinds, 'i0'] =  ivobj.ites[0,1]
+        self.df.loc[self.noiseinds, 'i0_err'] =  ivobj.ites_err[0,0]
+        self.df.loc[self.didvinds, 'i0_err'] =  ivobj.ites_err[0,1]
+        
+        
+        self.rp_iv = ivobj.rp[0,0]
+        self.rp_iv_err = ivobj.rp_err[0,0]
         self.rn_iv = ivobj.rnorm[0,0]
         self.rn_iv_err = ivobj.rnorm_err[0,0]
+
+        self.vb = ivobj.vb
+        self.vb_err = ivobj.vb_err
+        self.ivobj = ivobj
+
 
         if lgcplot:
             ivobj.plot_all_curves(lgcsave=lgcsave, savepath=self.figsavepath, savename=self.chname)
             
-        
-    
-    
     
     def fit_tran_didv(self, lgcplot=False, lgcsave=False):
         """
@@ -622,7 +678,7 @@ class IVanalysis(object):
             invpriorsCov = np.zeros((7,7))
             priors[0] = self.rload
             priors[1] = row.r0
-            invpriorsCov[0,0] = 1.0/self.rshunt_err**2
+            invpriorsCov[0,0] = 1.0/self.rload_err**2
             invpriorsCov[1,1] = 1.0/(dr0)**2
 
 
@@ -632,7 +688,8 @@ class IVanalysis(object):
                                        priors = priors, invpriorscov = invpriorsCov)
 
             didvobj.dofit(poles=2)
-            didvobj.dopriorsfit()
+            didvobj.dofit(poles=3)
+
             
             self.df.iat[int(np.flatnonzero(self.didvinds)[ind]), self.df.columns.get_loc('didvobj')] = didvobj
             self.df.iat[int(np.flatnonzero(self.noiseinds)[ind]), self.df.columns.get_loc('didvobj')] = didvobj
@@ -644,6 +701,71 @@ class IVanalysis(object):
                 didvobj.plot_re_im_didv(poles='all', plotpriors=True, lgcsave=lgcsave, 
                                         savepath=self.figsavepath,
                                         savename=f'didv_{row.qetbias:.3e}')
+            
+
+            #### Calculate correct errors
+            didvobj_p = qp.DIDVPriors(rawtraces=None, fs=625e3, sgfreq=row.sgfreq, sgamp=row.sgamp, rsh=rsh)
+            didvobj_p._freq = didvobj._freq
+            didvobj_p._didvmean = didvobj._didvmean
+            didvobj_p._didvstd = didvobj._didvstd
+            didvobj_p._offset = didvobj._offset
+            didvobj_p._offset_err = didvobj._offset_err
+            didvobj_p._tmean = didvobj._tmean
+            didvobj_p._dt0 = didvobj._dt0
+            
+            priors2 = np.ones(8)
+            priors3 = np.ones(10)
+            
+            priors2[0] = didvobj.fitresult(2)['smallsignalparams']['rsh']
+            priors2[1] = didvobj.fitresult(2)['smallsignalparams']['rp']
+            priors2[2] = didvobj.fitresult(2)['smallsignalparams']['r0']
+            priors2[3] = didvobj.fitresult(2)['smallsignalparams']['beta']
+            priors2[4] = didvobj.fitresult(2)['smallsignalparams']['l']
+            priors2[5] = didvobj.fitresult(2)['smallsignalparams']['L']
+            priors2[6] = didvobj.fitresult(2)['smallsignalparams']['tau0']
+            priors2[7] = didvobj.fitresult(2)['smallsignalparams']['dt']
+            
+            priors3[0] = didvobj.fitresult(3)['smallsignalparams']['rsh']
+            priors3[1] = didvobj.fitresult(3)['smallsignalparams']['rp']
+            priors3[2] = didvobj.fitresult(3)['smallsignalparams']['r0']
+            priors3[3] = didvobj.fitresult(3)['smallsignalparams']['beta']
+            priors3[4] = didvobj.fitresult(3)['smallsignalparams']['l']
+            priors3[5] = didvobj.fitresult(3)['smallsignalparams']['L']
+            priors3[6] = didvobj.fitresult(3)['smallsignalparams']['tau0']
+            priors3[7] = didvobj.fitresult(3)['smallsignalparams']['gratio']
+            priors3[8] = didvobj.fitresult(3)['smallsignalparams']['tau3']
+            priors3[9] = didvobj.fitresult(3)['smallsignalparams']['dt']
+            
+            rp_sig = row.rp_err
+            rshunt_sig = self.rshunt_err
+            r0_sig = row.r0_err
+            
+            cov2 = np.zeros((8,8))
+            cov3 = np.zeros((10,10))
+            
+            cov2[0,0] = rshunt_sig**2
+            cov2[1,1] = rp_sig**2
+            cov2[2,2] = r0_sig**2
+            cov2[0,1] = r_cov[1,0] = .5*rshunt_sig*rp_sig
+            cov2[0,2] = r_cov[2,0] = .5*rshunt_sig*r0_sig
+            cov2[1,2] = r_cov[2,1] = -.2*rp_sig*r0_sig
+            
+            cov3[0,0] = rshunt_sig**2
+            cov3[1,1] = rp_sig**2
+            cov3[2,2] = r0_sig**2
+            cov3[0,1] = r_cov[1,0] = .5*rshunt_sig*rp_sig
+            cov3[0,2] = r_cov[2,0] = .5*rshunt_sig*r0_sig
+            cov3[1,2] = r_cov[2,1] = -.2*rp_sig*r0_sig
+            
+            
+            didvobj_p.dofit(poles=2, priors=priors2, priorscov=cov2)
+            didvobj_p.dofit(poles=3, priors=priors3, priorscov=cov3)
+            
+
+            #print('saving....')
+            self.df.iat[int(np.flatnonzero(self.didvinds)[ind]), self.df.columns.get_loc('didvobj_p')] = didvobj_p
+            self.df.iat[int(np.flatnonzero(self.noiseinds)[ind]), self.df.columns.get_loc('didvobj_p')] = didvobj_p
+            #print(didvobj2)
 
                 
     
@@ -682,13 +804,14 @@ class IVanalysis(object):
         squidpole_list = []
         squidn_list = []
         
+        self.normal_psd = np.mean(self.df[self.noiseinds].iloc[self.norminds].psd.values, axis=0)[1:]
         
         for ind in self.norminds:
             noise_row = self.df[self.noiseinds].iloc[ind]
             f = noise_row.f
             psd = noise_row.psd
             
-            inductance = noise_row.didvobj.get_irwinparams_dict(1)["L"]
+            inductance = noise_row.didvobj.fitresult(1)['smallsignalparams']['L']
             
             ind_lower = (np.abs(f - fit_range[0])).argmin()
             ind_upper = (np.abs(f - fit_range[1])).argmin()
@@ -764,7 +887,7 @@ class IVanalysis(object):
             noise_row = self.df[self.noiseinds].iloc[ind]
             f = noise_row.f
             psd = noise_row.psd
-            inductance = noise_row.didvobj.get_irwinparams_dict(1)["L"]
+            inductance = noise_row.didvobj.fitresult(1)['smallsignalparams']['L']
             
             ind_lower = (np.abs(f - fit_range[0])).argmin()
             ind_upper = (np.abs(f - fit_range[1])).argmin()
@@ -800,12 +923,14 @@ class IVanalysis(object):
             
         self.tload = np.mean(tload_list)
         
-    def model_noise(self, tau_collect=20e-6, collection_eff=1, lgcplot=False, lgcsave=False, 
+    def model_noise_simple(self, tau_collect=20e-6, collection_eff=1, lgcplot=False, lgcsave=False, 
                     xlims=None, ylims_current = None, ylims_power = None):
         """
         Function to plot noise PSD with all the theoretical noise
         components (calculated from the didv fits). This function also estimates
         the expected energy resolution based on the power noise spectrum
+        
+        Note: This assumes a simple single body thermal model
         
         Parameters
         ----------
@@ -870,9 +995,290 @@ class IVanalysis(object):
         self.df.loc[self.didvinds, 'energy_res'] =  energy_res_arr
         self.df.loc[self.noiseinds, 'tau_eff'] =  tau_eff_arr
         self.df.loc[self.didvinds, 'tau_eff'] =  tau_eff_arr
+           
+    def _get_tes_params(self, didvobj, nsamples=100):
+        """
+        Function to return parameters sampled from multivariate
+        normal distribution based on TES fitted parameters
         
+        Parameters
+        ----------
+        didvobj : DIDVPriors object
+            DIDVPriors object after fit has been done
+        nsamples : int
+            Number of samples to generate
+            
+        Returns
+        -------
+        rload : Array
+            Array of rload samples of length nsamples
+        r0 : Array
+            Array of r0 samples of length nsamples
+        beta : Array
+            Array of beta samples of length nsamples
+        l : Array
+            Array of irwins loop gain samples of length nsamples
+        L : Array
+            Array of inductance samples of length nsamples
+        tau0 : Array
+            Array of tau0 samples of length nsamples
+        tc : Array
+            Array of tc samples of length nsamples
+        tb : Array
+            Array of tb samples of length nsamples
+        """
+        # didv params are in the following order
+        #('rshunt0','rp0','r0','beta0','l0','L0','tau0' dt)
+        cov = didvobj.fitresult(2)['cov'][:-1. :-1]
+        mu = np.ones(7)
+
+            
+        mu[0] = didvobj.fitresult(2)['smallsignalparams']['rsh']
+        mu[1] = didvobj.fitresult(2)['smallsignalparams']['rp']
+        mu[2] = didvobj.fitresult(2)['smallsignalparams']['r0']
+        mu[3] = didvobj.fitresult(2)['smallsignalparams']['beta']
+        mu[4] = didvobj.fitresult(2)['smallsignalparams']['l']
+        mu[5] = didvobj.fitresult(2)['smallsignalparams']['L']
+        mu[6] = didvobj.fitresult(2)['smallsignalparams']['tau0']
+        
+ 
+        full_cov = np.zeros((cov.shape[0]+3, cov.shape[1]+3))
+        full_mu = np.zeros((mu.shape[0]+3))
+        full_mu[:-3] = mu
+        full_mu[-3] = self.tc
+        full_mu[-2] = self.tbath
+        full_mu[-1] = self.Gta
+
+        full_cov[:-3,:-3] = cov
+        full_cov[-3,-3] = self.tc_err**2
+        full_cov[-2,-2] = self.tbath_err**2
+        full_cov[-1,-1] = self.Gta_err**2
+        
+        scale = 1/np.sqrt(np.diag(full_cov))
+        scale_cov = scale[np.newaxis].T.dot(scale[np.newaxis])
+
+        rand_data = np.random.multivariate_normal(full_mu*scale, full_cov*scale_cov, nsamples)
+        rand_data = rand_data/scale
+        rshunt = rand_data[:,0]
+        rp = rand_data[:,1]
+        r0 = rand_data[:,2]
+        beta = rand_data[:,3]
+        l = rand_data[:,4]
+        L = rand_data[:,5]
+        tau0 = rand_data[:,6]
+        tc = rand_data[:,7]
+        tb = rand_data[:,8]
+        gta = rand_data[:,9]
+
+        return rshunt, rp, r0, beta, l, L, tau0, tc, tb, gta
+    @staticmethod    
+    def _err_bounds(arr, perc):
+        """
+        Helper function to calculate asymmetric 
+        error bounds 
+        Parameters
+        ----------
+        arr : array
+            Array of shape (#samples, #frequency bins)
+        perc : tuple
+            (upper and lower percentiales).
+            If calculating 95 percentile, pass (5, 95)
+        Returns
+        -------
+        median : array
+            The median value for each 
+            frequency
+        p_upper : array
+            Upper bound, 
+            same shape as median
+        p_lower : array
+            Lower bound, 
+            same shape as median
+        """
+
+        median = np.median(arr, axis=0)
+        p_lower = np.percentile(arr, q=perc[0], axis=0)
+        p_upper = np.percentile(arr, q=perc[1], axis=0)
+        
+        return median, p_upper, p_lower
+
+
+
+    def estimate_noise_errors(self, tau_collect=0, collection_eff=1, inds = 'all',
+                              nsamples=500, perc=(10,90)):
+        """
+        Function to estimate the errors in the theoretical noise model
+        Parameters
+        ----------
+        tau_collect : float, optional
+            The phonon collection time of the detector
+        collection_eff : float, optional
+            The absolute phonon collection efficiency of the detector
+        inds : range, list, int, str, optional
+            The indices of the transistion state bias points to
+            model the noise errors with
+        nsamples : int, optional
+            The number of samples to generate
+        perc : tuple, optional
+            (upper and lower percentiales).
+            If calculating 95 percentile, pass (5, 95)
+        Returns
+        -------
+        None 
+        """
+
+        if inds == 'all':
+            inds = np.arange(len(self.traninds))
+        elif not isinstance(inds, list):
+            inds = [inds]
+
+        f = self.df[self.noiseinds].iloc[self.traninds].iloc[0].f[1:]
+
+        ites_mu = np.zeros((len(inds), len(f)))
+        ites_upper = np.zeros((len(inds), len(f)))
+        ites_lower = np.zeros((len(inds), len(f)))
+        iload_mu = np.zeros((len(inds), len(f)))
+        iload_upper = np.zeros((len(inds), len(f)))
+        iload_lower = np.zeros((len(inds), len(f)))
+        itfn_mu = np.zeros((len(inds), len(f)))
+        itfn_upper = np.zeros((len(inds), len(f)))
+        itfn_lower = np.zeros((len(inds), len(f)))
+        itot_mu = np.zeros((len(inds), len(f)))
+        itot_upper = np.zeros((len(inds), len(f)))
+        itot_lower = np.zeros((len(inds), len(f)))
+        isquid_mu = np.zeros((len(inds), len(f)))
+        isquid_upper = np.zeros((len(inds), len(f)))
+        isquid_lower = np.zeros((len(inds), len(f)))
+
+        ptes_mu = np.zeros((len(inds), len(f)))
+        ptes_upper = np.zeros((len(inds), len(f)))
+        ptes_lower = np.zeros((len(inds), len(f)))
+        pload_mu = np.zeros((len(inds), len(f)))
+        pload_upper = np.zeros((len(inds), len(f)))
+        pload_lower = np.zeros((len(inds), len(f)))
+        ptfn_mu = np.zeros((len(inds), len(f)))
+        ptfn_upper = np.zeros((len(inds), len(f)))
+        ptfn_lower = np.zeros((len(inds), len(f)))
+        ptot_mu = np.zeros((len(inds), len(f)))
+        ptot_upper = np.zeros((len(inds), len(f)))
+        ptot_lower = np.zeros((len(inds), len(f)))
+        psquid_mu = np.zeros((len(inds), len(f)))
+        psquid_upper = np.zeros((len(inds), len(f)))
+        psquid_lower = np.zeros((len(inds), len(f)))
+        s_psd_mu = np.zeros((len(inds), len(f)))
+        s_psd_upper = np.zeros((len(inds), len(f)))
+        s_psd_lower = np.zeros((len(inds), len(f)))
+        
+        e_res = np.zeros((len(inds)))
+        e_res_upper = np.zeros((len(inds)))
+        e_res_lower = np.zeros((len(inds)))
     
-    
+        for ind in inds:
+
+            noise_row = self.df[self.noiseinds].iloc[self.traninds].iloc[ind]
+            f = noise_row.f[1:]
+            psd = noise_row.psd[1:]
+            didvobj = noise_row.didvobj_p
+            rshunt, rp, r0, beta, l, L, tau0, tc, tb, gta = self._get_tes_params(
+                didvobj, nsamples=nsamples,
+            )
+
+            s_ites = np.zeros((nsamples, len(f)))
+            s_iload = np.zeros((nsamples, len(f)))
+            s_itfn = np.zeros((nsamples, len(f)))
+            s_itot = np.zeros((nsamples, len(f)))
+            s_isquid = np.zeros((nsamples, len(f)))
+
+            s_ptes = np.zeros((nsamples, len(f)))
+            s_pload = np.zeros((nsamples, len(f)))
+            s_ptfn = np.zeros((nsamples, len(f)))
+            s_ptot = np.zeros((nsamples, len(f)))
+            s_psquid = np.zeros((nsamples, len(f)))
+            s_psd = np.zeros((nsamples, len(f)))
+            energy_res = []
+
+            for ii in range(nsamples):
+                tesnoise = TESnoise(
+                    freqs=f,
+                    rload=rp[ii] + rshunt[ii],
+                    r0=r0[ii],
+                    rshunt=rshunt[ii],
+                    beta=beta[ii],
+                    loopgain=l[ii],
+                    inductance=L[ii],
+                    tau0=tau0[ii],
+                    G=gta[ii],
+                    qetbias=noise_row.qetbias,
+                    tc=tc[ii],
+                    tload=self.tload,
+                    tbath=tb[ii],
+                    n=5.0,
+                    lgcb=True,
+                    squiddc=self.squiddc,
+                    squidpole=self.squidpole,
+                    squidn=self.squidn,
+                )
+
+                res = qp.sim.energy_res_estimate(freqs=f, tau_collect=tau_collect,
+                                                  Sp=psd/(np.abs(tesnoise.dIdP(f))**2),
+                                                  collection_eff=collection_eff)
+                energy_res.append(res)
+
+                s_ites[ii] = tesnoise.s_ites()
+                s_iload[ii] = tesnoise.s_iload()
+                s_itfn[ii] = tesnoise.s_itfn()
+                s_isquid[ii] = self.normal_psd
+                s_itot[ii] = tesnoise.s_ites()+tesnoise.s_iload()+tesnoise.s_itfn()+self.normal_psd
+#                 s_itot[ii] = tesnoise.s_itot()
+#                 s_isquid[ii] = tesnoise.s_isquid()
+
+                s_ptes[ii] = tesnoise.s_ptes()
+                s_pload[ii] = tesnoise.s_pload()
+                s_ptfn[ii] = tesnoise.s_ptfn()
+                #s_ptot[ii] = tesnoise.s_ptot()
+                #s_psquid[ii] = tesnoise.s_psquid()
+                s_psquid[ii] = self.normal_psd/(np.abs(tesnoise.dIdP(f))**2)
+                s_ptot[ii] = tesnoise.s_ptes() + tesnoise.s_pload() +tesnoise.s_ptfn()+ self.normal_psd/(np.abs(tesnoise.dIdP(f))**2)
+
+                s_psd[ii] = psd/(np.abs(tesnoise.dIdP(f))**2)
+
+            #return s_ites, s_iload, s_itfn, s_itot, s_isquid
+        
+            ites_mu[ind], ites_upper[ind], ites_lower[ind] = IVanalysis._err_bounds(s_ites, perc)
+            iload_mu[ind], iload_upper[ind], iload_lower[ind] = IVanalysis._err_bounds(s_iload, perc)
+            itfn_mu[ind], itfn_upper[ind], itfn_lower[ind] = IVanalysis._err_bounds(s_itfn, perc)
+            itot_mu[ind], itot_upper[ind], itot_lower[ind] = IVanalysis._err_bounds(s_itot, perc)
+            isquid_mu[ind], isquid_upper[ind], isquid_lower[ind] = IVanalysis._err_bounds(s_isquid, perc)
+
+            ptes_mu[ind], ptes_upper[ind], ptes_lower[ind] = IVanalysis._err_bounds(s_ptes, perc)
+            pload_mu[ind], pload_upper[ind], pload_lower[ind] = IVanalysis._err_bounds(s_pload, perc)
+            ptfn_mu[ind], ptfn_upper[ind], ptfn_lower[ind] = IVanalysis._err_bounds(s_ptfn, perc)
+            ptot_mu[ind], ptot_upper[ind], ptot_lower[ind] = IVanalysis._err_bounds(s_ptot, perc)
+            psquid_mu[ind], psquid_upper[ind], psquid_lower[ind] = IVanalysis._err_bounds(s_psquid, perc)
+            s_psd_mu[ind], s_psd_upper[ind], s_psd_lower[ind] = IVanalysis._err_bounds(s_psd, perc)
+            
+            e_res[ind], e_res_upper[ind], e_res_lower[ind] = IVanalysis._err_bounds(energy_res, perc)
+#             e_res[ind] = np.mean(energy_res)
+#             e_res_err[ind] = np.std(energy_res)
+            
+        noise_model = {}
+        noise_model['ites'] = (ites_mu, ites_upper, ites_lower)
+        noise_model['iload'] = (iload_mu, iload_upper, iload_lower)
+        noise_model['itfn'] = (itfn_mu, itfn_upper, itfn_lower)
+        noise_model['isquid'] = (isquid_mu, isquid_upper, isquid_lower)
+        noise_model['itot'] = (itot_mu, itot_upper, itot_lower)
+        noise_model['ptes'] = (ptes_mu, ptes_upper, ptes_lower)
+        noise_model['pload'] = (pload_mu, pload_upper, pload_lower)
+        noise_model['ptfn'] = (ptfn_mu, ptfn_upper, ptfn_lower)
+        noise_model['psquid'] = (psquid_mu, psquid_upper, psquid_lower)
+        noise_model['ptot'] = (ptot_mu, ptot_upper, ptot_lower)
+        noise_model['s_psd'] = (s_psd_mu, s_psd_upper, s_psd_lower)
+        noise_model['energy_res'] = (e_res, e_res_upper, e_res_lower)
+        #noise_model['energy_res_err'] = e_res_err
+        
+        self.noise_model = noise_model
+            
+     
     def find_optimum_bias(self, 
                           lgcplot=False, 
                           lgcsave=False, 
@@ -885,7 +1291,6 @@ class IVanalysis(object):
         """
         Function to find the QET bias with the lowest energy 
         resolution. 
-
         Parameters
         ----------
         lgcplot : bool, optional
@@ -910,7 +1315,6 @@ class IVanalysis(object):
             to None, which will be base units [eV]
             Can be: 'n->nano, u->micro, m->milla,
             k->kilo, M-Mega, G-Giga'
-
         Returns
         -------
         optimum_bias_e : float
@@ -932,8 +1336,9 @@ class IVanalysis(object):
         """
 
         trandf = self.df.loc[self.noiseinds].iloc[self.traninds]
-        r0s = trandf.r0.values
-        energy_res = trandf.energy_res.values
+        r0s = trandf.r0.values/self.rn_iv
+        energy_res = self.noise_model['energy_res'][0]
+        energy_res_err = np.vstack((self.noise_model['energy_res'][1],self.noise_model['energy_res'][2]))
         qets = trandf.qetbias.values
         taus = trandf.tau_eff.values
 
@@ -947,7 +1352,7 @@ class IVanalysis(object):
         optimum_t = energy_res[tauminind]
 
         if lgcplot:
-            _plot_energy_res_vs_bias(r0s, energy_res, qets, taus,
+            plot._plot_energy_res_vs_bias(r0s, energy_res, energy_res_err, qets, taus,
                                 xlims, ylims, lgcoptimum=lgcoptimum,
                                  lgctau=lgctau, energyscale=energyscale)
         if lgctau:
@@ -964,26 +1369,22 @@ class IVanalysis(object):
         """
         Helper function to plot average noise/didv traces in time domain, as well as 
         corresponding noise PSDs, for all QET bias points in IV/dIdV sweep.
-
         Parameters
         ----------
         lgcsave : bool, optional
             If True, all the plots will be saved in the a folder
             Avetrace_noise/ within the user specified directory
-
         Returns
         -------
         None
-
         """
         
-        _make_iv_noiseplots(self, lgcsave)
+        plot._make_iv_noiseplots(self, lgcsave)
     
     def plot_rload_rn_qetbias(self, lgcsave=False, xlims_rl=None, ylims_rl=None, xlims_rn=None, ylims_rn=None):
         """
         Helper function to plot rload and rnormal as a function of
         QETbias from the didv fits of SC and Normal data
-
         Parameters
         ----------
         lgcsave : bool, optional
@@ -1007,86 +1408,91 @@ class IVanalysis(object):
         
         """
         
-        _plot_rload_rn_qetbias(self, lgcsave, xlims_rl, ylims_rl, xlims_rn, ylims_rn)
+        plot._plot_rload_rn_qetbias(self, lgcsave, xlims_rl, ylims_rl, xlims_rn, ylims_rn)
         
-        
-            
-    def do_full_analysis(self, collection_eff=1, lgcplot=True, lgcsave=True):
+    def plot_didv_bias(self, xlims=(-.15,0.025), ylims=(0,.08),
+                   cmap='magma'):
         """
-        Function to perform full IV/dIdV analysis. This function simply 
-        calls all the individual functions in this class in the 
-        proper order.
-        
-        Note, if any step in the analysis fails, the analysis will stop
-        and the user will need to do the analysis in parts. 
-        
+        Helper function to plot the real vs imaginary
+        part of the didv for different QET bias values
+        for an IVanalysis object
         Parameters
         ----------
-        collection_eff : float, optional
-            The absolute phonon collection efficiency of the detector, should be a float from 0 to 1.
-        lgcplot : bool, optional
-            If True, a plot of the fit is shown
-        lgcsave : bool, optional
-            If True, the figure is saved
-        
+        data : IVanalysis object
+            The IVanalysis object with the didv fits
+            already done
+        xlims : tuple, optional
+            The xlimits of the plot
+        ylims : tuple, optional
+            The ylimits of the plot
+        cmap : str, optional
+            The colormap to use for the 
+            plot. 
         Returns
         -------
-        success : bool
-            Will return True if the full analysis is successful.
-            
+        fig, ax : matplotlib fig and axes objects
+        """
+
+        plot._plot_didv_bias(self, xlims=xlims, ylims=ylims, cmap=cmap)
+        
+    def plot_ztes_bias(self, xlims=(-110,110), ylims=(-120, 0),
+                   cmap='magma_r'):
+        """
+        Helper function to plot the imaginary vs real
+        part of the complex impedance for different QET 
+        bias values for an IVanalysis object
+        Parameters
+        ----------
+        data : IVanalysis object
+            The IVanalysis object with the didv fits
+            already done
+        xlims : tuple, optional
+            The xlimits of the plot
+        ylims : tuple, optional
+            The ylimits of the plot
+        cmap : str, optional
+            The colormap to use for the 
+            plot. 
+        Returns
+        -------
+        fig, ax : matplotlib fig and axes objects
+        """
+
+        plot._plot_ztes_bias(self, xlims=xlims, ylims=ylims, cmap=cmap)
+        
+        
+        
+    def plot_noise_model(self, idx='all', xlims=(10, 2e5), ylims_current=None, 
+                         ylims_power=None):
+        """
+        Function to plot noise models with errors for IVanalysis object
+        Paramters
+        ---------
+        data : IVanalysis object
+            The IVanalysis object to plot
+        idx : range, str, optional
+            The range of indeces to plot
+            must be either a range() object
+            or 'all'. If 'all', it defaults
+            to all the transistion data
+        xlims : tuple, optional
+            The xlimits for all the plots
+        ylims_current : tuple, NoneType, optional
+            The ylimits for all the current
+            noise plots
+        ylims_power : tuple, NoneType, optional
+            The ylimits for all the power
+            noise plots
+        Returns
+        -------
+        None
         """
         
-        success = False
+        plot._plot_noise_model(data=self, idx=idx, xlims=xlims, ylims_current=ylims_current,
+                              ylims_power=ylims_power)
         
-        try:
-            self._fit_rload_didv(lgcplot=lgcplot, lgcsave=lgcsave)
-        except:
-            raise AnalysisError('An error occurred when fitting the SC dIdV to determine Rload. \n Please make sure the SC indices (scinds) are correct')
         
-        try:
-            self._fit_rn_didv(lgcplot=lgcplot, lgcsave=lgcsave)
-        except:
-            raise AnalysisError('An error occurred when fitting the Normal dIdV to determine Rn. \n Please make sure the Normal indices (norminds) are correct')
             
-        try:
-            self.analyze_sweep(lgcplot=lgcplot, lgcsave=lgcsave)
-        except:
-            raise AnalysisError('An error occurred when fitting the IV curve')
-        
-        try:
-            self.plot_rload_rn_qetbias(lgcsave=lgcsave)
-        except:
-            raise AnalysisError('An error occurred when plotting Rload and Rn vs applied QETbias')
-            
-        try:
-            self.fit_normal_noise(lgcplot=lcgplot, lgcsave=lgcsave)
-        except:
-            raise AnalysisError('An error occurred when trying to fit the SQUID and Electronics components \n of the normal state noise')
-        
-        try:
-            self.fit_sc_noise(lgcplot=lgcplot, lgcsave=lgcsave)
-        except:
-            raise AnalysisError('An error occurred when trying to fit the temperature of the load resistor \n from the SC state noise')
-            
-        try:
-            self.fit_tran_didv(lgcplot=lgcplot, lgcsave=lgcsave)
-        except:
-            raise AnalysisError('An error occurred when trying to fit the Transition state dIdV. \n Try changing the dt0 or add180phase parameter for the DIDV fits')
-        
-        try:
-            self.model_noise(collection_eff=collection_eff, lgcplot=lgcplot, lgcsave=lgcsave)
-        except:
-            raise AnalysisError('An error occurred when trying to model the Transition state noise and estimate the theoretical energy resolution')
-        
-        try:
-            self.find_optimum_bias()
-        except:
-            raise AnalysisError('An error occurred when fiding the optimum QET bias')
-            
-         
-        success = True
-        
-        return success
-            
+    
             
         
