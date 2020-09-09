@@ -18,7 +18,6 @@ __all__ = [
 
 def _make_iv_noiseplots(IVanalysisOBJ, lgcsave=False):
     """
-
     Helper function to plot average noise/didv traces in time domain,
     as well as corresponding noise PSDs, for all QET bias points in
     IV/dIdV sweep.
@@ -150,7 +149,7 @@ def _plot_rload_rn_qetbias(IVanalysisOBJ, lgcsave, xlims_rl, ylims_rl,
     axes[0].grid(True, linestyle = 'dashed')
     axes[0].set_title('Rload vs Vbias', fontsize = 14)
     axes[0].set_ylabel(r'$R_\ell \, [\mathrm{m}\Omega]$', fontsize = 14)
-    axes[0].set_xlabel(r'$V_\text{bias} \, [\mu\mathrm{V}]$', fontsize = 14)
+    axes[0].set_xlabel(r'$V_\mathrm{bias} \, [\mu\mathrm{V}]$', fontsize = 14)
     axes[0].tick_params(
         axis="both", direction="in", top=True, right=True, which="both",
     )
@@ -166,7 +165,7 @@ def _plot_rload_rn_qetbias(IVanalysisOBJ, lgcsave, xlims_rl, ylims_rl,
     axes[1].grid(True, linestyle='dashed')
     axes[1].set_title('Rtotal vs Vbias', fontsize=14)
     axes[1].set_ylabel(r'$R_N + R_\ell \, [\mathrm{m}\Omega]$', fontsize=14)
-    axes[1].set_xlabel(r'$V_\text{bias} \, [\mu\mathrm{V}]$', fontsize=14)
+    axes[1].set_xlabel(r'$V_\mathrm{bias} \, [\mu\mathrm{V}]$', fontsize=14)
     axes[1].tick_params(
         axis="both", direction="in", top=True, right=True, which="both",
     )
