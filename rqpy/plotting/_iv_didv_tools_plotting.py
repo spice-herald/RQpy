@@ -1,5 +1,6 @@
 import numpy as np
 import rqpy as rp
+import qetpy as qp
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import matplotlib.cm as cm
@@ -301,6 +302,7 @@ def _plot_didv_bias(data, xlims=(-.15,0.025), ylims=(0,.08),
 
     normalize = mcolors.Normalize(vmin=min(qets), vmax=max(qets))
     colormap = plt.get_cmap(cmap)
+    c = colormap(np.linspace(0, 1, len(data.traninds)))
     ax.grid(True, linestyle='--')
 
     for ind in (data.traninds):
@@ -320,7 +322,7 @@ def _plot_didv_bias(data, xlims=(-.15,0.025), ylims=(0,.08),
                 np.imag((didvobj._didvmean * time_phase))[plotinds]*1e3, linestyle=' ',
                 marker ='.', alpha = 1, ms=2, zorder=10, color=c[ii])#color='deepskyblue')
                   #c=colormap(normalize(qets[ii])))
-        key = 'smallsignalparams'
+        key = 'params'
         didvfit2_freqdomain = qp.complexadmittance(
                     didvobj._freq, **didvobj._2poleresult[key],
                 )
@@ -386,6 +388,7 @@ def _plot_ztes_bias(data, xlims=(-110,110), ylims=(-120,0),
 
     normalize = mcolors.Normalize(vmin=min(qets), vmax=max(qets))
     colormap = plt.get_cmap(cmap)
+    c = colormap(np.linspace(0, 1, len(data.traninds)))
     ax.grid(True, linestyle='--')
 
     for ind in (data.traninds):
@@ -408,7 +411,7 @@ def _plot_ztes_bias(data, xlims=(-110,110), ylims=(-120,0),
                 np.imag(1/(didvobj._didvmean * time_phase))[plotinds]*1e3, linestyle=' ',
                 marker ='.', alpha = 1, ms=2, zorder=10, color=c[ii])#color='deepskyblue')
                   #c=colormap(normalize(qets[ii])))
-        key = 'smallsignalparams'
+        key = 'params'
         didvfit2_freqdomain = qp.complexadmittance(
                     didvobj._freq, **didvobj._2poleresult[key],
                 )

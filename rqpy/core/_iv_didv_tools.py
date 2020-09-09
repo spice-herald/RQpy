@@ -451,7 +451,9 @@ class IVanalysis(object):
         self.rload_err = None
         
         tempdidv = DIDV(1,1,1,1,1)
+        tempdidv_p = qp.DIDVPriors(1,1,1,1,1)
         self.df = self.df.assign(didvobj = tempdidv)
+        self.df = self.df.assign(didvobj_p = tempdidv)
         self.noise_model = None
     
     def _fit_rload_didv(self, lgcplot=False, lgcsave=False, **kwargs):
@@ -483,7 +485,7 @@ class IVanalysis(object):
             didvobjsc = didvinitfromdata(didvsc.avgtrace[:len(didvsc.didvmean)], didvsc.didvmean, 
                                          didvsc.didvstd, didvsc.offset, didvsc.offset_err, 
                                          didvsc.fs, didvsc.sgfreq, didvsc.sgamp, 
-                                         rshunt = self.rshunt, **kwargs)
+                                         rsh = self.rshunt, **kwargs)
             didvobjsc.dofit(1)
             rload_list.append(didvobjsc.fitresult(1)['smallsignalparams']['rp'] + self.rshunt)
             
@@ -492,7 +494,7 @@ class IVanalysis(object):
             self.df.iat[int(np.flatnonzero(self.noiseinds)[ind]), self.df.columns.get_loc('didvobj')] = didvobjsc
             
             if lgcplot:
-                didvobjsc.plot_full_trace(lgcsave=lgcsave, savepath=self.figsavepath,
+                didvobjsc.plot_full_trace(saveplot=lgcsave, savepath=self.figsavepath,
                                           savename=f'didv_{didvsc.qetbias:.3e}')
                 
         
@@ -533,7 +535,7 @@ class IVanalysis(object):
             didvobjn = didvinitfromdata(didvn.avgtrace[:len(didvn.didvmean)], didvn.didvmean, 
                                          didvn.didvstd, didvn.offset, didvn.offset_err, 
                                          didvn.fs, didvn.sgfreq, didvn.sgamp, 
-                                         rshunt = self.rshunt, rload=self.rload, **kwargs)
+                                         rsh = self.rshunt, rp=self.rp, **kwargs)
             didvobjn.dofit(1)
             rtot = didvobjn.fitresult(1)['smallsignalparams']['rp'] + self.rshunt
             rtot_list.append(rtot)
@@ -543,7 +545,7 @@ class IVanalysis(object):
 
             
             if lgcplot:
-                didvobjn.plot_full_trace(lgcsave=lgcsave, savepath=self.figsavepath,
+                didvobjn.plot_full_trace(saveplot=lgcsave, savepath=self.figsavepath,
                                           savename=f'didv_{didvn.qetbias:.3e}')
         self.rn_didv = np.mean(rtot_list) - self.rload
         self.rtot_list = rtot_list
@@ -610,13 +612,13 @@ class IVanalysis(object):
         """
         
 
-        ivobj = IV2(dites=self.dites, dites_err=self.dites_err,ibias=self.ibias, 
+        ivobj = IBIS(dites=self.dites, dites_err=self.dites_err,ibias=self.ibias, 
                     ibias_err=self.ibias_err, rsh=self.rshunt, rsh_err=self.rshunt_err,
                     rp_guess=5e-3, rp_err_guess=0, 
                     chan_names=[f'{self.chname} Noise',f'{self.chname} dIdV'], fitsc=fitsc, 
                     normalinds=self.norminds, scinds=self.scinds)
 
-        ivobj.calc_iv(**kwargs)
+        ivobj.analyze(**kwargs)
         self.df.loc[self.noiseinds, 'ptes'] =  ivobj.ptes[0,0]
         self.df.loc[self.didvinds, 'ptes'] =  ivobj.ptes[0,1]
         self.df.loc[self.noiseinds, 'ptes_err'] =  ivobj.ptes_err[0,0]
@@ -673,19 +675,10 @@ class IVanalysis(object):
     
             row = self.df[self.didvinds].iloc[ind]
             r0 = row.r0
-            dr0 = row.r0_err
-            priors = np.zeros(7)
-            invpriorsCov = np.zeros((7,7))
-            priors[0] = self.rload
-            priors[1] = row.r0
-            invpriorsCov[0,0] = 1.0/self.rload_err**2
-            invpriorsCov[1,1] = 1.0/(dr0)**2
-
-
+ 
             didvobj = didvinitfromdata(row.avgtrace[:len(row.didvmean)], row.didvmean, row.didvstd, row.offset, 
-                                       row.offset_err, row.fs, row.sgfreq, row.sgamp, rshunt=self.rshunt,  
-                                       rload=self.rload, rload_err = self.rshunt_err, r0=r0, r0_err=dr0,
-                                       priors = priors, invpriorscov = invpriorsCov)
+                                       row.offset_err, row.fs, row.sgfreq, row.sgamp, rsh=self.rshunt,  
+                                       rp=self.rp_iv, r0=r0)
 
             didvobj.dofit(poles=2)
             didvobj.dofit(poles=3)
@@ -695,16 +688,10 @@ class IVanalysis(object):
             self.df.iat[int(np.flatnonzero(self.noiseinds)[ind]), self.df.columns.get_loc('didvobj')] = didvobj
             
             
-            if lgcplot:
-                didvobj.plot_full_trace(lgcsave=lgcsave, savepath=self.figsavepath,
-                                          savename=f'didv_{row.qetbias:.3e}')
-                didvobj.plot_re_im_didv(poles='all', plotpriors=True, lgcsave=lgcsave, 
-                                        savepath=self.figsavepath,
-                                        savename=f'didv_{row.qetbias:.3e}')
-            
 
             #### Calculate correct errors
-            didvobj_p = qp.DIDVPriors(rawtraces=None, fs=625e3, sgfreq=row.sgfreq, sgamp=row.sgamp, rsh=rsh)
+            didvobj_p = qp.DIDVPriors(rawtraces=None, fs=625e3, sgfreq=row.sgfreq, sgamp=row.sgamp, rsh=self.rshunt)
+            didvobj_p._time = didvobj._time
             didvobj_p._freq = didvobj._freq
             didvobj_p._didvmean = didvobj._didvmean
             didvobj_p._didvstd = didvobj._didvstd
@@ -743,19 +730,27 @@ class IVanalysis(object):
             cov2 = np.zeros((8,8))
             cov3 = np.zeros((10,10))
             
+            for ii in range(len(cov2)):
+                cov2[ii,ii] = (priors2[ii]*.1)**2
+            for ii in range(len(cov3)):
+                cov3[ii,ii] = (priors3[ii]*.1)**2
+            
+            
             cov2[0,0] = rshunt_sig**2
             cov2[1,1] = rp_sig**2
             cov2[2,2] = r0_sig**2
-            cov2[0,1] = r_cov[1,0] = .5*rshunt_sig*rp_sig
-            cov2[0,2] = r_cov[2,0] = .5*rshunt_sig*r0_sig
-            cov2[1,2] = r_cov[2,1] = -.2*rp_sig*r0_sig
+            cov2[0,1] = cov2[1,0] = .5*rshunt_sig*rp_sig
+            cov2[0,2] = cov2[2,0] = .5*rshunt_sig*r0_sig
+            cov2[1,2] = cov2[2,1] = -.2*rp_sig*r0_sig
+            
+            
             
             cov3[0,0] = rshunt_sig**2
             cov3[1,1] = rp_sig**2
             cov3[2,2] = r0_sig**2
-            cov3[0,1] = r_cov[1,0] = .5*rshunt_sig*rp_sig
-            cov3[0,2] = r_cov[2,0] = .5*rshunt_sig*r0_sig
-            cov3[1,2] = r_cov[2,1] = -.2*rp_sig*r0_sig
+            cov3[0,1] = cov3[1,0] = .5*rshunt_sig*rp_sig
+            cov3[0,2] = cov3[2,0] = .5*rshunt_sig*r0_sig
+            cov3[1,2] = cov3[2,1] = -.2*rp_sig*r0_sig
             
             
             didvobj_p.dofit(poles=2, priors=priors2, priorscov=cov2)
@@ -766,7 +761,12 @@ class IVanalysis(object):
             self.df.iat[int(np.flatnonzero(self.didvinds)[ind]), self.df.columns.get_loc('didvobj_p')] = didvobj_p
             self.df.iat[int(np.flatnonzero(self.noiseinds)[ind]), self.df.columns.get_loc('didvobj_p')] = didvobj_p
             #print(didvobj2)
-
+            if lgcplot:
+                didvobj_p.plot_full_trace(saveplot=lgcsave, savepath=self.figsavepath,
+                                          savename=f'didv_{row.qetbias:.3e}')
+                didvobj_p.plot_re_im_didv(poles='all', saveplot=lgcsave, 
+                                        savepath=self.figsavepath,
+                                        savename=f'didv_{row.qetbias:.3e}')
                 
     
     def fit_normal_noise(self, fit_range=(10, 3e4), squiddc0=6e-12, squidpole0=200, squidn0=0.7,
@@ -969,7 +969,7 @@ class IVanalysis(object):
             noise_sim = loadfromdidv(didvobj, G=self.Gta, qetbias=noise_row.qetbias, tc=self.tc, 
                                      tload=self.tload, tbath=self.tbath, squiddc=self.squiddc, 
                                      squidpole=self.squidpole, squidn=self.squidn,
-                                     noisetype='transition', lgcpriors = True)
+                                     noisetype='transition')
             if lgcplot:
                 plot_noise_sim(f=f, psd=psd, noise_sim=noise_sim, 
                                istype='current', qetbias=noise_row.qetbias,
@@ -987,7 +987,7 @@ class IVanalysis(object):
                                       collection_eff = collection_eff)
             energy_res_arr[ind] = res
             
-            tau_eff = didvobj.get_irwinparams_dict(2)['tau_eff']
+            tau_eff = didvobj.fitresult(2)['falltimes'][-1]
             tau_eff_arr[ind] = tau_eff
             
             
@@ -1029,17 +1029,18 @@ class IVanalysis(object):
         """
         # didv params are in the following order
         #('rshunt0','rp0','r0','beta0','l0','L0','tau0' dt)
-        cov = didvobj.fitresult(2)['cov'][:-1. :-1]
+
+        cov = didvobj.fitresult(2)['cov'][:-1, :-1]
         mu = np.ones(7)
 
             
-        mu[0] = didvobj.fitresult(2)['smallsignalparams']['rsh']
-        mu[1] = didvobj.fitresult(2)['smallsignalparams']['rp']
-        mu[2] = didvobj.fitresult(2)['smallsignalparams']['r0']
-        mu[3] = didvobj.fitresult(2)['smallsignalparams']['beta']
-        mu[4] = didvobj.fitresult(2)['smallsignalparams']['l']
-        mu[5] = didvobj.fitresult(2)['smallsignalparams']['L']
-        mu[6] = didvobj.fitresult(2)['smallsignalparams']['tau0']
+        mu[0] = didvobj.fitresult(2)['params']['rsh']
+        mu[1] = didvobj.fitresult(2)['params']['rp']
+        mu[2] = didvobj.fitresult(2)['params']['r0']
+        mu[3] = didvobj.fitresult(2)['params']['beta']
+        mu[4] = didvobj.fitresult(2)['params']['l']
+        mu[5] = didvobj.fitresult(2)['params']['L']
+        mu[6] = didvobj.fitresult(2)['params']['tau0']
         
  
         full_cov = np.zeros((cov.shape[0]+3, cov.shape[1]+3))
@@ -1056,6 +1057,7 @@ class IVanalysis(object):
         
         scale = 1/np.sqrt(np.diag(full_cov))
         scale_cov = scale[np.newaxis].T.dot(scale[np.newaxis])
+        
 
         rand_data = np.random.multivariate_normal(full_mu*scale, full_cov*scale_cov, nsamples)
         rand_data = rand_data/scale
