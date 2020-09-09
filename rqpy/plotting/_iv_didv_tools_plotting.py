@@ -690,7 +690,7 @@ def _plot_noise_model(data, idx='all', xlims=(10, 2e5), ylims_current=None,
             np.sqrt(np.abs(data.noise_model['ptes'][0][ii])),
             color='#1f77b4',
             linewidth=1.5,
-            label='TES Johnson Noise'.
+            label='TES Johnson Noise',
         )
         ax.fill_between(
             freqs,
