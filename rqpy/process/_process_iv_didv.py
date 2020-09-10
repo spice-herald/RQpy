@@ -202,8 +202,8 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
                 didvobj = DIDV(traces_temp[cut], fs[ii], sgfreq, sgamp, rshunt)
                 didvobj.processtraces()
                 
-                didvmean = didvobj.didvmean
-                didvstd = didvobj.didvstd
+                didvmean = didvobj._didvmean
+                didvstd = didvobj._didvstd
 
                 f = None
                 psd = None
