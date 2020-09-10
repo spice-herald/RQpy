@@ -6,14 +6,12 @@ from itertools import repeat
 from glob import glob
 
 from rqpy import io
-from rqpy import HAS_RAWIO, HAS_SCDMSPYTOOLS
+from rqpy import HAS_RAWIO
 from qetpy import calc_psd, autocuts, DIDV
 from qetpy.utils import calc_offset
 
 if HAS_RAWIO:
     import rawio.IO as midasio
-elif HAS_SCDMSPYTOOLS:
-    import scdmsPyTools.BatTools.IO as midasio
 
 
 __all__ = ["process_ivsweep"]

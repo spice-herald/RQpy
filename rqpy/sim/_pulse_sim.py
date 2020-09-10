@@ -8,12 +8,10 @@ from scipy import stats
 import deepdish as dd
 import rqpy as rp
 from rqpy import io
-from rqpy import HAS_RAWIO, HAS_SCDMSPYTOOLS
+from rqpy import HAS_RAWIO
 
 if HAS_RAWIO:
     from rawio.IO import getDetectorSettings
-elif HAS_SCDMSPYTOOLS:
-    from scdmsPyTools.BatTools.IO import getDetectorSettings
 
 pd.io.pytables._tables()
 
