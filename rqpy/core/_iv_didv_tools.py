@@ -1266,7 +1266,7 @@ class IVanalysis(object):
         #scale_cov = scale[np.newaxis].T.dot(scale[np.newaxis])
         scale = 1
         scale_cov = 1
-        #print(scale, scale_cov)
+
         rand_data = np.random.multivariate_normal(
             full_mu * scale,
             full_cov * scale_cov,
@@ -1397,7 +1397,7 @@ class IVanalysis(object):
             tes_params = self._get_tes_params(
                 didvobj, nsamples=nsamples,
             )
-            print(ind)
+
             rshunt, rp, r0, beta, l, L, tau0, tc, tb, gta = tes_params
 
             s_ites = np.zeros((nsamples, len(f)))
