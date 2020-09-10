@@ -267,8 +267,8 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
             didvobj.processtraces()
             
             # store data
-            didvmean = didvobj.didvmean
-            didvstd = didvobj.didvstd
+            didvmean = didvobj._didvmean
+            didvstd = didvobj._didvstd
             f = None
             psd = None
             datatype = 'didv'
