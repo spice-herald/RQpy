@@ -847,12 +847,19 @@ class IVanalysis(object):
             cov2[0,2] = cov2[2,0] = .5*rshunt_sig*r0_sig
             cov2[1,2] = cov2[2,1] = -.2*rp_sig*r0_sig
 
+            # the priors fit is not important for the 
+            # 3 pole fit since we don't use if for anything else
+            # the r0 error seems to be too constrained from the IV
+            # so we just consider a 15% error on the parameter
+      
+            r0_sig3 = priors3[2]*.15
             cov3[0,0] = rshunt_sig**2
             cov3[1,1] = rp_sig**2
-            cov3[2,2] = r0_sig**2
+            cov3[2,2] = r0_sig3**2
             cov3[0,1] = cov3[1,0] = .5*rshunt_sig*rp_sig
-            cov3[0,2] = cov3[2,0] = .5*rshunt_sig*r0_sig
-            cov3[1,2] = cov3[2,1] = -.2*rp_sig*r0_sig
+            cov3[0,2] = cov3[2,0] = .5*rshunt_sig*r0_sig3
+            cov3[1,2] = cov3[2,1] = -.2*rp_sig*r0_sig3
+
 
             didvobj_p.dofit(poles=2, priors=priors2, priorscov=cov2)
             didvobj_p.dofit(poles=3, priors=priors3, priorscov=cov3)
@@ -1255,10 +1262,11 @@ class IVanalysis(object):
         full_cov[-2,-2] = self.tbath_err**2
         full_cov[-1,-1] = self.Gta_err**2
 
-        scale = 1 / np.sqrt(np.diag(full_cov))
-        scale_cov = scale[np.newaxis].T.dot(scale[np.newaxis])
-
-
+        #scale = 1 / np.sqrt(np.diag(full_cov))
+        #scale_cov = scale[np.newaxis].T.dot(scale[np.newaxis])
+        scale = 1
+        scale_cov = 1
+        #print(scale, scale_cov)
         rand_data = np.random.multivariate_normal(
             full_mu * scale,
             full_cov * scale_cov,
@@ -1389,6 +1397,7 @@ class IVanalysis(object):
             tes_params = self._get_tes_params(
                 didvobj, nsamples=nsamples,
             )
+            print(ind)
             rshunt, rp, r0, beta, l, L, tau0, tc, tb, gta = tes_params
 
             s_ites = np.zeros((nsamples, len(f)))
