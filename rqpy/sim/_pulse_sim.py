@@ -511,7 +511,7 @@ def buildfakepulses(rq, cut, templates, amplitudes, tdelay, basepath, taurises=N
 
     """
 
-    if filetype == "mid.gz" and not HAS_SCDMSPYTOOLS:
+    if filetype == "mid.gz" and not HAS_RAWIO:
         raise ImportError("Cannot use filetype mid.gz because cdms rawio is not installed.")
 
     if isinstance(channels, str):
