@@ -67,13 +67,13 @@ class CleanCommand(Command):
                 shutil.rmtree(path)
 
 setup(
-    name="RQpy", 
-    version="0.1.0", 
-    description="DM Search Analysis and Processing Tools", 
-    author="Samuel Watkins, Caleb Fink", 
-    author_email="samwatkins@berkeley.edu, cwfink@berkeley.edu", 
-    url="https://github.com/ucbpylegroup/RQpy", 
-    packages=find_packages(), 
+    name="RQpy",
+    version="0.2.0",
+    description="DM Search Analysis and Processing Tools",
+    author="Samuel Watkins, Caleb Fink",
+    author_email="samwatkins@berkeley.edu, cwfink@berkeley.edu",
+    url="https://github.com/ucbpylegroup/RQpy",
+    packages=find_packages(),
     zip_safe=False,
     cmdclass={
         'clean': CleanCommand,
