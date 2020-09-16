@@ -67,21 +67,21 @@ class CleanCommand(Command):
                 shutil.rmtree(path)
 
 setup(
-    name="RQpy", 
-    version="0.1.0", 
-    description="DM Search Analysis and Processing Tools", 
-    author="Samuel Watkins, Caleb Fink", 
-    author_email="samwatkins@berkeley.edu, cwfink@berkeley.edu", 
-    url="https://github.com/ucbpylegroup/RQpy", 
-    packages=find_packages(), 
+    name="RQpy",
+    version="0.2.0",
+    description="DM Search Analysis and Processing Tools",
+    author="Samuel Watkins, Caleb Fink",
+    author_email="samwatkins@berkeley.edu, cwfink@berkeley.edu",
+    url="https://github.com/ucbpylegroup/RQpy",
+    packages=find_packages(),
     zip_safe=False,
     cmdclass={
         'clean': CleanCommand,
     },
     install_requires=[
         'pandas',
-        'numpy',
-        'scipy',
+        'numpy>=1.18',
+        'scipy>=1.2',
         'scikit_image',
         'matplotlib',
         'lmfit',

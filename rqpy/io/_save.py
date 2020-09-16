@@ -1,11 +1,11 @@
 import numpy as np
 from rqpy.io import get_traces_midgz
-from rqpy import HAS_SCDMSPYTOOLS
+from rqpy import HAS_RAWIO
 import deepdish as dd
 
-if HAS_SCDMSPYTOOLS:
-    from scdmsPyTools.BatTools import rawdata_writer as writer
-    from scdmsPyTools.BatTools.IO import getRawEvents
+if HAS_RAWIO:
+    from rawio import DataWriter
+    from rawio.IO import getRawEvents
 
 
 __all__ = ["saveevents_npz", "saveevents_midgz", "convert_midgz_to_h5"]
@@ -130,10 +130,10 @@ def saveevents_midgz(events, settings, savepath, savename, dumpnum):
     
     """
     
-    if not HAS_SCDMSPYTOOLS:
-        raise ImportError("Cannot use save mid.gz files because scdmsPyTools is not installed.")
+    if not HAS_RAWIO:
+        raise ImportError("Cannot use save mid.gz files because cdms rawio is not installed.")
     
-    mywriter = writer.DataWriter()
+    mywriter = DataWriter()
     
     filename_out = f"{savename}_F{dumpnum:04}.mid.gz"
     mywriter.open_file(filename_out, savepath)

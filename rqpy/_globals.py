@@ -1,13 +1,13 @@
 from importlib.util import find_spec
 import sys
 
-package_req = 'scdmsPyTools'
+package_req = 'rawio'
 spec = find_spec(package_req)
 
 if spec is None:
-    HAS_SCDMSPYTOOLS = False
+    HAS_RAWIO = False
 else:
-    HAS_SCDMSPYTOOLS = True
+    HAS_RAWIO = True
 
 package_req = 'trigsim'
 spec = find_spec(package_req)

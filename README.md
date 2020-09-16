@@ -9,6 +9,6 @@ To install the most recent development version of RQpy, clone this repo, then fr
 
 If using a shared Python installation, you may want to add the `--user` flag to the above line.
 
-This package requires python 3.6 or greater. Use of the much of the functionality in the `io` and `process` submodules requires an installation of `scdmsPyTools` for IO purposes.
+This package requires python 3.6 or greater. Use of the much of the functionality in the `io` and `process` submodules requires an installation of the CDMS internal IO package `rawio`.
 
 This package also requires a Fortran compiler for installation. We recommend installing `gfortran`, which can be done via `sudo apt-get install gfortran` on Linux.

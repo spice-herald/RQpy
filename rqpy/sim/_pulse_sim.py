@@ -8,10 +8,10 @@ from scipy import stats
 import deepdish as dd
 import rqpy as rp
 from rqpy import io
-from rqpy import HAS_SCDMSPYTOOLS
+from rqpy import HAS_RAWIO
 
-if HAS_SCDMSPYTOOLS:
-    from scdmsPyTools.BatTools.IO import getDetectorSettings
+if HAS_RAWIO:
+    from rawio.IO import getDetectorSettings
 
 pd.io.pytables._tables()
 
@@ -511,8 +511,8 @@ def buildfakepulses(rq, cut, templates, amplitudes, tdelay, basepath, taurises=N
 
     """
 
-    if filetype == "mid.gz" and not HAS_SCDMSPYTOOLS:
-        raise ImportError("Cannot use filetype mid.gz because scdmsPyTools is not installed.")
+    if filetype == "mid.gz" and not HAS_RAWIO:
+        raise ImportError("Cannot use filetype mid.gz because cdms rawio is not installed.")
 
     if isinstance(channels, str):
         channels = [channels]

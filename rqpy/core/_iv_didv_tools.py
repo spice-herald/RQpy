@@ -430,6 +430,8 @@ class IVanalysis(object):
         self.squiddc = None
         self.squidpole = None
         self.squidn = None
+        self.dt0_sc = None
+        self.dt0_n = None
 
         if lgcremove_badseries:
             self.df = _remove_bad_series(df)
@@ -504,6 +506,7 @@ class IVanalysis(object):
         """
 
         rload_list = []
+        dt0_list = []
         for ind in (self.scinds):
             didvsc = self.df[self.didvinds].iloc[ind]
             didvobjsc = didvinitfromdata(
@@ -524,6 +527,8 @@ class IVanalysis(object):
                     1,
                 )['smallsignalparams']['rp'] + self.rshunt
             )
+            
+            dt0_list.append(didvobjsc.fitresult(1)['smallsignalparams']['dt'])
 
             self.df.iat[
                 int(np.flatnonzero(self.didvinds)[ind]),
@@ -545,6 +550,7 @@ class IVanalysis(object):
         self.rload_list = rload_list
         self.rload_err = np.std(rload_list)
         self.rp = self.rload - self.rshunt
+        self.dt0_sc = np.median(dt0_list)
 
     def _fit_rn_didv(self, lgcplot=False, lgcsave=False, **kwargs):
         """
@@ -578,6 +584,7 @@ class IVanalysis(object):
                 'rload has not been calculated yet, please fit rload first'
             )
         rtot_list = []
+        dt0_list = []
         for ind in self.norminds:
             didvn = self.df[self.didvinds].iloc[ind]
             didvobjn = didvinitfromdata(
@@ -599,6 +606,8 @@ class IVanalysis(object):
             )['smallsignalparams']['rp'] + self.rshunt
             rtot_list.append(rtot)
 
+            dt0_list.append(didvobjn.fitresult(1)['smallsignalparams']['dt'])
+
             self.df.iat[
                 int(np.flatnonzero(self.didvinds)[ind]),
                 self.df.columns.get_loc('didvobj')
@@ -616,6 +625,7 @@ class IVanalysis(object):
                 )
         self.rn_didv = np.mean(rtot_list) - self.rload
         self.rtot_list = rtot_list
+        self.dt0_n = np.median(dt0_list)
 
     def fit_rload_rn(self, lgcplot=False, lgcsave=False, **kwargs):
         """
@@ -738,7 +748,7 @@ class IVanalysis(object):
             )
 
 
-    def fit_tran_didv(self, lgcplot=False, lgcsave=False):
+    def fit_tran_didv(self, lgcplot=False, lgcsave=False,**kwargs):
         """
         Function to fit all the didv data in the IV sweep data.
 
@@ -749,6 +759,9 @@ class IVanalysis(object):
         lgcsave : bool, optional
             If True, all the plots will be saved in the a folder
             Avetrace_noise/ within the user specified directory.
+        **kwargs : dict
+            Additional key word arguments to be passed to
+            didvinitfromdata(). See Notes for description.
 
         Returns
         -------
@@ -773,6 +786,7 @@ class IVanalysis(object):
                 rsh=self.rshunt,
                 rp=self.rp_iv,
                 r0=r0,
+                **kwargs,
             )
 
             didvobj.dofit(poles=2)
