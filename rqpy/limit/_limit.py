@@ -396,7 +396,7 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
     elow = max(0.001, min(effenergies))
     ehigh = max(effenergies)
 
-    en_interp = np.logspace(np.log10(0.9 * elow), np.log10(1.1 * ehigh), 1e5)
+    en_interp = np.logspace(np.log10(0.9 * elow), np.log10(1.1 * ehigh), int(1e5))
 
     delta_e = np.concatenate(([(en_interp[1] - en_interp[0])/2],
                               (en_interp[2:] - en_interp[:-2])/2,
@@ -679,7 +679,7 @@ def drde_gauss_smear2d(x, cov, delta, m_dm, sig0, nsig=3, tm="Si", subtract_zero
 
 def optimuminterval_2dsmear(eventenergies, masslist, passagefraction, exposure,
                             cov, delta, tm="Si", cl=0.9, nsig=3, verbose=False,
-                            npts=1e3, subtract_zero=False):
+                            npts=1000, subtract_zero=False):
     """
     Function for running Steve Yellin's Optimum Interval code on an
     inputted spectrum, using the two-dimensional normal distribution
