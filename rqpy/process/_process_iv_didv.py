@@ -34,7 +34,7 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
     Parameters
     ----------
     filepath : str
-        Absolute path to the series folder
+        Absolute path to the series folder OR full file name
     chans : list
         List containing strings corresponding to the names of all the
         channels of interest.
@@ -91,8 +91,8 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
     """
 
     if lgcverbose:
-        print('============================\n')
-        print(f'Processing dumps in file: {filepath}')
+        print('\n============================')
+        print(f'Processing dumps in: {filepath}')
         print('============================\n')
 
 
@@ -188,12 +188,12 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
 
         try:
             h5 = h5io.H5Reader()
-            traces, info = h5.read_many_events(filepath = filepath,
-                                         output_format=2,
-                                         include_metadata=True,
-                                         detector_chans=chans,
-                                         adctovolt=True)
-
+            traces, info = h5.read_many_events(filepath=filepath,
+                                               output_format=2,
+                                               include_metadata=True,
+                                               detector_chans=chans,
+                                               adctovolt=True)
+            
             channels = info[0]['detector_chans']
             fs  = info[0]['sample_rate']
             detector_settings = h5.get_detector_config(file_name=settings_file)
@@ -202,6 +202,9 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
             raise OSError('Unable to get traces or detector settings from hdf5 data!')
         
 
+
+
+        
     
     # =====================
     # Loop channels
@@ -222,11 +225,9 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
             is_didv = (signal_gen_settings[chan]['GeneratorEnable'] and
                        signal_gen_settings[chan]['QETConnection'])
         else:
-            is_didv = (detector_settings[chan_index]['signal_gen_onoff']=='on' and
-                       detector_settings[chan_index]['signal_gen_source']=='tes')
-            
-
-
+            is_didv = (detector_settings[chan]['signal_gen_onoff']=='on' and
+                       detector_settings[chan]['signal_gen_source']=='tes')
+                 
 
         # convert  to amps
         convtoamps = None
@@ -235,7 +236,7 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
             drivergain = lowpassgain * detector_settings[chan]['driverGain']
             convtoamps = 1/(drivergain * rfb * loopgain * binstovolts)
         else:
-            convtoamps =  1/(detector_settings[chan_index]['close_loop_norm']*1000)
+            convtoamps =  1/detector_settings[chan]['close_loop_norm']
 
         traces_amps = traces[:,chan_index]*convtoamps
 
@@ -249,9 +250,12 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
             sgamp = signal_gen_settings[chan]['Amplitude']*1e-3/rbias
             sgfreq = int(signal_gen_settings[chan]['Frequency'])
         else:
-            qetbias = detector_settings[chan_index]['tes_bias']
-            sgamp = detector_settings[chan_index]['signal_gen_current']
-            sgfreq = detector_settings[chan_index]['signal_gen_frequency']
+            qetbias = detector_settings[chan]['tes_bias']
+            sgamp = detector_settings[chan]['signal_gen_current']
+            sgfreq = detector_settings[chan]['signal_gen_frequency']
+            rshunt_temp = detector_settings[chan]['shunt_resistance']
+            if rshunt_temp:
+                rshunt = rshunt_temp
 
 
 
@@ -467,19 +471,24 @@ def process_ivsweep(ivfilepath, chans, detectorid="Z1", rfb=5000,
             or not.
 
     """
-    if not HAS_RAWIO or not HAS_PYTESDAQ:
+    if not HAS_RAWIO and not HAS_PYTESDAQ:
         raise ImportError(
             "Cannot use this IV processing because no file IO has been "
             "installed."
         )
 
+
+    
     # get files
     if isinstance(ivfilepath, str):
-        files = sorted(glob(ivfilepath +'*/'))
+        if os.path.isdir(ivfilepath):
+            ivfilepath += '/'
+            files = sorted(glob(ivfilepath +'*'))
+        else:
+            files = [ivfilepath]
     else:
         files = ivfilepath
 
-    # 
         
     
 
@@ -545,6 +554,6 @@ def process_ivsweep(ivfilepath, chans, detectorid="Z1", rfb=5000,
     )
 
     if lgcsave:
-        df.to_pickle(f"{savepath}{savename}.pkl")
+        df.to_pickle(f"{savepath}/{savename}.pkl")
 
     return df
