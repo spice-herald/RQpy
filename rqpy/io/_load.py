@@ -349,8 +349,8 @@ def get_traces_midgz(path, channels, det, convtoamps=None, lgcskip_empty=True, l
 
     """
 
-    if not HAS_SCDMSPYTOOLS:
-        raise ImportError("Cannot use get_traces_midgz because scdmsPyTools is not installed.")
+    if not HAS_RAWIO:
+        raise ImportError("Cannot use get_traces_midgz because cdms rawio is not installed.")
 
     if not isinstance(path, list):
         path = [path]
