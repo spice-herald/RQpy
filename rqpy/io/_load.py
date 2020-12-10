@@ -292,7 +292,7 @@ def get_trace_gain(path, chan, det, rfb=5000, loopgain=2.4, adcpervolt=2**(16)/8
 
     return convtoamps, drivergain, qetbias
 
-def get_traces_midgz(path, channels, det, convtoamps=None, lgcskip_empty=True, lgcreturndict=False):
+def get_traces_midgz(path, channels, det, convtoamps=None, lgcskip_empty=True, lgcreturndict=False, get_charge=False):
     """
     Function to return raw traces and event information for a single channel for mid.gz files.
 
@@ -311,7 +311,7 @@ def get_traces_midgz(path, channels, det, convtoamps=None, lgcskip_empty=True, l
     convtoamps : float, list of floats, Nonetype, optional
         Conversion factor from ADC bins to TES current in Amps (units are [Amps]/[ADC bins]). If units of ADC bins
         are desired, convtoamps should be set to 1. Default is None, which will call get_trace_gain() to get the
-        conversion to amps
+        conversion to amps. If `get_charge` is set to True, this defaults to 1.
     lgcskip_empty : bool, optional
         Boolean flag on whether or not to skip empty events. Should be set to True if user only wants the traces.
         If the user also wants to pull extra timing information (primarily for live time calculations), then set
@@ -319,6 +319,11 @@ def get_traces_midgz(path, channels, det, convtoamps=None, lgcskip_empty=True, l
     lgcreturndict : bool, optional
         Boolean flag on whether or not to return the info_dict that has extra information on every event.
         By default, this is False
+    get_charge : bool, optional
+        If the charge channel(s) are desired, then this should be set
+        to True. Default is False (i.e. the phonon channel(s)).
+        Note: A mix of charge and phonon channels cannot be outputted
+        due to commonly having different trace lengths.
 
     Returns
     -------
@@ -344,8 +349,8 @@ def get_traces_midgz(path, channels, det, convtoamps=None, lgcskip_empty=True, l
 
     """
 
-    if not HAS_RAWIO:
-        raise ImportError("Cannot use get_traces_midgz because cdms rawio is not installed.")
+    if not HAS_SCDMSPYTOOLS:
+        raise ImportError("Cannot use get_traces_midgz because scdmsPyTools is not installed.")
 
     if not isinstance(path, list):
         path = [path]
@@ -358,6 +363,13 @@ def get_traces_midgz(path, channels, det, convtoamps=None, lgcskip_empty=True, l
 
     if len(det) != len(channels):
         raise ValueError("channels and det should have the same length")
+
+    if get_charge:
+        chan_type = 'q'
+        if convtoamps is None:
+            convtoamps = 1
+    else:
+        chan_type = 'p'
 
     if convtoamps is None:
         convtoamps = []
@@ -382,14 +394,14 @@ def get_traces_midgz(path, channels, det, convtoamps=None, lgcskip_empty=True, l
     )
 
     if len(set(dets))==1:
-        if channels != events[det[0]]["pChan"]:
-            chans = [events[det[0]]["pChan"].index(ch) for ch in channels]
-            x = events[det[0]]["p"][:, chans].astype(float)
+        if channels != events[det[0]][f"{chan_type}Chan"]:
+            chans = [events[det[0]][f"{chan_type}Chan"].index(ch) for ch in channels]
+            x = events[det[0]][chan_type][:, chans].astype(float)
         else:
-            x = events[det[0]]["p"].astype(float)
+            x = events[det[0]][chan_type].astype(float)
     else:
-        chans = [events[d]["pChan"].index(ch) for d, ch in zip(det, channels)]
-        x = [events[d]["p"][:, ch].astype(float) for d, ch in zip(det, chans)]
+        chans = [events[d][f"{chan_type}Chan"].index(ch) for d, ch in zip(det, channels)]
+        x = [events[d][chan_type][:, ch].astype(float) for d, ch in zip(det, chans)]
         x = np.stack(x, axis=1)
 
     x*=convtoamps_arr
