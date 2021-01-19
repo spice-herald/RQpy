@@ -250,12 +250,13 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
             sgamp = signal_gen_settings[chan]['Amplitude']*1e-3/rbias
             sgfreq = int(signal_gen_settings[chan]['Frequency'])
         else:
-            qetbias = detector_settings[chan]['tes_bias']
-            sgamp = detector_settings[chan]['signal_gen_current']
-            sgfreq = detector_settings[chan]['signal_gen_frequency']
+            qetbias = float(detector_settings[chan]['tes_bias'])
+            print(qetbias)
+            sgamp = float(detector_settings[chan]['signal_gen_current'])
+            sgfreq = float(detector_settings[chan]['signal_gen_frequency'])
             rshunt_temp = detector_settings[chan]['shunt_resistance']
             if rshunt_temp:
-                rshunt = rshunt_temp
+                rshunt = float(rshunt_temp)
 
 
 
