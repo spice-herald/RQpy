@@ -470,12 +470,8 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
 
                 sigma[ii] = (sigma0 / tot_rate) * uloutput
 
-                oi_energy0[ii] = eventenergies[event_inds][possiblewimp][endpoint0]
-
-                if endpoint1 < len(fc):
-                    oi_energy1[ii] = eventenergies[event_inds][possiblewimp][endpoint1]
-                else:
-                    oi_energy1[ii] = eventenergies[event_inds][possiblewimp][-1]
+                oi_energy0[ii] = eventenergies[event_inds][possiblewimp][endpoint0-1] if endpoint0>0 else elow # endpoint==0 means the start of the SM integration range
+                oi_energy1[ii] = eventenergies[event_inds][possiblewimp][endpoint1-1] if endpoint1-1 < len(fc) else ehigh
             except:
                 pass
 
