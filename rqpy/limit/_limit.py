@@ -333,7 +333,8 @@ def gauss_smear(x, f, res, nres=1e5, gauss_width=10):
 
 
 def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
-                    tm="Si", cl=0.9, res=None, gauss_width=10, verbose=False):
+                    tm="Si", cl=0.9, res=None, gauss_width=10, verbose=False,
+                    drdefunction=None, hard_threshold=0.0):
     """
     Function for running Steve Yellin's Optimum Interval code on an inputted spectrum and efficiency curve.
 
@@ -345,6 +346,8 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
         Array of the energy values (in keV) of the efficiency curve.
     effs : ndarray
         Array of the efficiencies (unitless) corresponding to `effenergies`.
+        If `drdefunction` argument is provided, the `effs` argument is ignored. It is kept as
+        a positional argument for backward compatibility
     masslist : ndarray
         List of candidate DM masses (in GeV/c^2) to calculate the sensitivity at.
     exposure : float
@@ -361,12 +364,25 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
         The detector resolution in units of keV. If passed, then the differential event
         rate of the dark matter is convoluted with a Gaussian with width `res`, which results
         in a smeared spectrum. If left as None, no smearing is performed.
+        If `drdefunction` is provided, this argument is ignored
     gauss_width : float, optional
         If `res` is not None, this is the number of standard deviations of the Gaussian
         distribution that the smearing will go out to. Default is 10.
+        If `drdefunction` is provided, this argument is ignored
     verbose : bool, optional
         If True, then the algorithm prints out which mass is currently being used in the calculation.
         If False, no information is printed. Default is False.
+    drdefunction : list, optional
+        List of callables of type float(float). Every element of the list represents the signal model
+        rate as a function of reconstructed energy for the corresponding Dark Matter mass from the
+        `masslist` and the cross section sigma=10^-41 cm^2. The experiment efficiency must be taken
+        into account. The energy unit is keV, the rate unit is 1/keV/kg/day.
+        By default (or if None is provided) the standard Lewin&Smith signal model is used with gaussian
+        smearing of width `res`, truncated at `gauss_width` standard deviations.
+    hard_threshold : float, optional
+        The energy value (keV) below which the efficiency is zero.
+        This argument is not required in a case of smooth efficiency curve, however it must be provided 
+        in a case of step-function-like efficiency.
 
     Returns
     -------
@@ -393,25 +409,14 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
 
     eventenergies = np.sort(eventenergies)
 
-    elow = max(0.001, min(effenergies))
+    elow = max(hard_threshold, min(effenergies))
     ehigh = max(effenergies)
 
-    en_interp = np.logspace(np.log10(0.9 * elow), np.log10(1.1 * ehigh), int(1e5))
-
-    delta_e = np.concatenate(([(en_interp[1] - en_interp[0])/2],
-                              (en_interp[2:] - en_interp[:-2])/2,
-                              [(en_interp[-1] - en_interp[-2])/2]))
+    en_interp = np.logspace(np.log10(elow), np.log10(ehigh), int(1e5))
 
     sigma0 = 1e-41
 
     event_inds = rp.inrange(eventenergies, elow, ehigh)
-    inlim = rp.inrange(en_interp, elow, ehigh)
-
-    exp = effs * exposure
-
-    curr_exp = interpolate.interp1d(
-        effenergies, exp, kind="linear", bounds_error=False, fill_value=(0, exp[-1]),
-    )
 
     sigma = np.ones(len(masslist)) * np.inf
     oi_energy0 = np.zeros(len(masslist))
@@ -421,19 +426,26 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
         if verbose:
             print(f"On mass {ii+1} of {len(masslist)}.")
 
-        init_rate = drde(en_interp, mass, sigma0, tm=tm)
+        if drdefunction is None:
+            exp = effs * exposure
 
-        if res is not None:
-            init_rate = gauss_smear(en_interp, init_rate, res, gauss_width=gauss_width)
+            curr_exp = interpolate.interp1d(
+                effenergies, exp, kind="linear", bounds_error=False, fill_value=(0, exp[-1]),
+            )
+    
+            init_rate = drde(en_interp, mass, sigma0, tm=tm)
+            if res is not None:
+                init_rate = gauss_smear(en_interp, init_rate, res, gauss_width=gauss_width)
+            rate = init_rate * curr_exp(en_interp)
+        else:
+            rate = drdefunction[ii](en_interp) * exposure
 
-        rate = init_rate * curr_exp(en_interp)
-
-        integ_rate = integrate.cumtrapz(rate[inlim], x=en_interp[inlim], initial=0)
+        integ_rate = integrate.cumtrapz(rate, x=en_interp, initial=0)
 
         tot_rate = integ_rate[-1]
 
         x_val_fcn = interpolate.interp1d(
-            en_interp[inlim],
+            en_interp,
             integ_rate,
             kind="linear",
             bounds_error=False,
@@ -458,12 +470,8 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
 
                 sigma[ii] = (sigma0 / tot_rate) * uloutput
 
-                oi_energy0[ii] = eventenergies[event_inds][possiblewimp][endpoint0]
-
-                if endpoint1 < len(fc):
-                    oi_energy1[ii] = eventenergies[event_inds][possiblewimp][endpoint1]
-                else:
-                    oi_energy1[ii] = eventenergies[event_inds][possiblewimp][-1]
+                oi_energy0[ii] = eventenergies[event_inds][possiblewimp][endpoint0-1] if endpoint0>0 else elow # endpoint==0 means the start of the SM integration range
+                oi_energy1[ii] = eventenergies[event_inds][possiblewimp][endpoint1-1] if endpoint1-1 < len(fc) else ehigh
             except:
                 pass
 

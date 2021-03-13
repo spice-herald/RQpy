@@ -48,7 +48,7 @@ C  Exclude_low(2) and UpperLim is allowed.
       Implicit None
       Integer N,If,Iflag,NMax,I,m,Niter,Istat,IflagOpt,MaxF,
      1 N1,If1,NCalls,I1,mmax,EndPoints
-      Parameter (NMax=150000)
+      Parameter (NMax=250000)
       Real MeanMax
 C The number of iteration, Niter, can be 5 and it only occasionally needs
 C more for low mu and with lots of background.  Even then, 5 is enough to
@@ -244,7 +244,7 @@ C 215     Format('f,C: ',10F8.5)
       Real Function Fup(x,I)
       Implicit None
       Integer N1,NMax,I,If1,Istat,m,NCalls,I1,mmax
-      Parameter (NMax=150000)
+      Parameter (NMax=250000)
       Real f(0:NMax),x,CnMax,CL1,MeanMax,CMaxinf,
      1 CMxinf,FC1,FB1,muB1,fmin1(7),Cdbg,CMaxLoc
       Common/Fupcom/f,N1,CL1,If1,MeanMax,NCalls,Istat,FC1(0:NMax),

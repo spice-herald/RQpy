@@ -53,15 +53,15 @@ python module upper ! in
             real :: mub
             real dimension(n + 2),depend(n) :: fb
             integer :: iflag
-            real dimension(150001) :: f
+            real dimension(250001) :: f
             integer :: n1
             real :: cl1
             integer :: if1
             real :: meanmax
             integer :: ncalls
             integer :: istat
-            real dimension(150001) :: fc1
-            real dimension(150001) :: fb1
+            real dimension(250001) :: fc1
+            real dimension(250001) :: fb1
             real :: mub1
             real dimension(7) :: fmin1
             real dimension(11) :: cdbg
@@ -75,15 +75,15 @@ python module upper ! in
         function fup(x,i) ! in :upper:UpperLim.f
             real :: x
             integer :: i
-            real dimension(150001) :: f
+            real dimension(250001) :: f
             integer :: n1
             real :: cl1
             integer :: if1
             real :: meanmax
             integer :: ncalls
             integer :: istat
-            real dimension(150001) :: fc1
-            real dimension(150001) :: fb1
+            real dimension(250001) :: fc1
+            real dimension(250001) :: fb1
             real :: mub1
             real dimension(7) :: fmin1
             real dimension(11) :: cdbg
