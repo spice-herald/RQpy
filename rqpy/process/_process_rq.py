@@ -10,6 +10,10 @@ from rqpy import io
 import qetpy as qp
 from rqpy import HAS_TRIGSIM
 
+# wap: check
+#if HAS_PYTESDAQ:
+import pytesdaq.io.hdf5 as h5io
+
 __all__ = ["SetupRQ", "rq"]
 
 class SetupRQ(object):
@@ -2131,6 +2135,11 @@ def _rq(file, channels, det, setup, convtoamps, savepath, lgcsavedumps, filetype
     elif filetype == "npz":
         seriesnum = file.split('/')[-1].split('.')[0]
         dump = f"{int(seriesnum.split('_')[-1]):04d}"
+    elif filetype == "hdf5":
+        seriesnumd = file.split('/')[-1].split('_')[-3]
+        seriesnumt = file.split('/')[-1].split('_')[-2]
+        seriesnum = seriesnumd + '_' + seriesnumt
+        dump = file.split('/')[-1].split('_')[-1].split('.')[-2][1:]
 
     print(f"On Series: {seriesnum},  dump: {dump}")
 
@@ -2149,6 +2158,42 @@ def _rq(file, channels, det, setup, convtoamps, savepath, lgcsavedumps, filetype
                                                          lgcskip_empty=False, lgcreturndict=True)
     elif filetype == "npz":
         traces, info_dict = io.get_traces_npz([file])
+    elif filetype == "hdf5":
+        h5 = h5io.H5Reader()
+        traces, h5info_dict = h5.read_many_events(filepath=file,
+                                                output_format=2,
+                                                include_metadata=True,
+                                                detector_chans=channels,
+                                                adctovolt=True)
+        # repackage h5info_dict into info_dict
+        len_traces = len(traces)
+        eventnumber_arr = np.zeros(len_traces)
+        seriesnumber_arr = np.chararray(len_traces)
+        eventtime_arr = np.zeros(len_traces)
+        triggertype_arr = np.ones(len_traces)
+        triggeramp_arr = np.zeros(len_traces)
+        triggertime_arr = np.zeros(len_traces)
+        for i in range(len_traces):
+            eventnumber_arr[i] = h5info_dict[i]['event_index']
+            seriesnumber_arr[i] = seriesnum
+            eventtime_arr[i] = h5info_dict[i]['event_time']
+            if h5info_dict[i]['data_mode'] == 'threshold':
+                triggertype_arr[i] = 1
+            elif h5info_dict[i]['data_mode'] == 'rand':
+                triggertype_arr[i] = 0
+            else:
+                triggertype_arr[i] = None
+            triggeramp_arr[i] = h5info_dict[i]['trigger_amplitude']
+            triggertime_arr[i] = h5info_dict[i]['trigger_time'] 
+
+        info_dict = {'eventnumber': eventnumber_arr,
+                     'seriesnumber': seriesnumber_arr,
+                     'eventtime': eventtime_arr,
+                     'triggertype': triggertype_arr,
+                     'triggeramp': triggeramp_arr,
+                     'triggertime': triggertime_arr}
+
+
 
     data = {}
 
@@ -2172,6 +2217,15 @@ def _rq(file, channels, det, setup, convtoamps, savepath, lgcsavedumps, filetype
         traces = traces_unscaled * convtoamps_arr
     elif filetype == "npz":
         readout_inds = None
+    elif filetype == "hdf5":
+        readout_inds = None
+        # convert traces to amps
+        detector_settings = h5.get_detector_config(file_name=file)
+        close_loop_norm = [detector_settings[chan]['close_loop_norm'] for chan in channels]
+        close_loop_norm_arr = np.asarray(close_loop_norm)
+        traces = np.divide(traces,close_loop_norm_arr[:,np.newaxis])
+
+
 
     rq_dict = _calc_rq(traces, channels, det, setup, readout_inds=readout_inds)
 
@@ -2242,6 +2296,9 @@ def rq(filelist, channels, setup, det="Z1", savepath='', lgcsavedumps=False, npr
         for ch, d in zip(channels, det):
             convtoamps.append(io.get_trace_gain(folder, ch, d)[0])
     elif filetype == "npz":
+        convtoamps = [1]*len(channels)
+    elif filetype == "hdf5":
+        # will convert to amps in h5.read_many_events
         convtoamps = [1]*len(channels)
 
     if nprocess == 1:
