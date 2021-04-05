@@ -9,10 +9,10 @@ import rqpy as rp
 from rqpy import io
 import qetpy as qp
 from rqpy import HAS_TRIGSIM
+from rqpy import HAS_PYTESDAQ
 
-# wap: check
-#if HAS_PYTESDAQ:
-import pytesdaq.io.hdf5 as h5io
+if HAS_PYTESDAQ:
+    import pytesdaq.io.hdf5 as h5io
 
 __all__ = ["SetupRQ", "rq"]
 
@@ -2091,6 +2091,60 @@ def _calc_rq(traces, channels, det, setup, readout_inds=None):
 
     return rq_dict
 
+
+def _repack_h5info_dict(h5info_dict):
+    """
+    Helper function to repackage the hdf5 file event info (metadata)  dictionaries into a dictionary
+    with a format that can be used in the rq dataframe
+
+    Parameters
+    ----------
+    h5dict : list
+        A list of dictionaries (one dictionary per event) with format as output by the pytesdaq
+        function read_many_events
+
+    Returns
+    -------
+    retdict : dict
+        A dictionary of numpy arrays containing event metadata (eventnumber, seriesnumber, etc.)
+
+    """
+    
+    len_dict = len(h5info_dict)
+    eventnumber_arr = np.zeros(len_dict, dtype=np.int32)
+    eventindex_arr = np.zeros(len_dict, dtype=np.int16)
+    dumpnum_arr = np.zeros(len_dict, dtype=np.int16)
+    seriesnumber_arr = np.zeros(len_dict, dtype=np.int64)
+    eventtime_arr = np.zeros(len_dict)
+    triggertype_arr = np.ones(len_dict)
+    triggeramp_arr = np.zeros(len_dict)
+    triggertime_arr = np.zeros(len_dict)
+    for i in range(len_dict):
+        eventnumber_arr[i] = h5info_dict[i]['event_num']
+        eventindex_arr[i] = h5info_dict[i]['event_index']
+        dumpnum_arr[i] = h5info_dict[i]['dump_num']
+        seriesnumber_arr[i] = h5info_dict[i]['series_num']
+        eventtime_arr[i] = h5info_dict[i]['event_time']
+        if h5info_dict[i]['data_mode'] == 'threshold':
+            triggertype_arr[i] = 1
+        elif h5info_dict[i]['data_mode'] == 'rand':
+            triggertype_arr[i] = 0
+        else:
+            triggertype_arr[i] = None
+        triggeramp_arr[i] = h5info_dict[i]['trigger_amplitude']
+        triggertime_arr[i] = h5info_dict[i]['trigger_time'] 
+        
+    retdict = {'eventnumber': eventnumber_arr,
+               'eventindex': eventindex_arr,
+               'dumpnumber': dumpnum_arr,
+               'seriesnumber': seriesnumber_arr,
+               'eventtime': eventtime_arr,
+               'triggertype': triggertype_arr,
+               'triggeramp': triggeramp_arr,
+               'triggertime': triggertime_arr}
+
+    return retdict
+
 def _rq(file, channels, det, setup, convtoamps, savepath, lgcsavedumps, filetype):
     """
     Helper function for processing raw data to calculate RQs for single files.
@@ -2161,38 +2215,12 @@ def _rq(file, channels, det, setup, convtoamps, savepath, lgcsavedumps, filetype
     elif filetype == "hdf5":
         h5 = h5io.H5Reader()
         traces, h5info_dict = h5.read_many_events(filepath=file,
-                                                output_format=2,
-                                                include_metadata=True,
-                                                detector_chans=channels,
-                                                adctovolt=True)
-        # repackage h5info_dict into info_dict
-        len_traces = len(traces)
-        eventnumber_arr = np.zeros(len_traces)
-        seriesnumber_arr = np.chararray(len_traces)
-        eventtime_arr = np.zeros(len_traces)
-        triggertype_arr = np.ones(len_traces)
-        triggeramp_arr = np.zeros(len_traces)
-        triggertime_arr = np.zeros(len_traces)
-        for i in range(len_traces):
-            eventnumber_arr[i] = h5info_dict[i]['event_index']
-            seriesnumber_arr[i] = seriesnum
-            eventtime_arr[i] = h5info_dict[i]['event_time']
-            if h5info_dict[i]['data_mode'] == 'threshold':
-                triggertype_arr[i] = 1
-            elif h5info_dict[i]['data_mode'] == 'rand':
-                triggertype_arr[i] = 0
-            else:
-                triggertype_arr[i] = None
-            triggeramp_arr[i] = h5info_dict[i]['trigger_amplitude']
-            triggertime_arr[i] = h5info_dict[i]['trigger_time'] 
-
-        info_dict = {'eventnumber': eventnumber_arr,
-                     'seriesnumber': seriesnumber_arr,
-                     'eventtime': eventtime_arr,
-                     'triggertype': triggertype_arr,
-                     'triggeramp': triggeramp_arr,
-                     'triggertime': triggertime_arr}
-
+                                                  output_format=2,
+                                                  include_metadata=True,
+                                                  detector_chans=channels,
+                                                  adctovolt=True)
+        
+        info_dict = _repack_h5info_dict(h5info_dict)
 
 
     data = {}
