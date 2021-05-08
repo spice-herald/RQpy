@@ -331,6 +331,20 @@ def gauss_smear(x, f, res, nres=1e5, gauss_width=10):
 
     return s(x)
 
+def _mixed_tm(tm):
+    pos = [i for i, e in enumerate(tm + 'A') if e.isupper()]
+    parts = [tm[pos[j]:pos[j + 1]] for j in range(len(pos) - 1)]
+    tms = []
+    for item in parts:
+        for ii, letter in enumerate(item):
+            if letter.isdigit():
+                tm_temp = [item[:ii], int(item[ii:])]
+                break
+            elif ii == len(item) - 1:
+                tm_temp = [item, 1]
+        tms.append(tm_temp)
+    return tms
+
 
 def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
                     tm="Si", cl=0.9, res=None, gauss_width=10, verbose=False,
@@ -433,7 +447,12 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
                 effenergies, exp, kind="linear", bounds_error=False, fill_value=(0, exp[-1]),
             )
     
-            init_rate = drde(en_interp, mass, sigma0, tm=tm)
+            totalmassnum = sum([mendeleev.element(t).mass_number * num for t, num in _mixed_tm(tm)])
+            init_rate = sum(
+                [mendeleev.element(t).mass_number * num / totalmassnum * drde(
+                    en_interp, mass, sigma0, tm=t,
+                ) for t, num in _mixed_tm(tm)]
+            )
             if res is not None:
                 init_rate = gauss_smear(en_interp, init_rate, res, gauss_width=gauss_width)
             rate = init_rate * curr_exp(en_interp)
