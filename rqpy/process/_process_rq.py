@@ -2119,6 +2119,7 @@ def _repack_h5info_dict(h5info_dict):
     triggertype_arr = np.ones(len_dict)
     triggeramp_arr = np.zeros(len_dict)
     triggertime_arr = np.zeros(len_dict)
+    triggerchannel_arr_list = []
     for i in range(len_dict):
         eventnumber_arr[i] = h5info_dict[i]['event_num']
         eventindex_arr[i] = h5info_dict[i]['event_index']
@@ -2133,7 +2134,8 @@ def _repack_h5info_dict(h5info_dict):
             triggertype_arr[i] = None
         triggeramp_arr[i] = h5info_dict[i]['trigger_amplitude']
         triggertime_arr[i] = h5info_dict[i]['trigger_time'] 
-        
+        triggerchannel_arr_list.append(h5info_dict[i]['trigger_channel'])
+
     retdict = {'eventnumber': eventnumber_arr,
                'eventindex': eventindex_arr,
                'dumpnumber': dumpnum_arr,
@@ -2141,7 +2143,8 @@ def _repack_h5info_dict(h5info_dict):
                'eventtime': eventtime_arr,
                'triggertype': triggertype_arr,
                'triggeramp': triggeramp_arr,
-               'triggertime': triggertime_arr}
+               'triggertime': triggertime_arr,
+               'triggerchannel_arr_list': triggerchannel_arr_list}
 
     return retdict
 
