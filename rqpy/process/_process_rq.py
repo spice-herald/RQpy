@@ -1392,6 +1392,20 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
         rq_dict[f'integral_{chan}{det}'][readout_inds] = integral
 
     if setup.do_energy_absorbed[chan_num]:
+        #wap: try a different energy absorbed function using i0
+        # instead of ioffset
+        if setup.do_baseline[chan_num]:
+            print('wap: calling energy_absorbed2')
+            energy_absorbed = qp.utils.energy_absorbed2(
+                signal[:, setup.indstart_energy_absorbed[chan_num]:setup.indstop_energy_absorbed[chan_num]],
+                setup.ioffset[chan_num], 
+                setup.qetbias[chan_num],
+                setup.rload[chan_num],
+                setup.rsh[chan_num],
+                fs=fs,
+                baseline=baseline[:, np.newaxis],
+            )
+        """
         if setup.do_baseline[chan_num]:
             energy_absorbed = qp.utils.energy_absorbed(
                 signal[:, setup.indstart_energy_absorbed[chan_num]:setup.indstop_energy_absorbed[chan_num]],
@@ -1412,6 +1426,7 @@ def _calc_rq_single_channel(signal, template, psd, setup, readout_inds, chan, ch
                 indbasepre=setup.indstart_energy_absorbed[chan_num],
                 fs=fs,
             )
+        """
         rq_dict[f'energy_absorbed_{chan}{det}'] = np.ones(len(readout_inds))*(-999999.0)
         rq_dict[f'energy_absorbed_{chan}{det}'][readout_inds] = energy_absorbed
 
@@ -2120,7 +2135,9 @@ def _repack_h5info_dict(h5info_dict):
     triggeramp_arr = np.zeros(len_dict)
     triggertime_arr = np.zeros(len_dict)
     triggerchannel_arr_list = []
+    
     for i in range(len_dict):
+
         eventnumber_arr[i] = h5info_dict[i]['event_num']
         eventindex_arr[i] = h5info_dict[i]['event_index']
         dumpnum_arr[i] = h5info_dict[i]['dump_num']
@@ -2132,10 +2149,22 @@ def _repack_h5info_dict(h5info_dict):
             triggertype_arr[i] = 0
         else:
             triggertype_arr[i] = None
-        triggeramp_arr[i] = h5info_dict[i]['trigger_amplitude']
-        triggertime_arr[i] = h5info_dict[i]['trigger_time'] 
-        triggerchannel_arr_list.append(h5info_dict[i]['trigger_channel'])
 
+        if 'trigger_amplitude' in h5info_dict[i]:
+            triggeramp_arr[i] = h5info_dict[i]['trigger_amplitude']
+        else:
+            triggeramp_arr[i] = np.nan
+            
+        if 'trigger_time' in h5info_dict[i]:
+            triggertime_arr[i] = h5info_dict[i]['trigger_time']
+        else:
+            triggertime_arr[i] = np.nan
+
+        if 'trigger_channel' in h5info_dict[i]:
+            triggerchannel_arr_list.append(h5info_dict[i]['trigger_channel'])
+        else:
+            triggerchannel_arr_list.append(np.nan)
+    
     retdict = {'eventnumber': eventnumber_arr,
                'eventindex': eventindex_arr,
                'dumpnumber': dumpnum_arr,
@@ -2145,7 +2174,6 @@ def _repack_h5info_dict(h5info_dict):
                'triggeramp': triggeramp_arr,
                'triggertime': triggertime_arr,
                'triggerchannel_arr_list': triggerchannel_arr_list}
-
     return retdict
 
 def _rq(file, channels, det, setup, convtoamps, savepath, lgcsavedumps, filetype):
