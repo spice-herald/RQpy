@@ -2,5 +2,5 @@
 requires = [
     "wheel",
     "setuptools",
-    "numpy",
+    "oldest-supported-numpy",
 ]
