@@ -1,4 +1,4 @@
-from ._globals import HAS_RAWIO, HAS_TRIGSIM
+from ._globals import HAS_RAWIO, HAS_TRIGSIM, HAS_PYTESDAQ
 from . import core
 from .core import *
 from . import plotting

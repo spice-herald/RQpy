@@ -194,7 +194,8 @@ class OptimumFilt(object):
             
     """
 
-    def __init__(self, fs, template, noisepsd, tracelength, trigtemplate=None, lgcoverlap=True):
+    def __init__(self, fs, template, noisepsd, tracelength, chan_to_trigger='all',
+                 trigtemplate=None, lgcoverlap=True, merge_window=None):
         """
         Initialization of the FIR filter.
         
@@ -208,6 +209,11 @@ class OptimumFilt(object):
             The two-sided power spectral density in units of A^2/Hz
         tracelength : int
             The desired trace length (in bins) to be saved when triggering on events.
+        chan_to_trigger : str, int, list of int
+            The specified channels to trigger events on. If 'all', then all channels are summed.
+            If an integer (e.g. 0 for channel 1), then only that channel is used. If a list of
+            integers, then those channels are summed. The `noisepsd` and `template` passed
+            are assumed to be correctly calculated for the desired setup. Default is 'all'.
         trigtemplate : NoneType, ndarray, optional
             The template for the trigger channel pulse. If left as None, then the trigger channel will not
             be analyzed.
@@ -223,6 +229,7 @@ class OptimumFilt(object):
         self.template = template
         self.noisepsd = noisepsd
         self.lgcoverlap = lgcoverlap
+        self.chan = chan_to_trigger
         
         # calculate the time-domain optimum filter
         self.phi = ifft(fft(self.template)/self.noisepsd).real
@@ -231,12 +238,12 @@ class OptimumFilt(object):
         
         # calculate the expected energy resolution
         self.resolution = 1/(np.dot(self.phi, self.template)/self.fs)**0.5
-        
-        # calculate pulse_range as the distance (in bins) between the max of the template and 
-        # the next value that is half of the max value
-        tmax_ind = np.argmax(self.template)
-        half_pulse_ind = np.argmin(abs(self.template[tmax_ind:]- self.template[tmax_ind]/2))+tmax_ind
-        self.pulse_range = half_pulse_ind-tmax_ind
+
+        if merge_window is None:
+            # merge triggers within half a tracelength of one another
+            self.pulse_range = tracelength * fs / 2
+        else:
+            self.pulse_range = merge_window * fs
         
         # set the trigger ttl template value
         self.trigtemplate = trigtemplate
@@ -286,7 +293,16 @@ class OptimumFilt(object):
         self.trig = trig
         
         # calculate the total pulse by summing across channels for each trace
-        pulsestot = np.sum(traces, axis=1)
+        if self.chan == "all":
+            pulsestot = np.sum(traces, axis=1)
+        elif np.any(np.atleast_1d(self.chan) > traces.shape[1]):
+            raise ValueError(
+                '`chan_to_trigger` was set to a value greater than the number of channels.',
+            )
+        elif np.isscalar(self.chan):
+            pulsestot = traces[:, self.chan]
+        else:
+            pulsestot = np.sum(traces[:, self.chan], axis=1)
         
         # apply the FIR filter to each trace
         self.filts = np.array([correlate(trace, self.phi, mode="same")/self.norm for trace in pulsestot])
@@ -618,9 +634,11 @@ def acquire_randoms(filelist, n, l, datashape=None, iotype="stanford", savepath=
                 res = res[maxevts:]
                 trigtypes = trigtypes[maxevts:]
     
-def acquire_pulses(filelist, template, noisepsd, tracelength, thresh, nchan=2, trigtemplate=None, 
-                   trigthresh=None, positivepulses=True, iotype="stanford", savepath=None, 
-                   savename=None, dumpnum=1, maxevts=1000, lgcoverlap=True, convtoamps=1/1024):
+def acquire_pulses(filelist, template, noisepsd, tracelength, thresh, nchan=2,
+                   chan_to_trigger="all", trigtemplate=None, trigthresh=None,
+                   positivepulses=True, iotype="stanford", savepath=None,
+                   savename=None, dumpnum=1, maxevts=1000, lgcoverlap=True,
+                   convtoamps=1/1024):
     """
     Function for running the continuous trigger on many different files and saving the events 
     to .npz files for later processing.
@@ -638,6 +656,13 @@ def acquire_pulses(filelist, template, noisepsd, tracelength, thresh, nchan=2, t
     thresh : float
         The number of standard deviations of the energy resolution to use as the threshold for which events
         will be detected as a pulse.
+    nchan : int, optional
+        The number of channels in each dataset. Default is 2.
+    chan_to_trigger : str, int, list of int
+        The specified channels to trigger events on. If 'all', then all channels are summed.
+        If an integer (e.g. 0 for channel 1), then only that channel is used. If a list of
+        integers, then those channels are summed. The `noisepsd` and `template` passed
+        are assumed to be correctly calculated for the desired setup. Default is 'all'.
     trigtemplate : NoneType, ndarray, optional
         The template for the trigger channel pulse. If left as None, then the trigger channel will not
         be analyzed.
@@ -703,7 +728,7 @@ def acquire_pulses(filelist, template, noisepsd, tracelength, thresh, nchan=2, t
         else:
             raise ValueError("Unrecognized iotype inputted.")
             
-        filt = OptimumFilt(fs, template, noisepsd, tracelength, trigtemplate=trigtemplate, lgcoverlap=lgcoverlap)
+        filt = OptimumFilt(fs, template, noisepsd, tracelength, chan_to_trigger=chan_to_trigger, trigtemplate=trigtemplate, lgcoverlap=lgcoverlap)
         filt.filtertraces(traces, times, trig=trig)
         filt.eventtrigger(thresh, trigthresh=trigthresh, positivepulses=positivepulses)
         
