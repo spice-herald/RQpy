@@ -188,15 +188,19 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
 
         try:
             h5 = h5io.H5Reader()
-            traces, info = h5.read_many_events(filepath=filepath,
-                                               output_format=2,
-                                               include_metadata=True,
-                                               detector_chans=chans,
-                                               adctovolt=True)
+            traces, info = h5.read_many_events(
+                filepath=filepath,
+                output_format=2,
+                include_metadata=True,
+                detector_chans=chans,
+                adctovolt=True,
+                nevents=100,
+            )
             
             channels = info[0]['detector_chans']
             fs  = info[0]['sample_rate']
             detector_settings = h5.get_detector_config(file_name=settings_file)
+            del h5
  
         except:
             raise OSError('Unable to get traces or detector settings from hdf5 data!')

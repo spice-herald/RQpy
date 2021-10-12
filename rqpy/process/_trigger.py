@@ -194,7 +194,8 @@ class OptimumFilt(object):
             
     """
 
-    def __init__(self, fs, template, noisepsd, tracelength, chan_to_trigger='all', trigtemplate=None, lgcoverlap=True):
+    def __init__(self, fs, template, noisepsd, tracelength, chan_to_trigger='all',
+                 trigtemplate=None, lgcoverlap=True, merge_window=None):
         """
         Initialization of the FIR filter.
         
@@ -237,12 +238,12 @@ class OptimumFilt(object):
         
         # calculate the expected energy resolution
         self.resolution = 1/(np.dot(self.phi, self.template)/self.fs)**0.5
-        
-        # calculate pulse_range as the distance (in bins) between the max of the template and 
-        # the next value that is half of the max value
-        tmax_ind = np.argmax(self.template)
-        half_pulse_ind = np.argmin(abs(self.template[tmax_ind:]- self.template[tmax_ind]/2))+tmax_ind
-        self.pulse_range = half_pulse_ind-tmax_ind
+
+        if merge_window is None:
+            # merge triggers within half a tracelength of one another
+            self.pulse_range = tracelength * fs / 2
+        else:
+            self.pulse_range = merge_window * fs
         
         # set the trigger ttl template value
         self.trigtemplate = trigtemplate

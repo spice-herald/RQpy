@@ -2125,15 +2125,16 @@ def _repack_h5info_dict(h5info_dict):
         dumpnum_arr[i] = h5info_dict[i]['dump_num']
         seriesnumber_arr[i] = h5info_dict[i]['series_num']
         eventtime_arr[i] = h5info_dict[i]['event_time']
-        if h5info_dict[i]['data_mode'] == 'threshold':
-            triggertype_arr[i] = 1
-        elif h5info_dict[i]['data_mode'] == 'rand':
-            triggertype_arr[i] = 0
+        if 'trigger_amplitude' in h5info_dict[i]:
+            triggeramp_arr[i] = h5info_dict[i]['trigger_amplitude']
         else:
-            triggertype_arr[i] = None
-        triggeramp_arr[i] = h5info_dict[i]['trigger_amplitude']
-        triggertime_arr[i] = h5info_dict[i]['trigger_time'] 
-        
+            triggeramp_arr[i] = np.nan
+
+        if 'trigger_time' in h5info_dict[i]:
+            triggertime_arr[i] = h5info_dict[i]['trigger_time']
+        else:
+            triggertime_arr[i] = np.nan
+
     retdict = {'eventnumber': eventnumber_arr,
                'eventindex': eventindex_arr,
                'dumpnumber': dumpnum_arr,
