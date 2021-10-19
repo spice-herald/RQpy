@@ -804,7 +804,7 @@ class IVanalysis(object):
             #### Calculate correct errors
             didvobj_p = qp.DIDVPriors(
                 rawtraces=None,
-                fs=625e3,
+                fs=row.fs,
                 sgfreq=row.sgfreq,
                 sgamp=row.sgamp,
                 rsh=self.rshunt,
