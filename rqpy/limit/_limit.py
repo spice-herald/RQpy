@@ -336,7 +336,7 @@ def _drde_max_q(m_dm, tm):
 
     a = mendeleev.element(tm).mass_number
     mn = constants.atomic_mass * constants.c**2 / constants.e * 1e-9 # nucleon mass (1 amu) [GeV]
-    mtarget = a * mn # nucleon mass for largest_tm [GeV]
+    mtarget = a * mn # nucleon mass for tm [GeV]
     r = 4 * m_dm * mtarget / (m_dm + mtarget)**2 # unitless reduced mass parameter
     e0 = 0.5 * m_dm * (constants.v0_sun / constants.c)**2 * 1e6 # kinetic energy of dark matter [keV]
     qmax = e0 * r * ((constants.vesc_galactic + constants.ve_orbital) / constants.v0_sun)**2
