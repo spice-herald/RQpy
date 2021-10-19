@@ -6,13 +6,18 @@ from itertools import repeat
 from glob import glob
 
 from rqpy import io
-from rqpy import HAS_RAWIO
+from rqpy import HAS_RAWIO, HAS_PYTESDAQ
 from qetpy import calc_psd, autocuts, DIDV
 from qetpy.utils import calc_offset
 
 if HAS_RAWIO:
     import rawio.IO as midasio
 
+if HAS_PYTESDAQ:
+    import pytesdaq.io.hdf5 as h5io
+
+
+    
 
 __all__ = [
     "process_ivsweep",
@@ -29,7 +34,7 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
     Parameters
     ----------
     filepath : str
-        Absolute path to the series folder
+        Absolute path to the series folder OR full file name
     chans : list
         List containing strings corresponding to the names of all the
         channels of interest.
@@ -86,114 +91,206 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
     """
 
     if lgcverbose:
+        print('\n============================')
+        print(f'Processing dumps in: {filepath}')
         print('============================\n')
-        print(f'Processing dumps in file: {filepath}')
-        print('============================\n')
 
-    if isinstance(chans, str):
-        chans = [chans]
 
-    detnum = int(detectorid[1:])
-    nchan = len(chans)
-
-    # Initialize data list
+    # Initialize output data list
     data_list = []
 
-    # series number (a bit sketchy...)
-    if filepath[-1] == '/':
-        seriesnum = filepath[:-1].split('/')[-1]
+
+        
+    # =====================
+    # File type
+    # =====================
+
+    
+    is_midas = False
+    if os.path.isdir(filepath):
+        file_list = list()
+        file_list.extend(glob(filepath+'/*.mid'))
+        file_list.extend(glob(filepath+'/*.mid.gz'))
+
+        if file_list:
+            is_midas = True
+        else:
+            file_list.extend(glob(filepath+'/*.hdf5'))
+            
+        if not file_list:
+            raise OSError('No midas or hdf5 found!')
+
+    elif os.path.isfile(filepath):
+        if filepath.find('.mid')!=-1 or filepath.find('.mid.gz')!=-1:
+            is_midas = True
+        elif filepath.find('.hdf5')==-1:
+            raise OSError('No midas or hdf5 found!')
+            
     else:
-        seriesnum = filepath.split('/')[-1]
+        raise OSError('Directory or file "' + filepath + '" does not exist!')
+    
 
+    # check module available
+    if (is_midas and not HAS_RAWIO):
+        raise OSError('Python module "rawio" required!')
+    if (not is_midas and not HAS_PYTESDAQ):
+        raise OSError('Python module "pytesdaq" required!')
 
-    # Load traces for user provided detector and channels
-    events = []
-    try:
-        events = midasio.getRawEvents(
-            filepath,
-            "",
-            channelList=chans,
-            detectorList=[detnum],
-            outputFormat=3,
-        )
-    except:
-        raise OSError('Unable to get traces!')
-
-    traces = events[detectorid]["p"]
-    channels = events[detectorid]["pChan"]
+    
+    # =====================
+    # Get pulse data
+    # and detector settings
+    # =====================
 
     # Get detector settings (-> use first file)
     settings_file = glob(f"{filepath}*")[0]
 
+    
+    # series number (a bit sketchy...)
+    if filepath[-1] == '/':
+        seriesnum = filepath[:-1].split('/')[-1]
+    else:     
+        seriesnum = filepath.split('/')[-1]
+
+    # channels
+    if isinstance(chans, str):
+        chans = [chans]
+    nchan = len(chans)
+
+
+    traces = []
+    channels = []
     detector_settings =[]
     signal_gen_settings = []
-    try:
-        detector_settings = midasio.getDetectorSettings(
-            '', settings_file,
-        )[detectorid]
-        signal_gen_settings = midasio.getTestSignalInfo(
-            '', settings_file, detectorList=[detnum],
-        )[detectorid]
-    except:
-        raise OSError('Unable to get detector settings!')
+    fs = []
+    
+
+    if is_midas:
+            
+        try:
+            detnum = int(detectorid[1:])
+            events = midasio.getRawEvents(filepath,"",
+                                          channelList=chans,
+                                          detectorList=[detnum],
+                                          outputFormat=3,)
+
+            traces = events[detectorid]["p"]
+            channels = events[detectorid]["pChan"]
+            detector_settings = midasio.getDetectorSettings('', settings_file,)[detectorid]
+            signal_gen_settings = midasio.getTestSignalInfo('', settings_file,
+                                                            detectorList=[detnum],)[detectorid]
+            
+        except:
+            raise OSError('Unable to get traces or detector settings from midas data!')
 
 
-    # Is it an IV or dIdV data?
-    # if signal generator enable AND one channel connected to QET
-    #    -> dIdV
+    else:
 
-    is_didv = False
+        try:
+            h5 = h5io.H5Reader()
+            traces, info = h5.read_many_events(
+                filepath=filepath,
+                output_format=2,
+                include_metadata=True,
+                detector_chans=chans,
+                adctovolt=True,
+                nevents=100,
+            )
+            
+            channels = info[0]['detector_chans']
+            fs  = info[0]['sample_rate']
+            detector_settings = h5.get_detector_config(file_name=settings_file)
+            del h5
+ 
+        except:
+            raise OSError('Unable to get traces or detector settings from hdf5 data!')
+        
+
+
+
+        
+    
+    # =====================
+    # Loop channels
+    # =====================
+    
     for chan in channels:
-        if (signal_gen_settings[chan]['GeneratorEnable'] and 
-            signal_gen_settings[chan]['QETConnection']):
-            is_didv = True
 
-    # process...
-    if not is_didv:
+        # channel array index
+        chan_index = channels.index(chan)
 
-        # =====================
-        # IV processing
-        # =====================
         if lgcverbose:
-            print('--------------\nIV processing\n--------------')
+            print(f'Processing channel {chan} (ndarray index = {chan_index})')
 
-        # LOOP channels
-        for chan in channels:
-            # channel array index
-            chan_index = channels.index(chan)
 
-            if lgcverbose:
-                print(
-                    f'Processing channel {chan} (ndarray index = {chan_index})'
-                )
+        # check if IV or dIdV processing
+        is_didv = False
+        if is_midas:
+            is_didv = (signal_gen_settings[chan]['GeneratorEnable'] and
+                       signal_gen_settings[chan]['QETConnection'])
+        else:
+            is_didv = (detector_settings[chan]['signal_gen_onoff']=='on' and
+                       detector_settings[chan]['signal_gen_source']=='tes')
+                 
 
-            # settings
-            qetbias = detector_settings[chan]['qetBias']
+        # convert  to amps
+        convtoamps = None
+        if is_midas:
             fs = 1/detector_settings[chan]['timePerBin']
-
-            # conversion factors
             drivergain = lowpassgain * detector_settings[chan]['driverGain']
             convtoamps = 1/(drivergain * rfb * loopgain * binstovolts)
+        else:
+            convtoamps =  1/detector_settings[chan]['close_loop_norm']
 
-            # normalize traces
-            traces_temp = traces[:,chan_index]*convtoamps
+        traces_amps = traces[:,chan_index]*convtoamps
 
+
+        # get a few more parameters
+        qetbias = None
+        sgamp = None
+        sgfreq = None
+        if is_midas:
+            qetbias = detector_settings[chan]['qetBias']
+            sgamp = signal_gen_settings[chan]['Amplitude']*1e-3/rbias
+            sgfreq = int(signal_gen_settings[chan]['Frequency'])
+        else:
+            qetbias = float(detector_settings[chan]['tes_bias'])
+            print(qetbias)
+            sgamp = float(detector_settings[chan]['signal_gen_current'])
+            sgfreq = float(detector_settings[chan]['signal_gen_frequency'])
+            rshunt_temp = detector_settings[chan]['shunt_resistance']
+            if rshunt_temp:
+                rshunt = float(rshunt_temp)
+
+
+
+        if not is_didv:
+
+            # ----------------
+            # IV calculation
+            # ----------------
+            
+            
+            if lgcverbose:
+                print('----\nIV processing\n----')
+
+                
             # apply cut
             cut_pass = True
             try:
-                cut = autocuts(traces_temp, fs=fs)
+                cut = autocuts(traces_amps, fs=fs)
             except:
-                cut = np.ones(shape = traces_temp.shape[0], dtype=bool)
+                cut = np.ones(shape = traces_amps.shape[0], dtype=bool)
                 cut_pass = False 
 
             # PSD calculation
-            f, psd = calc_psd(traces_temp[cut], fs=fs)
+            f, psd = calc_psd(traces_amps[cut], fs=fs)
 
             # Offset calculation
-            offset, offset_err = calc_offset(traces_temp[cut], fs=fs)
+            offset, offset_err = calc_offset(traces_amps[cut], fs=fs)
 
             # Pulse average
-            avgtrace = np.mean(traces_temp[cut], axis = 0)
+            avgtrace = np.mean(traces_amps[cut], axis = 0)
 
             # Store data
             sgamp = None
@@ -224,68 +321,41 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
             ]
             data_list.append(data)
 
-    else:
+        else:
 
-        # =====================
-        # dIdV processing
-        # =====================
-        if lgcverbose:
-            print('--------------\ndIdV processing\n--------------')
-
-        # LOOP channels
-        for chan in channels:
-
-            # check if signal generator enabled on that channel
-            if  not signal_gen_settings[chan]['QETConnection']:
-                continue
-
-            # channel array index
-            chan_index = channels.index(chan)
-
+            # ----------------
+            # dIdV calculation
+            # ----------------
+            
             if lgcverbose:
-                print(
-                    f'Processing channel {chan} (ndarray index = {chan_index})'
-                )
+                print('----\ndIdV processing\n----')
 
-            # settings
-            qetbias = detector_settings[chan]['qetBias']
-            fs = 1/detector_settings[chan]['timePerBin']
-
-            # conversion factors
-            drivergain = lowpassgain * detector_settings[chan]['driverGain']
-            convtoamps = 1/(drivergain * rfb * loopgain * binstovolts)
-
-            # normalize traces
-            traces_temp = traces[:,chan_index]*convtoamps
-
-            # signal generator conversion, from mV and Amps
-            sgamp = signal_gen_settings[chan]['Amplitude']*1e-3/rbias
-            sgfreq = int(signal_gen_settings[chan]['Frequency'])
+                
 
             # get rid of traces that are all zero
-            zerocut = np.all(traces_temp!=0, axis=1)
-            traces_temp = traces_temp[zerocut]
+            zerocut = np.all(traces_amps!=0, axis=1)
+            traces_amps = traces_amps[zerocut]
 
             # pile-up cuts
             cut_pass = True
             try:
                 cut = autocuts(
-                    traces_temp, fs=fs, is_didv=True, sgfreq=sgfreq,
+                    traces_amps, fs=fs, is_didv=True, sgfreq=sgfreq,
                 )
             except:
-                cut = np.ones(shape = traces_temp.shape[0], dtype=bool)
+                cut = np.ones(shape = traces_amps.shape[0], dtype=bool)
                 cut_pass = False 
 
             # Offset calculation
             offset, offset_err = calc_offset(
-                traces_temp[cut], fs=fs, sgfreq=sgfreq, is_didv=True,
+                traces_amps[cut], fs=fs, sgfreq=sgfreq, is_didv=True,
             )
 
             # Average pulse
-            avgtrace = np.mean(traces_temp[cut], axis = 0)
+            avgtrace = np.mean(traces_amps[cut], axis = 0)
 
             # dIdV fit
-            didvobj = DIDV(traces_temp[cut], fs, sgfreq, sgamp, rshunt)
+            didvobj = DIDV(traces_amps[cut], fs, sgfreq, sgamp, rshunt)
             didvobj.processtraces()
 
             # store data
@@ -406,17 +476,26 @@ def process_ivsweep(ivfilepath, chans, detectorid="Z1", rfb=5000,
             or not.
 
     """
-    if not HAS_RAWIO:
+    if not HAS_RAWIO and not HAS_PYTESDAQ:
         raise ImportError(
-            "Cannot use this IV processing because cdms rawio is not "
-            "installed. More file types will be supported in future "
-            "releases of RQpy."
+            "Cannot use this IV processing because no file IO has been "
+            "installed."
         )
 
+
+    
+    # get files
     if isinstance(ivfilepath, str):
-        files = sorted(glob(ivfilepath +'*/'))
+        if os.path.isdir(ivfilepath):
+            ivfilepath += '/'
+            files = sorted(glob(ivfilepath +'*'))
+        else:
+            files = [ivfilepath]
     else:
         files = ivfilepath
+
+        
+    
 
     if nprocess == 1:
         results = []
@@ -480,6 +559,6 @@ def process_ivsweep(ivfilepath, chans, detectorid="Z1", rfb=5000,
     )
 
     if lgcsave:
-        df.to_pickle(f"{savepath}{savename}.pkl")
+        df.to_pickle(f"{savepath}/{savename}.pkl")
 
     return df

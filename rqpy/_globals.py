@@ -9,6 +9,15 @@ if spec is None:
 else:
     HAS_RAWIO = True
 
+package_req = 'pytesdaq'
+spec = find_spec(package_req)
+
+if spec is None:
+    HAS_PYTESDAQ = False
+else:
+    HAS_PYTESDAQ = True
+
+    
 package_req = 'trigsim'
 spec = find_spec(package_req)
 
