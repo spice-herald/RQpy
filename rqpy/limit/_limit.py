@@ -172,6 +172,27 @@ def helmfactor(er, tm='Si'):
 
     return ffactor2
 
+def _mixed_tm(tm):
+    """
+    Helper function for extracting the element names and number
+    of them from an inputted chemical formula.
+
+    """
+
+    pos = [i for i, e in enumerate(tm + 'A') if e.isupper()]
+    parts = [tm[pos[j]:pos[j + 1]] for j in range(len(pos) - 1)]
+    tms = []
+    for item in parts:
+        for ii, letter in enumerate(item):
+            if letter.isdigit():
+                tm_temp = [item[:ii], int(item[ii:])]
+                break
+            elif ii == len(item) - 1:
+                tm_temp = [item, 1]
+        tms.append(tm_temp)
+
+    return tms
+
 
 def drde(q, m_dm, sig0, tm='Si'):
     """
@@ -189,8 +210,9 @@ def drde(q, m_dm, sig0, tm='Si'):
         The dark matter cross section at which to calculate the expected differential
         event rate. Expected units are cm^2.
     tm : str, int, optional
-        The target material of the detector. Can be passed as either the atomic symbol, the
-        atomic number, or the full name of the element. Default is 'Si'.
+        The target material of the detector. Must be passed as the atomic
+        symbol. Can also pass a compound, but must be its chemical formula
+        (e.g. sapphire is 'Al2O3'). Default value is 'Si'.
 
     Returns
     -------
@@ -214,6 +236,23 @@ def drde(q, m_dm, sig0, tm='Si'):
     DAMA/LIBRA dark matter detection with other searches", see Eq. 19. This is a different parameterization,
     but is the same solution.
         - https://doi.org/10.1088/1475-7516/2009/04/010
+
+    """
+
+    totalmassnum = sum([mendeleev.element(t).mass_number * num for t, num in _mixed_tm(tm)])
+    rate = sum(
+        [mendeleev.element(t).mass_number * num / totalmassnum * _drde(
+            q, m_dm, sig0, t,
+        ) for t, num in _mixed_tm(tm)]
+    )
+
+    return rate
+
+
+def _drde(q, m_dm, sig0, tm):
+    """
+    The differential event rate of an expected WIMP for a single target material.
+    See `drde` for the full explanation of each parameter.
 
     """
 
@@ -271,8 +310,9 @@ def drde_max_q(m_dm, tm='Si'):
         The dark matter mass at which to calculate the expected differential
         event rate. Expected units are GeV.
     tm : str, int, optional
-        The target material of the detector. Can be passed as either the atomic symbol, the
-        atomic number, or the full name of the element. Default is 'Si'.
+        The target material of the detector. Must be passed as the atomic
+        symbol. Can also pass a compound, but must be its chemical formula
+        (e.g. sapphire is 'Al2O3'). Default value is 'Si'.
 
     Returns
     -------
@@ -282,7 +322,19 @@ def drde_max_q(m_dm, tm='Si'):
 
     """
 
-    a = mendeleev.element(tm).atomic_weight
+    qmax = max([_drde_max_q(m_dm, t) for t, num in _mixed_tm(tm)])
+
+    return qmax
+
+def _drde_max_q(m_dm, tm):
+    """
+    Function for calculating the energy corresponding to the largest nonzero
+    value of the differential rate, i.e. `rqpy.limit.drde`. See `drde_max_q` for
+    the full documentation.
+
+    """
+
+    a = mendeleev.element(tm).mass_number
     mn = constants.atomic_mass * constants.c**2 / constants.e * 1e-9 # nucleon mass (1 amu) [GeV]
     mtarget = a * mn # nucleon mass for tm [GeV]
     r = 4 * m_dm * mtarget / (m_dm + mtarget)**2 # unitless reduced mass parameter
@@ -353,8 +405,9 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
     exposure : float
         The total exposure of the detector (kg*days).
     tm : str, int, optional
-        The target material of the detector. Can be passed as either the atomic symbol, the
-        atomic number, or the full name of the element. Default is 'Si'.
+        The target material of the detector. Must be passed as the atomic
+        symbol. Can also pass a compound, but must be its chemical formula
+        (e.g. sapphire is 'Al2O3'). Default value is 'Si'.
     cl : float, optional
         The confidence level desired for the upper limit. Default is 0.9. Can be any value
         between 0.00001 and 0.99999. However, the algorithm requires less than 100 upper
@@ -433,7 +486,9 @@ def optimuminterval(eventenergies, effenergies, effs, masslist, exposure,
                 effenergies, exp, kind="linear", bounds_error=False, fill_value=(0, exp[-1]),
             )
     
-            init_rate = drde(en_interp, mass, sigma0, tm=tm)
+            init_rate = drde(
+                en_interp, mass, sigma0, tm=tm,
+            )
             if res is not None:
                 init_rate = gauss_smear(en_interp, init_rate, res, gauss_width=gauss_width)
             rate = init_rate * curr_exp(en_interp)
@@ -614,8 +669,9 @@ def drde_gauss_smear2d(x, cov, delta, m_dm, sig0, nsig=3, tm="Si", subtract_zero
         The number of sigma outside of which the PDF will be set to zero. This defines
         an elliptical confidence region, whose shape comes from the covariance matrix.
     tm : str, int, optional
-        The target material of the detector. Can be passed as either the atomic symbol, the
-        atomic number, or the full name of the element. Default is 'Si'.
+        The target material of the detector. Must be passed as the atomic
+        symbol. Can also pass a compound, but must be its chemical formula
+        (e.g. sapphire is 'Al2O3'). Default value is 'Si'.
     subtract_zero : bool, optional
         Option to subtract out the zero-energy multivariate normal distribution in true energy for
         a more conservative estimate of the 2D Gaussian smeared limit. This will have only a small
@@ -717,9 +773,9 @@ def optimuminterval_2dsmear(eventenergies, masslist, passagefraction, exposure,
     delta : float
         The threshold value (in keV) for the trigger energy.
     tm : str, int, optional
-        The target material of the detector. Can be passed as either
-        the atomic symbol, the atomic number, or the full name of the
-        element. Default is 'Si'.
+        The target material of the detector. Must be passed as the atomic
+        symbol. Can also pass a compound, but must be its chemical formula
+        (e.g. sapphire is 'Al2O3'). Default value is 'Si'.
     cl : float, optional
         The confidence level desired for the upper limit. Default is
         0.9. Can be any value between 0.00001 and 0.99999. However, the

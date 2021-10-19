@@ -202,7 +202,7 @@ class SensEst(object):
         self._backgrounds = []
 
 
-    def run_sim(self, threshold, e_high, m_dms=None, nexp=1, npts=1000,
+    def run_sim(self, threshold, e_high, e_low=1e-6, m_dms=None, nexp=1, npts=1000,
                 plot_bkgd=False):
         """
         Method for running the simulation for getting the sensitivity
@@ -247,7 +247,7 @@ class SensEst(object):
         if m_dms is None:
             m_dms = np.geomspace(0.5, 2, num=50)
 
-        en_interp = np.linspace(0, e_high, num=npts)
+        en_interp = np.geomspace(e_low, e_high, num=npts)
 
         for ii in range(nexp):
             evts_sim = self._generate_background(
@@ -305,7 +305,7 @@ class SensEst(object):
 
         """
 
-        en_interp = np.linspace(0, e_high, num=npts)
+        en_interp = np.geomspace(e_low, e_high, num=npts)
         evts_sim = self._generate_background(en_interp, plot_bkgd=plot_bkgd)
 
         return evts_sim
