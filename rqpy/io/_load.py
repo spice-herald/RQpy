@@ -7,10 +7,13 @@ from glob import glob
 import warnings
 import deepdish as dd
 
-from rqpy import HAS_RAWIO
+from rqpy import HAS_RAWIO, HAS_PYTESDAQ
 
 if HAS_RAWIO:
     from rawio.IO import getRawEvents, getDetectorSettings
+
+if HAS_PYTESDAQ:
+    from pytesdaq.io.hdf5 import H5Reader
 
 
 __all__ = [
@@ -71,8 +74,10 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
         This baseline will then be subtracted from the traces when plotting. If left as None, no
         baseline subtraction will be done.
     filetype : str, optional
-        The string that corresponds to the file type that will be opened. Supports two 
-        types -"mid.gz" and "npz". "mid.gz" is the default.
+        The string that corresponds to the file type that will be opened. Supports three 
+        types: "mid.gz", "npz", "pytesdaq". "mid.gz" is the default, and corresponds to
+        opening MIDAS files via `rawio`. "pytesdaq" should be used for opening files created
+        by pytesdaq`. "npz" is a legacy format, and is seldom used.
 
     Returns
     -------
@@ -87,6 +92,9 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
 
     if filetype == "mid.gz" and not HAS_RAWIO:
         raise ImportError("Cannot use filetype mid.gz because cdms rawio is not installed.")
+
+    if filetype == "pytesdaq" and not HAS_PYTESDAQ:
+        raise ImportError("Cannot open pytesdaq files because pytesdaq is not installed.")
 
     if seed is not None:
         np.random.seed(seed)
@@ -120,86 +128,109 @@ def getrandevents(basepath, evtnums, seriesnums, cut=None, channels=["PDS1"], de
     crand = np.zeros(len(evtnums), dtype=bool)
     crand[inds] = True
 
-    arrs = list()
-    for snum in seriesnums[crand].unique():
-        cseries = crand & (seriesnums == snum)
+    if filetype in ["mid.gz", "npz"]:
+
+        arrs = list()
+        for snum in seriesnums[crand].unique():
+            cseries = crand & (seriesnums == snum)
+
+            if filetype == "mid.gz":
+
+                if isinstance(det, str):
+                    det = [det]*len(channels)
+
+                if len(det) != len(channels):
+                    raise ValueError("channels and det should have the same length")
+
+                if np.isscalar(snum):
+                    snum_str = f"{int(snum):012}"
+                    snum_str = snum_str[:8] + '_' + snum_str[8:]
+                else:
+                    snum_str = snum
+
+                dets = [int("".join(filter(str.isdigit, d))) for d in det]
+
+                arr = getRawEvents(
+                    f"{basepath}{snum_str}/",
+                    "",
+                    channelList=channels,
+                    detectorList=list(set(dets)),
+                    outputFormat=3,
+                    eventNumbers=evtnums[cseries].astype(int).tolist(),
+                )
+            elif filetype == "npz":
+                dumpnums = np.asarray(evtnums/10000, dtype=int)
+
+                snum_str = f"{snum:010}"
+                snum_str = snum_str[:6] + '_' + snum_str[6:]
+
+                arr = list()
+
+                for dumpnum in set(dumpnums[cseries]):
+                    cdump = dumpnums == dumpnum
+                    inds = np.mod(evtnums[cseries & cdump], 10000) - 1
+
+                    matching_files = sorted(glob(f"{basepath}/{snum_str}/{snum_str}_*_{dumpnum:04d}.npz"))
+                    if len(matching_files) > 1:
+                        raise IOError(
+                            f"There are multiple files with series number {snum_str} "
+                            f"and dump number {dumpnum:04d} at this location, making "
+                            "it unclear which one to open."
+                        )
+
+                    with np.load(matching_files[0]) as f:
+                        arr.append(f["traces"][inds])
+
+                arr = np.vstack(arr)
+
+            arrs.append(arr)
 
         if filetype == "mid.gz":
-
-            if isinstance(det, str):
-                det = [det]*len(channels)
-
-            if len(det) != len(channels):
-                raise ValueError("channels and det should have the same length")
-
-            if np.isscalar(snum):
-                snum_str = f"{int(snum):012}"
-                snum_str = snum_str[:8] + '_' + snum_str[8:]
-            else:
-                snum_str = snum
-
-            dets = [int("".join(filter(str.isdigit, d))) for d in det]
-
-            arr = getRawEvents(
-                f"{basepath}{snum_str}/",
-                "",
-                channelList=channels,
-                detectorList=list(set(dets)),
-                outputFormat=3,
-                eventNumbers=evtnums[cseries].astype(int).tolist(),
-            )
-        elif filetype == "npz":
-            dumpnums = np.asarray(evtnums/10000, dtype=int)
-
-            snum_str = f"{snum:010}"
-            snum_str = snum_str[:6] + '_' + snum_str[6:]
-
-            arr = list()
-
-            for dumpnum in set(dumpnums[cseries]):
-                cdump = dumpnums == dumpnum
-                inds = np.mod(evtnums[cseries & cdump], 10000) - 1
-
-                matching_files = sorted(glob(f"{basepath}/{snum_str}/{snum_str}_*_{dumpnum:04d}.npz"))
-                if len(matching_files) > 1:
-                    raise IOError(
-                        f"There are multiple files with series number {snum_str} "
-                        f"and dump number {dumpnum:04d} at this location, making "
-                        "it unclear which one to open."
-                    )
-
-                with np.load(matching_files[0]) as f:
-                    arr.append(f["traces"][inds])
-
-            arr = np.vstack(arr)
-
-        arrs.append(arr)
-
-    if filetype == "mid.gz":
-        xs = []
-        for arr in arrs:
-            if len(set(dets))==1:
-                if channels != arr[det[0]]["pChan"]:
-                    chans = [arr[det[0]]["pChan"].index(ch) for ch in channels]
-                    x = arr[det[0]]["p"][:, chans].astype(float)
+            xs = []
+            for arr in arrs:
+                if len(set(dets))==1:
+                    if channels != arr[det[0]]["pChan"]:
+                        chans = [arr[det[0]]["pChan"].index(ch) for ch in channels]
+                        x = arr[det[0]]["p"][:, chans].astype(float)
+                    else:
+                        x = arr[det[0]]["p"].astype(float)
                 else:
-                    x = arr[det[0]]["p"].astype(float)
-            else:
-                chans = [arr[d]["pChan"].index(ch) for d, ch in zip(det, channels)]
-                x = [arr[d]["p"][:, ch].astype(float) for d, ch in zip(det, chans)]
-                x = np.stack(x, axis=1)
+                    chans = [arr[d]["pChan"].index(ch) for d, ch in zip(det, channels)]
+                    x = [arr[d]["p"][:, ch].astype(float) for d, ch in zip(det, chans)]
+                    x = np.stack(x, axis=1)
 
-            xs.append(x)
+                xs.append(x)
 
-        x = np.vstack(xs)
+            x = np.vstack(xs)
 
-    elif filetype == "npz":
-        x = np.vstack(arrs).astype(float)
-        channels = list(range(x.shape[1]))
+        elif filetype == "npz":
+            x = np.vstack(arrs).astype(float)
+            channels = list(range(x.shape[1]))
 
-    t = np.arange(x.shape[-1])/fs
+        t = np.arange(x.shape[-1])/fs
 
-    x*=convtoamps_arr
+        x*=convtoamps_arr
+
+    elif filetype == "pytesdaq":
+
+        h5_reader = H5Reader()
+        x = h5_reader.read_many_events(
+            filepath=glob(f'{basepath}/*'),
+            event_nums=np.asarray(evtnums[cut & crand]),
+            series_nums=np.asarray(seriesnums[cut & crand]),
+            output_format=2,
+            detector_chans=channels,
+            adctovolt=True,
+        )
+
+        t = np.arange(x.shape[-1])/fs
+
+        # convert traces to amps
+        detector_settings = h5_reader.get_detector_config()
+        close_loop_norm = [detector_settings[chan]['close_loop_norm'] for chan in channels]
+        close_loop_norm_arr = np.asarray(close_loop_norm)
+        x = np.divide(x, close_loop_norm_arr[:, np.newaxis])
+
 
     if lgcplot:
         if nplot>ntraces:
