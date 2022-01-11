@@ -25,7 +25,7 @@ __all__ = [
 
 
 def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
-                    rshunt, rbias, lowpassgain, lgcverbose):
+                    rshunt, rbias, lowpassgain, autoresample_didv, lgcverbose):
     """
     Helper function to process data from noise or dIdV series as part
     of an IV/dIdV sweep. See Notes for more details on what parameters
@@ -55,6 +55,12 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
     lowpassgain: int
         The value of fix low pass filter driver gain (DCRC RevD = 2,
         DCRC RevE = 4).
+    autoresample_didv : bool
+        If True, the DIDV code will automatically resample
+        the DIDV data so that `fs` / `sgfreq` is an integer, which
+        ensures that an arbitrary number of signal-generator
+        periods can fit in an integer number of time bins. See
+        `qetpy.utils.resample_data` for more info.
     lgcverbose : bool
         If True, the series number being processed will be displayed.
 
@@ -355,7 +361,14 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
             avgtrace = np.mean(traces_amps[cut], axis = 0)
 
             # dIdV fit
-            didvobj = DIDV(traces_amps[cut], fs, sgfreq, sgamp, rshunt)
+            didvobj = DIDV(
+                traces_amps[cut],
+                fs,
+                sgfreq,
+                sgamp,
+                rshunt,
+                autoresample=autoresample_didv,
+            )
             didvobj.processtraces()
 
             # store data
@@ -369,7 +382,7 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
             data = [
                 chan,
                 seriesnum,
-                fs,
+                didvobj._fs,
                 qetbias,
                 sgamp,
                 sgfreq,
@@ -392,9 +405,9 @@ def _process_ivfile(filepath, chans, detectorid, rfb, loopgain, binstovolts,
 
 def process_ivsweep(ivfilepath, chans, detectorid="Z1", rfb=5000,
                     loopgain=2.4, binstovolts=65536/8, rshunt=0.005,
-                    rbias=20000, lowpassgain=4, lgcverbose=False,
-                    lgcsave=True, nprocess=1, savepath='',
-                    savename='IV_dIdV_DF'):
+                    rbias=20000, lowpassgain=4, autoresample_didv=False,
+                    lgcverbose=False, lgcsave=True, nprocess=1,
+                    savepath='', savename='IV_dIdV_DF'):
     """
     Function to process data for an IV/dIdV sweep. See Notes for
     more details on what parameters are calculated.
@@ -425,6 +438,12 @@ def process_ivsweep(ivfilepath, chans, detectorid="Z1", rfb=5000,
     lowpassgain: int, optional
          The value of fix low pass filter driver gain (DCRC RevD = 2,
          DCRC RevE = 4).
+    autoresample_didv : bool, optional
+        If True, the DIDV code will automatically resample
+        the DIDV data so that `fs` / `sgfreq` is an integer, which
+        ensures that an arbitrary number of signal-generator
+        periods can fit in an integer number of time bins. See
+        `qetpy.utils.resample_data` for more info.
     lgcverbose : bool, optional
         If True, the series number being processed will be displayed.
     lgcsave : bool, optional
@@ -510,6 +529,7 @@ def process_ivsweep(ivfilepath, chans, detectorid="Z1", rfb=5000,
                 rshunt,
                 rbias,
                 lowpassgain,
+                autoresample_didv,
                 lgcverbose,
             ))
     else:
@@ -527,6 +547,7 @@ def process_ivsweep(ivfilepath, chans, detectorid="Z1", rfb=5000,
                     rshunt,
                     rbias,
                     lowpassgain,
+                    autoresample_didv,
                     lgcverbose,
                 ),
             ),
