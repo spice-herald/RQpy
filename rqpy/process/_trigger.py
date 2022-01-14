@@ -243,9 +243,9 @@ class OptimumFilt(object):
 
         if merge_window is None:
             # merge triggers within half a tracelength of one another
-            self.pulse_range = tracelength * fs / 2
+            self.pulse_range = tracelength / 2
         else:
-            self.pulse_range = merge_window * fs
+            self.pulse_range = merge_window
         
         # set the trigger ttl template value
         self.trigtemplate = trigtemplate
