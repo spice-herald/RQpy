@@ -68,7 +68,7 @@ class CleanCommand(Command):
 
 setup(
     name="RQpy",
-    version="0.3.0",
+    version="0.3.1",
     description="DM Search Analysis and Processing Tools",
     author="Samuel Watkins, Caleb Fink",
     author_email="samwatkins@berkeley.edu, cwfink@berkeley.edu",
