@@ -519,7 +519,7 @@ class IVanalysis(object):
                 didvsc.sgfreq,
                 didvsc.sgamp,
                 rsh=self.rshunt,
-                dutycycle=didvsc.dutycycle,
+                dutycycle=didvsc.dutycycle if 'dutycycle' in didvsc.index else 0.5,
                 **kwargs,
             )
             didvobjsc.dofit(1)
@@ -599,7 +599,7 @@ class IVanalysis(object):
                 didvn.sgamp,
                 rsh=self.rshunt,
                 rp=self.rp,
-                dutycycle=didvn.dutycycle,
+                dutycycle=didvn.dutycycle if 'dutycycle' in didvn.index else 0.5,
                 **kwargs,
             )
             didvobjn.dofit(1)
@@ -788,7 +788,7 @@ class IVanalysis(object):
                 rsh=self.rshunt,
                 rp=self.rp_iv,
                 r0=r0,
-                dutycycle=row.dutycycle,
+                dutycycle=row.dutycycle if 'dutycycle' in row.index else 0.5,
                 **kwargs,
             )
 
@@ -811,7 +811,7 @@ class IVanalysis(object):
                 sgfreq=row.sgfreq,
                 sgamp=row.sgamp,
                 rsh=self.rshunt,
-                dutycycle=row.dutycycle,
+                dutycycle=row.dutycycle if 'dutycycle' in row.index else 0.5,
             )
 
             didvobj_p._time = didvobj._time
