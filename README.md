@@ -1,5 +1,13 @@
-# RQpy Package
--------
+# RQpy Legacy Package
+
+This package has been archived and its constituent parts have been moved to various new homes:
+ - Event triggering and IV/dIdV processing: [**`pytesdaq`**](https://github.com/berkeleytes/pytesdaq)
+ - Feature extraction and post-analysis: [**`detprocess`**](https://github.com/slwatkins/detprocess)
+ - Dark matter limit setting and sensitivity: [**DarkLim**](https://github.com/slwatkins/DarkLim)
+
+Development has ceased on this repository, please check out above repositories for any future versions this package's functionality. The old README text is shown below.
+
+-----------
 
 RQpy (Reduced Quantities) provides helpful tools for dark matter search related analysis. It contains submodules for processing, energy calibration, plotting, automated cut routines, and many other useful DM analysis tools. This repository is tailored specifically towards creating an efficient workflow for dark matter search analysis using detectors studied by the Pyle Group, and it may not generalize well to research using any detector.
 
